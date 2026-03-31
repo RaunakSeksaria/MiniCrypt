@@ -1,0 +1,128 @@
+:root {
+  --bg: #f3efe6;
+  --paper: #fff9ee;
+  --ink: #1b1a17;
+  --accent: #0b6e4f;
+  --accent-soft: #cde8da;
+  --warn: #8a5a00;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+  color: var(--ink);
+  background: radial-gradient(circle at 15% 10%, #f5d6a0 0%, transparent 35%),
+    radial-gradient(circle at 85% 90%, #bcd8ef 0%, transparent 40%),
+    var(--bg);
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 1rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.controls {
+  display: flex;
+  gap: 0.8rem;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.column,
+.proof {
+  background: var(--paper);
+  border: 1px solid #d5ccb9;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.8rem;
+  font-size: 0.9rem;
+}
+
+select,
+input,
+button {
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.55rem;
+  border: 1px solid #b8af9d;
+  border-radius: 8px;
+  font: inherit;
+}
+
+button {
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid #e0d8c9;
+  border-radius: 10px;
+  padding: 0.6rem;
+}
+
+ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.step-ok {
+  color: var(--ink);
+}
+
+.step-warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.step-stub {
+  color: #6b6b6b;
+  font-style: italic;
+}
+
+.hint {
+  margin-top: 0.7rem;
+  color: var(--warn);
+}
+
+@media (max-width: 860px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+
+  header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .controls {
+    width: 100%;
+  }
+}

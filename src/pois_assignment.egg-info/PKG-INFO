@@ -1,3 +1,10 @@
+Metadata-Version: 2.4
+Name: pois-assignment
+Version: 0.1.0
+Summary: CS8.401 PA#0-#20 educational implementation
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+
 # CS8.401 Programming Assignments (PA#0-PA#20)
 
 This repository contains an end-to-end educational scaffold for the CS8.401 Principles of Information Security programming assignments:
