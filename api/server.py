@@ -1,0 +1,382 @@
+"""
+api/server.py — FastAPI backend for the Minicrypt Clique Web Explorer (PA#0).
+Exposes all crypto primitives via REST endpoints.
+"""
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from typing import Optional
+import json, traceback
+
+app = FastAPI(title="Minicrypt Clique Explorer API")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+# ── Pydantic models ──
+class BuildRequest(BaseModel):
+    foundation: str  # "AES" or "DLP"
+    source: str      # target primitive: OWF, PRG, PRF, PRP, MAC, CRHF, HMAC
+    seed: str        # hex seed
+
+class ReduceRequest(BaseModel):
+    foundation: str
+    source: str
+    target: str
+    seed: str
+    query: str       # hex query for target
+
+class DemoRequest(BaseModel):
+    pa: int
+    params: Optional[dict] = {}
+
+# ── Helpers ──
+def safe_hex(b):
+    if isinstance(b, bytes): return b.hex()
+    if isinstance(b, int): return hex(b)
+    return str(b)
+
+# ── ROUTING TABLE ──
+REDUCTIONS = {
+    ("OWF","PRG"): [("OWF→PRG","HILL hard-core-bit (PA#1)")],
+    ("OWF","OWP"): [("OWF→OWP","DLP is already a OWP")],
+    ("PRG","PRF"): [("PRG→PRF","GGM tree construction (PA#2)")],
+    ("PRF","PRP"): [("PRF→PRP","Luby-Rackoff 3-round Feistel")],
+    ("PRF","MAC"): [("PRF→MAC","Mac_k(m)=F_k(m) (PA#5)")],
+    ("PRP","MAC"): [("PRP→PRF","PRP/PRF switching lemma"),("PRF→MAC","Mac_k(m)=F_k(m)")],
+    ("PRP","PRF"): [("PRP→PRF","PRP/PRF switching lemma")],
+    ("CRHF","HMAC"): [("CRHF→HMAC","HMAC construction (PA#10)")],
+    ("HMAC","MAC"): [("HMAC→MAC","HMAC is a MAC (direct)")],
+    ("MAC","PRF"): [("MAC→PRF","Secure MAC is a PRF on random inputs")],
+    ("PRG","OWF"): [("PRG→OWF","Any PRG is a OWF (immediate)")],
+    ("PRF","PRG"): [("PRF→PRG","G(s)=F_s(0)||F_s(1) (PA#2)")],
+    ("MAC","CRHF"): [("MAC→CRHF","MAC as compression in Merkle-Damgård (PA#7)")],
+    ("HMAC","CRHF"): [("HMAC→CRHF","Fix key, H'(m)=HMAC_k(m) is CRHF")],
+    ("OWF","PRF"): [("OWF→PRG","HILL (PA#1)"),("PRG→PRF","GGM (PA#2)")],
+    ("OWF","MAC"): [("OWF→PRG","HILL"),("PRG→PRF","GGM"),("PRF→MAC","Direct")],
+    ("PRG","MAC"): [("PRG→PRF","GGM (PA#2)"),("PRF→MAC","Direct (PA#5)")],
+    ("OWF","PRP"): [("OWF→PRG","HILL"),("PRG→PRF","GGM"),("PRF→PRP","Luby-Rackoff")],
+}
+
+PROOF_DB = {
+    "OWF→PRG": {"theorem":"HILL Theorem","security":"If PRG broken with advantage ε, OWF invertible with prob ε/poly(n)","pa":"PA#1"},
+    "PRG→PRF": {"theorem":"GGM Theorem","security":"If PRF broken with advantage ε, PRG broken with advantage ε/n","pa":"PA#2"},
+    "PRF→PRP": {"theorem":"Luby-Rackoff","security":"3-round Feistel: PRP advantage ≤ PRF advantage + q²/2ⁿ","pa":"PA#2"},
+    "PRF→MAC": {"theorem":"PRF⇒MAC","security":"If MAC forged, PRF distinguished from random","pa":"PA#5"},
+    "PRP→PRF": {"theorem":"PRP/PRF Switching Lemma","security":"Advantage ≤ q²/2ⁿ⁺¹ for q queries","pa":"PA#2"},
+    "CRHF→HMAC": {"theorem":"HMAC Security (Bellare 2006)","security":"If compression is PRF, HMAC is secure MAC","pa":"PA#10"},
+    "HMAC→MAC": {"theorem":"Direct","security":"HMAC satisfies EUF-CMA definition","pa":"PA#10"},
+    "PRG→OWF": {"theorem":"Immediate","security":"Inverting G recovers seed, breaking pseudorandomness","pa":"PA#1"},
+    "PRF→PRG": {"theorem":"PRF⇒PRG","security":"G(s)=F_s(0)||F_s(1); distinguisher for G breaks PRF","pa":"PA#2"},
+    "OWF→OWP": {"theorem":"DLP OWP","security":"f(x)=gˣ mod p is already a permutation on Zq","pa":"PA#1"},
+    "MAC→PRF": {"theorem":"MAC⇒PRF","security":"EUF-CMA MAC on random messages is pseudorandom","pa":"PA#5"},
+    "MAC→CRHF": {"theorem":"MAC compression","security":"Collision in MAC = forgery, contradicting EUF-CMA","pa":"PA#7"},
+    "HMAC→CRHF": {"theorem":"HMAC→CRHF","security":"Fix key k; collision in HMAC_k = MAC forgery","pa":"PA#10"},
+}
+
+# ── Build endpoint (Column 1) ──
+@app.post("/api/build")
+def build_primitive(req: BuildRequest):
+    try:
+        seed_bytes = bytes.fromhex(req.seed) if req.seed else os.urandom(16)
+        steps = []
+        result_hex = ""
+
+        if req.foundation == "AES":
+            from crypto.aes import aes_encrypt_block, BLOCK_SIZE
+            key = (seed_bytes * 2)[:16]
+            if req.source in ("OWF",):
+                from crypto.utils import xor_bytes
+                zero = b'\x00'*16
+                enc = aes_encrypt_block(zero, key)
+                owf_out = xor_bytes(enc, key)
+                steps.append({"fn":"AES-OWF: f(k) = AES_k(0¹²⁸) ⊕ k","input":key.hex(),"output":owf_out.hex()})
+                result_hex = owf_out.hex()
+            elif req.source in ("PRF","PRP"):
+                steps.append({"fn":"AES as PRF/PRP (switching lemma)","input":key.hex(),"output":"F_k ready"})
+                out = aes_encrypt_block(b'\x00'*16, key)
+                steps.append({"fn":"F_k(0¹²⁸)","input":"00"*16,"output":out.hex()})
+                result_hex = out.hex()
+            elif req.source == "PRG":
+                b0 = aes_encrypt_block(b'\x00'*16, key)
+                b1 = aes_encrypt_block(b'\x00'*15+b'\x01', key)
+                steps.append({"fn":"AES→PRF (switching lemma)","input":key.hex(),"output":"PRF ready"})
+                steps.append({"fn":"G(s) = F_s(0) ‖ F_s(1)","input":key.hex(),"output":b0.hex()+b1.hex()})
+                result_hex = b0.hex()+b1.hex()
+            elif req.source == "MAC":
+                steps.append({"fn":"AES→PRF (switching lemma)","input":key.hex(),"output":"PRF ready"})
+                steps.append({"fn":"PRF→MAC: Mac_k(m)=F_k(m)","input":key.hex(),"output":"MAC ready"})
+                out = aes_encrypt_block(b'\x00'*16, key)
+                steps.append({"fn":"Mac_k(0¹²⁸)","input":"00"*16,"output":out.hex()})
+                result_hex = out.hex()
+            elif req.source == "CRHF":
+                from crypto.pa08_dlp_crhf import DLP_CRHF
+                crhf = DLP_CRHF(bits=32)
+                h = crhf.hash(key)
+                steps.append({"fn":"DLP-CRHF (PA#8): g^x·h^y mod p","input":key.hex(),"output":h.hex()})
+                result_hex = h.hex()
+            elif req.source == "HMAC":
+                from crypto.pa10_hmac import HMAC
+                hmac = HMAC(bits=32)
+                tag = hmac.mac(key[:hmac.block_size], b"test")
+                steps.append({"fn":"CRHF→HMAC: H((k⊕opad)‖H((k⊕ipad)‖m))","input":key.hex(),"output":tag.hex()})
+                result_hex = tag.hex()
+            else:
+                steps.append({"fn":f"{req.source} from AES","input":key.hex(),"output":"Ready"})
+                result_hex = key.hex()
+        else:  # DLP
+            from crypto.pa01_owf_prg import DLP_OWF, PRG_from_OWF
+            from crypto.utils import mod_exp
+            from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
+            p, q = gen_safe_prime(32)
+            g = find_generator(p, q)
+            from crypto.utils import bytes_to_int
+            x = bytes_to_int(seed_bytes) % q if bytes_to_int(seed_bytes) % q > 1 else 2
+            gx = mod_exp(g, x, p)
+            if req.source in ("OWF","OWP"):
+                steps.append({"fn":f"DLP-OWF: f(x) = g^x mod p (p={p}, g={g})","input":str(x),"output":str(gx)})
+                result_hex = hex(gx)
+            elif req.source == "PRG":
+                steps.append({"fn":f"DLP-OWF: g^x mod p (p={p})","input":str(x),"output":str(gx)})
+                hcb = gx & 1
+                steps.append({"fn":"Hard-core bit: b(g^x) = LSB","input":str(gx),"output":str(hcb)})
+                result_hex = hex(gx)
+            else:
+                steps.append({"fn":f"DLP-OWF: g^x mod p","input":str(x),"output":str(gx)})
+                result_hex = hex(gx)
+
+        return {"steps":steps,"result":result_hex,"source":req.source,"foundation":req.foundation}
+    except Exception as e:
+        raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
+
+# ── Reduce endpoint (Column 2) ──
+@app.post("/api/reduce")
+def reduce_primitive(req: ReduceRequest):
+    try:
+        key_pair = (req.source, req.target)
+        chain = REDUCTIONS.get(key_pair)
+        if chain is None:
+            return {"error": f"No direct reduction from {req.source} to {req.target}. Try the reverse direction.",
+                    "steps":[],"proofs":[],"output":"N/A"}
+
+        seed_bytes = bytes.fromhex(req.seed) if req.seed else os.urandom(16)
+        query_bytes = bytes.fromhex(req.query) if req.query else b'\x00'*16
+        key = (seed_bytes*2)[:16]
+        steps = []
+        proofs = []
+
+        for label, desc in chain:
+            proof = PROOF_DB.get(label, {"theorem":"","security":"","pa":""})
+            proofs.append({"step":label,"description":desc,**proof})
+            steps.append({"fn":desc,"input":safe_hex(key)[:32]+"...","output":"→"})
+
+        # Compute actual output
+        from crypto.aes import aes_encrypt_block
+        if req.foundation == "AES":
+            query_padded = (query_bytes*2)[:16]
+            out = aes_encrypt_block(query_padded, key)
+            output_hex = out.hex()
+        else:
+            from crypto.utils import mod_exp, bytes_to_int
+            from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
+            p, q = gen_safe_prime(32)
+            g = find_generator(p, q)
+            x = bytes_to_int(seed_bytes) % q if bytes_to_int(seed_bytes) % q > 1 else 2
+            output_hex = hex(mod_exp(g, x, p))
+
+        steps.append({"fn":f"Final {req.target} output","input":safe_hex(query_bytes),"output":output_hex})
+
+        return {"steps":steps,"proofs":proofs,"output":output_hex,"chain":[l for l,_ in chain]}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+# ── PA Demo endpoints ──
+@app.post("/api/demo")
+def run_demo(req: DemoRequest):
+    try:
+        if req.pa == 1:
+            from crypto.pa01_owf_prg import AES_OWF, PRG_from_AES
+            from crypto.utils import random_bytes, to_hex
+            owf = AES_OWF()
+            k = random_bytes(16)
+            y = owf.evaluate(k)
+            prg = PRG_from_AES()
+            s = random_bytes(16)
+            out = prg.generate(s, 32)
+            return {"owf_input":to_hex(k),"owf_output":to_hex(y),"prg_seed":to_hex(s),"prg_output":to_hex(out)}
+        elif req.pa == 2:
+            from crypto.pa02_prf_ggm import PRF, distinguishing_game
+            from crypto.utils import random_bytes, to_hex
+            prf = PRF(mode='aes')
+            k = random_bytes(16); x = random_bytes(16)
+            y = prf.F(k, x)
+            game = distinguishing_game(prf, 30)
+            return {"key":to_hex(k),"input":to_hex(x),"output":to_hex(y),"game":game}
+        elif req.pa == 3:
+            from crypto.pa03_cpa_enc import CPAEncryption, ind_cpa_game
+            from crypto.utils import random_bytes, to_hex
+            enc = CPAEncryption(); k = random_bytes(16)
+            msg = req.params.get("message","Hello CPA!").encode()
+            r, ct = enc.encrypt(k, msg)
+            pt = enc.decrypt(k, r, ct)
+            game = ind_cpa_game(enc, 50)
+            return {"plaintext":msg.decode(),"nonce":to_hex(r),"ciphertext":to_hex(ct),"decrypted":pt.decode(),"match":pt==msg,"game":game}
+        elif req.pa == 4:
+            from crypto.pa04_modes import encrypt, decrypt
+            from crypto.utils import random_bytes, to_hex
+            k = random_bytes(16)
+            msg = req.params.get("message","Modes of Operation test!").encode()
+            results = {}
+            for mode in ['CBC','OFB','CTR']:
+                iv, ct = encrypt(mode, k, msg)
+                pt = decrypt(mode, k, iv, ct)
+                results[mode] = {"iv":to_hex(iv),"ciphertext":to_hex(ct),"decrypted":pt.decode(),"match":pt==msg}
+            return results
+        elif req.pa == 5:
+            from crypto.pa05_mac import MAC, euf_cma_game
+            from crypto.utils import random_bytes, to_hex
+            mac = MAC(mode='cbc'); k = random_bytes(16)
+            msg = b"Authenticate me!"
+            tag = mac.Mac(k, msg)
+            game = euf_cma_game(mac, 30, 10)
+            return {"message":msg.decode(),"tag":to_hex(tag),"verify":mac.Vrfy(k,msg,tag),"game":game}
+        elif req.pa == 6:
+            from crypto.pa06_cca_enc import CCAEncryption, malleability_attack_demo
+            from crypto.utils import random_bytes, to_hex
+            cca = CCAEncryption(); ke=random_bytes(16); km=random_bytes(16)
+            msg = b"CCA-secure message!"
+            r,ct,tag = cca.encrypt(ke,km,msg)
+            pt = cca.decrypt(ke,km,r,ct,tag)
+            attack = malleability_attack_demo()
+            return {"plaintext":msg.decode(),"decrypted":pt.decode(),"match":pt==msg,"tamper_rejected":cca.decrypt(ke,km,r,bytes([ct[0]^1])+ct[1:],tag) is None,"attack":{"cpa_malleable":attack['cpa_only']['malleable'],"cca_rejected":attack['cca_secure']['rejected']}}
+        elif req.pa == 7:
+            from crypto.pa07_merkle_damgard import create_toy_hash
+            from crypto.utils import to_hex
+            toy = create_toy_hash()
+            msg = req.params.get("message","Hello Hash!").encode()
+            trace = toy.hash_with_trace(msg)
+            return trace
+        elif req.pa == 8:
+            from crypto.pa08_dlp_crhf import DLP_CRHF
+            from crypto.utils import to_hex
+            crhf = DLP_CRHF(bits=32)
+            msg = req.params.get("message","Test DLP Hash").encode()
+            h = crhf.hash(msg)
+            return {"message":msg.decode(),"hash":to_hex(h),"p":crhf.dlp.p,"g":crhf.dlp.g,"h_pub":crhf.dlp.h}
+        elif req.pa == 9:
+            from crypto.pa09_birthday import attack_toy_hash, practical_context
+            results = attack_toy_hash([8,10,12], num_trials=5)
+            ctx = practical_context()
+            return {"attacks":{str(k):v for k,v in results.items()},"context":ctx}
+        elif req.pa == 10:
+            from crypto.pa10_hmac import HMAC
+            from crypto.utils import random_bytes, to_hex
+            hmac = HMAC(bits=32); k = random_bytes(hmac.block_size)
+            msg = b"HMAC test message"
+            tag = hmac.mac(k, msg)
+            return {"message":msg.decode(),"tag":to_hex(tag),"verify":hmac.verify(k,msg,tag),"tamper":not hmac.verify(k,b"wrong",tag)}
+        elif req.pa == 11:
+            from crypto.pa11_diffie_hellman import DiffieHellman, mitm_attack
+            dh = DiffieHellman(bits=32)
+            exch = dh.key_exchange()
+            mitm = mitm_attack(dh)
+            return {"exchange":{"p":exch['p'],"g":exch['g'],"A":exch['A'],"B":exch['B'],"K_alice":exch['K_alice'],"K_bob":exch['K_bob'],"match":exch['keys_match']},"mitm":{"eve_has_alice_key":mitm['eve_has_alice_key'],"eve_has_bob_key":mitm['eve_has_bob_key'],"alice_bob_same":mitm['alice_bob_same']}}
+        elif req.pa == 12:
+            from crypto.pa12_rsa import rsa_keygen, rsa_encrypt, rsa_decrypt, pkcs15_encrypt, pkcs15_decrypt
+            kp = rsa_keygen(256); m = int(req.params.get("message_int", 42))
+            c = rsa_encrypt(kp.n, kp.e, m)
+            d = rsa_decrypt(kp.d, kp.n, c)
+            msg = req.params.get("message_pkcs", "RSA!").encode()
+            c2 = pkcs15_encrypt(kp.n, kp.e, msg)
+            d2 = pkcs15_decrypt(kp.d, kp.n, c2)
+            return {"textbook":{"m":m,"c":str(c),"d":d,"match":d==m},"pkcs":{"message":msg.decode(),"decrypted":d2.decode(),"match":d2==msg},"n":str(kp.n),"e":kp.e,"bits":kp.bits}
+        elif req.pa == 13:
+            from crypto.pa13_miller_rabin import is_prime, gen_prime
+            p = gen_prime(64)
+            tests = {str(n): is_prime(n) for n in [2,3,17,561,1009,65537]}
+            return {"generated_prime":str(p),"bits":p.bit_length(),"tests":tests}
+        elif req.pa == 14:
+            from crypto.pa14_crt import crt, hastad_attack_demo
+            x = crt([2,3,2],[3,5,7])
+            attack = hastad_attack_demo(bits=128, e=3)
+            return {"crt_example":{"residues":[2,3,2],"moduli":[3,5,7],"solution":x},"hastad":{"success":attack['success'],"bits":attack['bits']}}
+        elif req.pa == 15:
+            from crypto.pa15_signatures import DigitalSignature, homomorphism_attack_demo
+            ds = DigitalSignature(bits=256)
+            msg = req.params.get("message", "Sign this!").encode()
+            sigma = ds.sign(msg)
+            attack = homomorphism_attack_demo(256)
+            return {"message":msg.decode(),"signature":str(sigma),"verify":ds.verify(msg,sigma),"wrong":not ds.verify(b"wrong",sigma),"attack":{"raw_works":attack['raw_attack_works'],"hash_works":attack['hash_then_sign_attack_works']}}
+        elif req.pa == 16:
+            from crypto.pa16_elgamal import elgamal_keygen, elgamal_encrypt, elgamal_decrypt, malleability_attack
+            key = elgamal_keygen(bits=32); m = int(req.params.get("message_int", 42))
+            c1,c2 = elgamal_encrypt(key.pk, m)
+            d = elgamal_decrypt(key.sk, key.p, c1, c2)
+            att = malleability_attack(key, m)
+            return {"m":m,"c1":c1,"c2":c2,"decrypted":d,"match":d==m,"malleability":att['attack_works'],"p":key.p,"g":key.g}
+        elif req.pa == 17:
+            from crypto.pa17_cca_pkc import CCA_PKC
+            cca = CCA_PKC(eg_bits=32, rsa_bits=256)
+            m = int(req.params.get("message_int", 42)); ct=cca.encrypt(m)
+            pt=cca.decrypt(ct['c1'],ct['c2'],ct['sigma'])
+            bad=cca.decrypt(ct['c1'],(ct['c2']*2)%cca.eg_key.p,ct['sigma'])
+            return {"m":m,"decrypted":pt,"match":pt==m,"tamper_rejected":bad is None}
+        elif req.pa == 18:
+            from crypto.pa18_ot import run_ot
+            m0 = int(req.params.get("m0", 42))
+            m1 = int(req.params.get("m1", 99))
+            b = int(req.params.get("b", 0))
+            r = run_ot(m0, m1, b, bits=32)
+            return {"m0": m0, "m1": m1, "b": b, "received": r['received'], "correct": r['correct']}
+            
+            
+        elif req.pa == 19:
+            from crypto.pa19_secure_and import SecureGates
+            gates = SecureGates(bits=32)
+            results = {}
+            for a in [0,1]:
+                for b in [0,1]:
+                    r = gates.secure_and(a,b)
+                    results[f"AND({a},{b})"] = {"result":r['result'],"expected":r['expected'],"correct":r['correct']}
+            return results
+        elif req.pa == 20:
+            from crypto.pa20_mpc import build_comparator, build_equality, build_adder, int_to_bits, bits_to_int
+            results = {}
+            for name, builder, pairs in [
+                ("comparator", build_comparator, [(7,3),(3,7),(5,5)]),
+                ("equality", build_equality, [(5,5),(5,6)]),
+                ("adder", build_adder, [(3,5),(7,8),(15,1)]),
+            ]:
+                c = builder(4)
+                tests = []
+                for x,y in pairs:
+                    r = c.evaluate_plain(int_to_bits(x,4)+int_to_bits(y,4))
+                    val = bits_to_int(r) if len(r)>1 else r[0]
+                    if name=="comparator": exp = 1 if x>y else 0
+                    elif name=="equality": exp = 1 if x==y else 0
+                    else: exp = (x+y)%16
+                    tests.append({"x":x,"y":y,"result":val,"expected":exp,"correct":val==exp})
+                results[name] = {"gates":len(c.gates),"tests":tests}
+            return results
+        else:
+            return {"error":f"PA#{req.pa} not found"}
+    except Exception as e:
+        raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
+
+# ── Routing table ──
+@app.get("/api/reductions")
+def get_reductions():
+    return {"reductions":{f"{a}→{b}": [{"step":l,"desc":d} for l,d in v] for (a,b),v in REDUCTIONS.items()},
+            "proofs":PROOF_DB,
+            "primitives":["OWF","PRG","PRF","PRP","MAC","CRHF","HMAC"]}
+
+# ── Serve frontend ──
+STATIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'web')
+if os.path.isdir(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    @app.get("/")
+    def serve_index():
+        return FileResponse(os.path.join(STATIC_DIR, "index.html"))

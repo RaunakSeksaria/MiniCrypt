@@ -1,7 +1,31 @@
-.venv/
+# Python
 __pycache__/
-.pytest_cache/
 *.pyc
-web/node_modules/
-web/dist/
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+env.bak/
+venv.bak/
+
+# IDEs and Editors
 .vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Virtual environments
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Local environments
+.env
+.env.local
+
+# Logs
+logs/
+*.log

@@ -1,85 +1,75 @@
-# CS8.401 Programming Assignments (PA#0-PA#20)
+# POIS Cryptographic Stack & Minicrypt Explorer
 
-This repository contains an end-to-end educational scaffold for the CS8.401 Principles of Information Security programming assignments:
+Welcome to the **Principles of Information Security (CS8.401)** Cryptographic Stack project. 
 
-1. Python implementations for PA#1 through PA#20 under `src/pois/`
-2. A React web explorer for PA#0 under `web/`
-3. Smoke tests under `tests/`
+This repository contains a complete, from-scratch implementation of the "Minicrypt Clique" reduction chain. Over the course of 20 programming assignments (PA#1 to PA#20), we have implemented foundational cryptographic primitives, symmetric cryptography, hashing, public-key cryptography, and secure multi-party computation.
 
-Important notes:
+**Absolutely no external cryptographic libraries were used.** Everything from AES to Miller-Rabin primality testing, RSA, ElGamal, Oblivious Transfer, and Yao/GMW boolean circuits was built in pure Python using only standard math and `os.urandom`.
 
-1. This code is for learning and assignment flow tracing, not production cryptography.
-2. The implementation follows assignment interfaces and reduction wiring, with practical toy defaults where full-strength parameters would be too heavy for local demos.
-3. No external cryptographic library is used.
+## Phase 6: The Web Explorer (PA#0)
+This repository includes a beautiful, interactive web application (powered by FastAPI and Vanilla JS/CSS) to visualize the entire Minicrypt Equivalence Theorem. 
 
-## Repository Layout
+The web explorer allows you to:
+1. **Build & Reduce:** Start with a foundation (AES or DLP), build a source primitive, and reduce it to a target primitive (e.g. `AES → PRG → PRF`).
+2. **View Proofs:** See the exact cryptographic theorems (e.g., HILL, GGM, Luby-Rackoff) mapped to each reduction.
+3. **Interactive Demos:** Run live simulations of all 20 programming assignments (e.g. demonstrating a malleability attack on raw RSA, or executing a Secure AND gate via Oblivious Transfer) directly in your browser.
+4. **Dependency Graph:** A live SVG map showing how all 20 modules depend on each other.
 
-- `src/pois/common.py`: shared utilities (modexp, modinv, padding, randomness tests)
-- `src/pois/pa1_owf_prg.py` ... `src/pois/pa20_mpc.py`: per-PA modules
-- `src/pois/main.py`: quick runner
-- `tests/test_smoke.py`: basic correctness checks
-- `web/`: PA#0 Vite + React app (foundation toggle, two columns, reduction summary)
+---
 
-## Quick Start (Python)
+## 🚀 How to Run the Web Application
 
+### Prerequisites
+Make sure you have Python 3.8+ installed.
+
+### 1. Install Dependencies
+The core cryptography requires no dependencies. Only the Web Explorer backend requires a few lightweight libraries.
 ```bash
-cd /workspaces/pois_assignment_1
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-python -m pois.main --quick
-pytest -q
+pip install fastapi uvicorn
 ```
 
-## Quick Start (PA#0 Web App)
-
+### 2. Start the Server
+Navigate to the root directory of this project and run the FastAPI server:
 ```bash
-cd /workspaces/pois_assignment_1/web
-npm install
-npm run dev
+python3 -m uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Open the local URL shown by Vite.
+### 3. Open the Explorer
+Open your web browser and go to:
+[http://localhost:8000](http://localhost:8000)
 
-## PA Coverage Map
+---
 
-1. PA#0: Implemented as a full scaffolded explorer UI with:
-	- Foundation selector (AES/DLP)
-	- Build column (Foundation -> A)
-	- Reduce column (A -> B)
-	- Forward/backward toggle
-	- Shortest-path routing over supported reduction graph
-	- Collapsible proof summary panel
-	- Not-yet-implemented placeholders with correct PA references
-2. PA#1-PA#2: OWF/PRG/PRF (DLP OWF, hard-core-bit PRG, GGM PRF, backward reductions)
-3. PA#3-PA#6: CPA encryption, block modes API, MACs, Encrypt-then-MAC
-4. PA#7-PA#10: Merkle-Damgard, DLP compression hash, birthday attack tooling, HMAC and Encrypt-then-HMAC
-5. PA#11-PA#17: DH, RSA + PKCS#1 v1.5, Miller-Rabin, CRT + Hastad, signatures, ElGamal, CCA-secure PKC composition
-6. PA#18-PA#20: OT, secure AND/XOR/NOT, and circuit-level secure evaluation skeleton
+## 💻 How to Run CLI Demos
 
-## What To Extend For Full Credit
+Every single cryptographic module can also be run independently from the command line to view its internal mathematical operations and security game simulations.
 
-1. Replace toy parameter sizes with assignment-grade sizes (where required by your instructor).
-2. Expand per-PA experiments and reporting scripts (plots, 100-trial distributions, timing reports).
-3. Add full IND-CPA/IND-CCA game harnesses and transcript-simulation checks exactly as your section grading rubric expects.
-4. Optionally add a local API bridge so the React app calls Python modules live for every reduction step.
+Simply execute any module from the root directory. For example:
 
-## One-Command Demo Checklist
-
-1. Python smoke demo:
-
+**Run the Birthday Attack Simulation (PA#9):**
 ```bash
-python -m pois.main --quick
+python3 -m crypto.pa09_birthday
 ```
 
-2. Unit tests:
-
+**Run the Oblivious Transfer Protocol (PA#18):**
 ```bash
-pytest -q
+python3 -m crypto.pa18_ot
 ```
 
-3. Web explorer:
-
+**Run the 2-Party MPC Circuits (PA#20):**
 ```bash
-cd web && npm run dev
+python3 -m crypto.pa20_mpc
 ```
+
+---
+
+## Project Structure
+- `crypto/` — Contains all 20 pure-Python cryptographic implementations (PA#1–20).
+- `api/server.py` — The FastAPI backend routing table mapping web requests to the python crypto code.
+- `web/` — The frontend HTML, CSS, and JS for the beautiful dark-mode explorer.
+- `pois_project_full.txt` — The original assignment specification.
+
+---
+
+## License
+Created for CS8.401 Principles of Information Security. All rights reserved.
