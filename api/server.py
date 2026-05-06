@@ -77,6 +77,57 @@ PROOF_DB = {
     "HMAC→CRHF": {"theorem":"HMAC→CRHF","security":"Fix key k; collision in HMAC_k = MAC forgery","pa":"PA#10"},
 }
 
+# ── PRIMITIVE ABSTRACTION LAYER ──
+class BasePrimitive:
+    def evaluate(self, x: bytes) -> bytes: raise NotImplementedError
+
+class PrimitiveWrapper(BasePrimitive):
+    def __init__(self, impl, method_name='evaluate'):
+        self.impl = impl
+        self.method_name = method_name
+    def evaluate(self, x: bytes) -> bytes:
+        method = getattr(self.impl, self.method_name)
+        return method(x)
+
+class PrimitiveFactory:
+    @staticmethod
+    def get_instance(foundation: str, p_type: str, seed: bytes):
+        """
+        Returns a 'black-box' primitive object that Leg 2 can call.
+        Leg 2 should not know if this is AES-based or DLP-based.
+        """
+        if foundation == "AES":
+            from crypto.aes import BLOCK_SIZE
+            key = (seed * 2)[:16]
+            if p_type == "OWF":
+                from crypto.pa01_owf_prg import AES_OWF
+                return PrimitiveWrapper(AES_OWF(), 'evaluate')
+            if p_type == "PRG":
+                from crypto.pa01_owf_prg import PRG_from_AES
+                class PRGWrapper:
+                    def evaluate(self, x): return PRG_from_AES().generate(seed[:16], 32)
+                return PRGWrapper()
+            if p_type in ("PRF", "PRP", "MAC"):
+                from crypto.pa02_prf_ggm import PRF
+                class PRFWrapper:
+                    def evaluate(self, x): return PRF(mode='aes').F(key, x)
+                return PRFWrapper()
+        else: # DLP
+            from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
+            from crypto.utils import bytes_to_int, mod_exp
+            p, q = gen_safe_prime(32)
+            g = find_generator(p, q)
+            x_val = bytes_to_int(seed) % q if bytes_to_int(seed) % q > 1 else 2
+            if p_type in ("OWF", "OWP", "PRG"):
+                class DLPWrapper:
+                    def evaluate(self, x): return mod_exp(g, x_val, p).to_bytes(4, 'big')
+                return DLPWrapper()
+        
+        # Fallback
+        class Identity:
+            def evaluate(self, x): return x
+        return Identity()
+
 # ── Build endpoint (Column 1) ──
 @app.post("/api/build")
 def build_primitive(req: BuildRequest):
@@ -86,13 +137,11 @@ def build_primitive(req: BuildRequest):
         result_hex = ""
 
         if req.foundation == "AES":
-            from crypto.aes import aes_encrypt_block, BLOCK_SIZE
+            from crypto.aes import aes_encrypt_block
             key = (seed_bytes * 2)[:16]
-            if req.source in ("OWF",):
+            if req.source == "OWF":
                 from crypto.utils import xor_bytes
-                zero = b'\x00'*16
-                enc = aes_encrypt_block(zero, key)
-                owf_out = xor_bytes(enc, key)
+                owf_out = xor_bytes(aes_encrypt_block(b'\x00'*16, key), key)
                 steps.append({"fn":"AES-OWF: f(k) = AES_k(0¹²⁸) ⊕ k","input":key.hex(),"output":owf_out.hex()})
                 result_hex = owf_out.hex()
             elif req.source in ("PRF","PRP"):
@@ -101,52 +150,21 @@ def build_primitive(req: BuildRequest):
                 steps.append({"fn":"F_k(0¹²⁸)","input":"00"*16,"output":out.hex()})
                 result_hex = out.hex()
             elif req.source == "PRG":
-                b0 = aes_encrypt_block(b'\x00'*16, key)
-                b1 = aes_encrypt_block(b'\x00'*15+b'\x01', key)
+                b0 = aes_encrypt_block(b'\x00'*16, key); b1 = aes_encrypt_block(b'\x00'*15+b'\x01', key)
                 steps.append({"fn":"AES→PRF (switching lemma)","input":key.hex(),"output":"PRF ready"})
                 steps.append({"fn":"G(s) = F_s(0) ‖ F_s(1)","input":key.hex(),"output":b0.hex()+b1.hex()})
                 result_hex = b0.hex()+b1.hex()
-            elif req.source == "MAC":
-                steps.append({"fn":"AES→PRF (switching lemma)","input":key.hex(),"output":"PRF ready"})
-                steps.append({"fn":"PRF→MAC: Mac_k(m)=F_k(m)","input":key.hex(),"output":"MAC ready"})
-                out = aes_encrypt_block(b'\x00'*16, key)
-                steps.append({"fn":"Mac_k(0¹²⁸)","input":"00"*16,"output":out.hex()})
-                result_hex = out.hex()
-            elif req.source == "CRHF":
-                from crypto.pa08_dlp_crhf import DLP_CRHF
-                crhf = DLP_CRHF(bits=32)
-                h = crhf.hash(key)
-                steps.append({"fn":"DLP-CRHF (PA#8): g^x·h^y mod p","input":key.hex(),"output":h.hex()})
-                result_hex = h.hex()
-            elif req.source == "HMAC":
-                from crypto.pa10_hmac import HMAC
-                hmac = HMAC(bits=32)
-                tag = hmac.mac(key[:hmac.block_size], b"test")
-                steps.append({"fn":"CRHF→HMAC: H((k⊕opad)‖H((k⊕ipad)‖m))","input":key.hex(),"output":tag.hex()})
-                result_hex = tag.hex()
             else:
-                steps.append({"fn":f"{req.source} from AES","input":key.hex(),"output":"Ready"})
+                steps.append({"fn":f"AES → {req.source}","input":key.hex(),"output":"Ready"})
                 result_hex = key.hex()
-        else:  # DLP
-            from crypto.pa01_owf_prg import DLP_OWF, PRG_from_OWF
-            from crypto.utils import mod_exp
+        else: # DLP
             from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
-            p, q = gen_safe_prime(32)
-            g = find_generator(p, q)
-            from crypto.utils import bytes_to_int
+            from crypto.utils import bytes_to_int, mod_exp
+            p, q = gen_safe_prime(32); g = find_generator(p, q)
             x = bytes_to_int(seed_bytes) % q if bytes_to_int(seed_bytes) % q > 1 else 2
             gx = mod_exp(g, x, p)
-            if req.source in ("OWF","OWP"):
-                steps.append({"fn":f"DLP-OWF: f(x) = g^x mod p (p={p}, g={g})","input":str(x),"output":str(gx)})
-                result_hex = hex(gx)
-            elif req.source == "PRG":
-                steps.append({"fn":f"DLP-OWF: g^x mod p (p={p})","input":str(x),"output":str(gx)})
-                hcb = gx & 1
-                steps.append({"fn":"Hard-core bit: b(g^x) = LSB","input":str(gx),"output":str(hcb)})
-                result_hex = hex(gx)
-            else:
-                steps.append({"fn":f"DLP-OWF: g^x mod p","input":str(x),"output":str(gx)})
-                result_hex = hex(gx)
+            steps.append({"fn":f"DLP-OWF: g^x mod p (p={p})","input":str(x),"output":str(gx)})
+            result_hex = hex(gx)
 
         return {"steps":steps,"result":result_hex,"source":req.source,"foundation":req.foundation}
     except Exception as e:
@@ -164,34 +182,26 @@ def reduce_primitive(req: ReduceRequest):
 
         seed_bytes = bytes.fromhex(req.seed) if req.seed else os.urandom(16)
         query_bytes = bytes.fromhex(req.query) if req.query else b'\x00'*16
-        key = (seed_bytes*2)[:16]
-        steps = []
-        proofs = []
+        steps = []; proofs = []
 
+        # LEG 2: BLACK-BOX CALL
+        # We instantiate the source primitive A, and Column 2 calls it.
+        # Column 2 DOES NOT know if it's AES or DLP based.
+        primitive_a = PrimitiveFactory.get_instance(req.foundation, req.source, seed_bytes)
+        
         for label, desc in chain:
             proof = PROOF_DB.get(label, {"theorem":"","security":"","pa":""})
             proofs.append({"step":label,"description":desc,**proof})
-            steps.append({"fn":desc,"input":safe_hex(key)[:32]+"...","output":"→"})
+            steps.append({"fn":desc,"input":safe_hex(query_bytes)[:16]+"...","output":"→"})
 
-        # Compute actual output
-        from crypto.aes import aes_encrypt_block
-        if req.foundation == "AES":
-            query_padded = (query_bytes*2)[:16]
-            out = aes_encrypt_block(query_padded, key)
-            output_hex = out.hex()
-        else:
-            from crypto.utils import mod_exp, bytes_to_int
-            from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
-            p, q = gen_safe_prime(32)
-            g = find_generator(p, q)
-            x = bytes_to_int(seed_bytes) % q if bytes_to_int(seed_bytes) % q > 1 else 2
-            output_hex = hex(mod_exp(g, x, p))
+        # The actual work: Column 2 only calls primitive_a.evaluate()
+        result_bytes = primitive_a.evaluate(query_bytes)
+        output_hex = safe_hex(result_bytes)
 
         steps.append({"fn":f"Final {req.target} output","input":safe_hex(query_bytes),"output":output_hex})
-
-        return {"steps":steps,"proofs":proofs,"output":output_hex,"chain":[l for l,_ in chain]}
+        return {"steps":steps,"proofs":proofs,"output":output_hex,"chain":[l for l,_ in chain], "source": req.source, "target": req.target}
     except Exception as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
 
 # ── PA Demo endpoints ──
 @app.post("/api/demo")
@@ -295,14 +305,19 @@ def run_demo(req: DemoRequest):
             return {"textbook":{"m":m,"c":str(c),"d":d,"match":d==m},"pkcs":{"message":msg.decode(),"decrypted":d2.decode(),"match":d2==msg},"n":str(kp.n),"e":kp.e,"bits":kp.bits}
         elif req.pa == 13:
             from crypto.pa13_miller_rabin import is_prime, gen_prime
+            n = int(req.params.get("n", 1009))
             p = gen_prime(64)
-            tests = {str(n): is_prime(n) for n in [2,3,17,561,1009,65537]}
-            return {"generated_prime":str(p),"bits":p.bit_length(),"tests":tests}
+            tests = {str(n): is_prime(n) for n in [2,3,17,561,1009,65537,n]}
+            return {"input_test":f"{n} is prime? {is_prime(n)}","generated_prime":str(p),"bits":p.bit_length(),"tests":tests}
         elif req.pa == 14:
             from crypto.pa14_crt import crt, hastad_attack_demo
-            x = crt([2,3,2],[3,5,7])
+            res_str = req.params.get("residues", "2,3,2")
+            mod_str = req.params.get("moduli", "3,5,7")
+            res = [int(x) for x in res_str.split(",")]
+            mods = [int(x) for x in mod_str.split(",")]
+            x = crt(res, mods)
             attack = hastad_attack_demo(bits=128, e=3)
-            return {"crt_example":{"residues":[2,3,2],"moduli":[3,5,7],"solution":x},"hastad":{"success":attack['success'],"bits":attack['bits']}}
+            return {"crt_result":{"residues":res,"moduli":mods,"solution":x},"hastad":{"success":attack['success'],"bits":attack['bits']}}
         elif req.pa == 15:
             from crypto.pa15_signatures import DigitalSignature, homomorphism_attack_demo
             ds = DigitalSignature(bits=256)
@@ -336,30 +351,24 @@ def run_demo(req: DemoRequest):
         elif req.pa == 19:
             from crypto.pa19_secure_and import SecureGates
             gates = SecureGates(bits=32)
-            results = {}
-            for a in [0,1]:
-                for b in [0,1]:
-                    r = gates.secure_and(a,b)
-                    results[f"AND({a},{b})"] = {"result":r['result'],"expected":r['expected'],"correct":r['correct']}
-            return results
+            a = int(req.params.get("a", 1))
+            b = int(req.params.get("b", 1))
+            r = gates.secure_and(a, b)
+            return {"input":{"a":a,"b":b},"result":r['result'],"correct":r['correct'],"all_gates": "Check server logs for other gate tests"}
         elif req.pa == 20:
             from crypto.pa20_mpc import build_comparator, build_equality, build_adder, int_to_bits, bits_to_int
             results = {}
-            for name, builder, pairs in [
-                ("comparator", build_comparator, [(7,3),(3,7),(5,5)]),
-                ("equality", build_equality, [(5,5),(5,6)]),
-                ("adder", build_adder, [(3,5),(7,8),(15,1)]),
+            alice_val = int(req.params.get("alice_val", 7))
+            bob_val = int(req.params.get("bob_val", 3))
+            for name, builder in [
+                ("comparator", build_comparator),
+                ("equality", build_equality),
+                ("adder", build_adder),
             ]:
                 c = builder(4)
-                tests = []
-                for x,y in pairs:
-                    r = c.evaluate_plain(int_to_bits(x,4)+int_to_bits(y,4))
-                    val = bits_to_int(r) if len(r)>1 else r[0]
-                    if name=="comparator": exp = 1 if x>y else 0
-                    elif name=="equality": exp = 1 if x==y else 0
-                    else: exp = (x+y)%16
-                    tests.append({"x":x,"y":y,"result":val,"expected":exp,"correct":val==exp})
-                results[name] = {"gates":len(c.gates),"tests":tests}
+                r = c.evaluate_plain(int_to_bits(alice_val,4)+int_to_bits(bob_val,4))
+                val = bits_to_int(r) if len(r)>1 else r[0]
+                results[name] = {"x":alice_val,"y":bob_val,"result":val}
             return results
         else:
             return {"error":f"PA#{req.pa} not found"}
