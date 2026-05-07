@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import GGMVisualizer from './GGMVisualizer';
 
 const PA_DEFINITIONS = {
   1: {
@@ -7,7 +8,13 @@ const PA_DEFINITIONS = {
       { name: 'length', label: 'Output Length (ℓ)', type: 'range', min: 8, max: 256, default: 32 }
     ]
   },
-  2: { params: [] },
+  2: {
+    params: [
+      { name: 'key', label: 'Secret Key (k)', default: '2b7e151628aed2a6abf7158809cf4f3c' },
+      { name: 'query', label: 'Query (x) [Bit String]', default: '00' },
+      { name: 'depth', label: 'Tree Depth (n)', type: 'range', min: 2, max: 6, default: 3 }
+    ]
+  },
   3: { params: [{ name: 'message', label: 'Plaintext Message', default: 'Hello CPA!' }] },
   4: { params: [{ name: 'message', label: 'Plaintext Message', default: 'Modes of Operation test!' }] },
   5: { params: [{ name: 'message', label: 'Message to Authenticate', default: 'Authenticate me!' }] },
@@ -268,7 +275,19 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  const renderPA2Special = () => {
+    if (!result || !result.tree) return null;
+    return (
+      <GGMVisualizer 
+        tree={result.tree} 
+        queryBits={result.query_bits} 
+        output={result.output} 
+      />
+    );
+  };
+
   const isPA1 = pa.pa === 1;
+  const isPA2 = pa.pa === 2;
 
   return (
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -297,7 +316,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       onChange={(e) => {
                         const next = { ...params, [p.name]: e.target.value };
                         setParams(next);
-                        if (isPA1) {
+                        if (isPA1 || isPA2) {
                           setShowStats(false);
                           setShowInversion(false);
                           setResult(prev => prev ? { ...prev, stats: null, ratio: null, inversion: null } : null);
@@ -312,7 +331,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       onChange={(e) => {
                         const next = { ...params, [p.name]: e.target.value };
                         setParams(next);
-                        if (isPA1) {
+                        if (isPA1 || isPA2) {
                           setShowStats(false);
                           setShowInversion(false);
                           setResult(prev => prev ? { ...prev, stats: null, ratio: null, inversion: null } : null);
@@ -335,7 +354,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           <div id="demoOutputContainer">
             {isLoading && !isPA1 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : (result && renderResult(result))}
+            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>

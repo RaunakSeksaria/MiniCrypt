@@ -239,6 +239,25 @@ def reduce_primitive(req: ReduceRequest):
                     # Mock flow for visualization
                     curr_x = (int.from_bytes(curr_x, 'big') + 1).to_bytes(16, 'big')
                 steps.append({"fn": "...", "input": "Iterations 5-128", "output": "Truncated for brevity"})
+            elif label == "PRG→PRF":
+                # GGM Tree Trace: Show first 4 levels of tree walking
+                from crypto.pa02_prf_ggm import GGM_PRF
+                from crypto.utils import bytes_to_bits
+                ggm = GGM_PRF()
+                x_bits = bytes_to_bits(query_bytes)
+                current = seed_bytes
+                for i in range(4):
+                    bit = x_bits[i]
+                    g0 = ggm.prg.G0(current)
+                    g1 = ggm.prg.G1(current)
+                    chosen = g0 if bit == 0 else g1
+                    steps.append({
+                        "fn": f"GGM Tree Depth {i+1}",
+                        "input": f"Node: {safe_hex(current)[:8]}... (Bit {bit})",
+                        "output": f"→ {safe_hex(chosen)[:8]}..."
+                    })
+                    current = chosen
+                steps.append({"fn": "...", "input": "Depths 5-128", "output": "Truncated for brevity"})
             else:
                 # DYNAMIC: Actually call the intermediate primitive to show its output!
                 mid_target = label.split("→")[-1]
@@ -295,13 +314,36 @@ def run_demo(req: DemoRequest):
             
             return response
         elif req.pa == 2:
-            from crypto.pa02_prf_ggm import PRF, distinguishing_game
-            from crypto.utils import random_bytes, to_hex
-            prf = PRF(mode='aes')
-            k = random_bytes(16); x = random_bytes(16)
-            y = prf.F(k, x)
-            game = distinguishing_game(prf, 30)
-            return {"key":to_hex(k),"input":to_hex(x),"output":to_hex(y),"game":game}
+            from crypto.pa02_prf_ggm import GGM_PRF
+            from crypto.utils import to_hex, bytes_to_bits
+            key_hex = req.params.get("key", "2b7e151628aed2a6abf7158809cf4f3c")
+            query_hex = req.params.get("query", "00000000000000000000000000000001")
+            depth = int(req.params.get("depth", 4))
+            
+            key = bytes.fromhex(key_hex)
+            key = (key + b'\x00' * 16)[:16]
+            
+            # Interpret 'query' as a bit string (0101...) for PA#2
+            query_str = req.params.get("query", "0000")
+            query_bits = []
+            for bit in query_str:
+                if bit in ('0', '1'):
+                    query_bits.append(int(bit))
+            
+            # Pad or truncate query bits to match depth
+            query_bits = (query_bits + [0] * depth)[:depth]
+            
+            ggm = GGM_PRF()
+            full_tree = ggm.generate_full_tree(key, depth)
+            trace = ggm.evaluate_with_trace(key, query_bits)
+            
+            return {
+                "key": to_hex(key),
+                "query_bits": query_bits,
+                "tree": full_tree,
+                "trace": trace,
+                "output": trace['output']
+            }
         elif req.pa == 3:
             from crypto.pa03_cpa_enc import CPAEncryption, ind_cpa_game
             from crypto.utils import random_bytes, to_hex

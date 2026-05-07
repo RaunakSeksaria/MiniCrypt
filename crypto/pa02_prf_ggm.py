@@ -100,38 +100,46 @@ class GGM_PRF:
                 current = self.prg.G1(current)
         return current
 
+    def generate_full_tree(self, key: bytes, depth: int) -> dict:
+        """
+        Generate every node in the GGM tree up to a certain depth.
+        Used for the full binary tree visualizer.
+
+        Returns:
+            Dictionary mapping depth -> list of nodes at that depth.
+        """
+        if depth > 8:
+            raise ValueError("Max depth for full tree visualization is 8")
+
+        tree = {0: [{"value": to_hex(key), "index": 0}]}
+        
+        for d in range(depth):
+            tree[d+1] = []
+            for i, parent_node in enumerate(tree[d]):
+                parent_val = bytes.fromhex(parent_node["value"])
+                g0 = self.prg.G0(parent_val)
+                g1 = self.prg.G1(parent_val)
+                
+                tree[d+1].append({"value": to_hex(g0), "index": i*2, "parent_index": i})
+                tree[d+1].append({"value": to_hex(g1), "index": i*2+1, "parent_index": i})
+        
+        return tree
+
     def evaluate_with_trace(self, key: bytes, x_bits: list) -> dict:
         """
         Evaluate F_k(x) and return the full trace of intermediate values.
-        Used for the GGM tree visualizer in the web app.
-
-        Returns:
-            Dictionary with 'steps', 'output', and path information.
         """
-        trace = {
-            'key': to_hex(key),
-            'input_bits': x_bits,
-            'steps': [],
-            'output': None,
-        }
-
+        trace = {'key': to_hex(key), 'input_bits': x_bits, 'steps': [], 'output': None}
         current = key
         for i, bit in enumerate(x_bits):
             g0 = self.prg.G0(current)
             g1 = self.prg.G1(current)
             chosen = g0 if bit == 0 else g1
-
             trace['steps'].append({
-                'depth': i,
-                'bit': bit,
-                'parent': to_hex(current),
-                'G0': to_hex(g0),
-                'G1': to_hex(g1),
-                'chosen': to_hex(chosen),
+                'depth': i, 'bit': bit, 'parent': to_hex(current),
+                'G0': to_hex(g0), 'G1': to_hex(g1), 'chosen': to_hex(chosen),
             })
-
             current = chosen
-
         trace['output'] = to_hex(current)
         return trace
 

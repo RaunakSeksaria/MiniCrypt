@@ -29,14 +29,22 @@ pip install fastapi uvicorn
 ```
 
 ### 2. Start the Server
-Navigate to the root directory of this project and run the FastAPI server:
+### 2. Start the Backend (API)
+Navigate to the root directory and start the FastAPI server:
 ```bash
 python3 -m uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 3. Open the Explorer
+### 3. Start the Frontend (Developer Mode)
+To see live changes and the new GGM Tree visualizer, run the React dev server:
+```bash
+cd frontend && npm run dev
+```
+
+### 4. Open the Explorer
 Open your web browser and go to:
-[http://localhost:8000](http://localhost:8000)
+[http://localhost:5173](http://localhost:5173) 
+
 
 ---
 
