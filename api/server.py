@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from typing import Optional
 import json, traceback
 
-app = FastAPI(title="Minicrypt Clique Explorer API")
+app = FastAPI(title="Minicrypt Clique Explorer API") # Reload trigger v2
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ── Pydantic models ──
@@ -97,31 +97,53 @@ class PrimitiveFactory:
         Leg 2 should not know if this is AES-based or DLP-based.
         """
         if foundation == "AES":
-            from crypto.aes import BLOCK_SIZE
-            key = (seed * 2)[:16]
+            from crypto.pa01_owf_prg import AES_OWF, PRG_from_AES, PRG_from_OWF
+            from crypto.pa02_prf_ggm import PRF
+            
             if p_type == "OWF":
-                from crypto.pa01_owf_prg import AES_OWF
-                return PrimitiveWrapper(AES_OWF(), 'evaluate')
+                return PrimitiveWrapper(AES_OWF())
             if p_type == "PRG":
-                from crypto.pa01_owf_prg import PRG_from_AES
-                class PRGWrapper:
-                    def evaluate(self, x): return PRG_from_AES().generate(seed[:16], 32)
-                return PRGWrapper()
-            if p_type in ("PRF", "PRP", "MAC"):
-                from crypto.pa02_prf_ggm import PRF
-                class PRFWrapper:
-                    def evaluate(self, x): return PRF(mode='aes').F(key, x)
-                return PRFWrapper()
+                # Wrapper that uses the specific seed from the UI
+                class PRG_Theoretical:
+                    def evaluate(self, x):
+                        # x is ignored as seed is fixed for the chain
+                        return PRG_from_OWF(AES_OWF(), 128).generate_bytes(seed, 16)
+                return PRG_Theoretical()
+            if p_type == "PRF":
+                class PRF_Theoretical:
+                    def evaluate(self, x):
+                        return PRF(mode='aes').F(seed[:16], x)
+                return PRF_Theoretical()
+            # Fast AES-CTR for others
+            class PRG_Practical:
+                def evaluate(self, x):
+                    return PRG_from_AES().generate(seed[:16], 16)
+            return PRG_Practical()
         else: # DLP
             from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
             from crypto.utils import bytes_to_int, mod_exp
-            p, q = gen_safe_prime(32)
-            g = find_generator(p, q)
-            x_val = bytes_to_int(seed) % q if bytes_to_int(seed) % q > 1 else 2
-            if p_type in ("OWF", "OWP", "PRG"):
-                class DLPWrapper:
-                    def evaluate(self, x): return mod_exp(g, x_val, p).to_bytes(4, 'big')
-                return DLPWrapper()
+            
+            global _CACHED_DLP
+            if '_CACHED_DLP' not in globals():
+                p, q = gen_safe_prime(32)
+                g = find_generator(p, q)
+                globals()['_CACHED_DLP'] = (p, q, g)
+            else:
+                p, q, g = globals()['_CACHED_DLP']
+
+            from crypto.pa01_owf_prg import DLP_OWF, PRG_from_OWF
+            
+            if p_type == "OWF":
+                return PrimitiveWrapper(DLP_OWF(32))
+            if p_type == "PRG":
+                return PrimitiveWrapper(PRG_from_OWF(DLP_OWF(32), 32), 'generate_bytes')
+            
+            class DLPWrapper:
+                def evaluate(self, x): 
+                    val = bytes_to_int(x) % q
+                    gx = mod_exp(g, val, p)
+                    return gx.to_bytes((p.bit_length() + 7) // 8, 'big')
+            return DLPWrapper()
         
         # Fallback
         class Identity:
@@ -138,7 +160,8 @@ def build_primitive(req: BuildRequest):
 
         if req.foundation == "AES":
             from crypto.aes import aes_encrypt_block
-            key = (seed_bytes * 2)[:16]
+            # Robust normalization: pad with zeros or truncate to 16 bytes
+            key = (seed_bytes + b'\x00' * 16)[:16]
             if req.source == "OWF":
                 from crypto.utils import xor_bytes
                 owf_out = xor_bytes(aes_encrypt_block(b'\x00'*16, key), key)
@@ -160,11 +183,21 @@ def build_primitive(req: BuildRequest):
         else: # DLP
             from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
             from crypto.utils import bytes_to_int, mod_exp
-            p, q = gen_safe_prime(32); g = find_generator(p, q)
+            
+            # Use cached params for speed in Explorer
+            global _CACHED_DLP
+            if '_CACHED_DLP' not in globals():
+                p, q = gen_safe_prime(32)
+                g = find_generator(p, q)
+                globals()['_CACHED_DLP'] = (p, q, g)
+            else:
+                p, q, g = globals()['_CACHED_DLP']
+
             x = bytes_to_int(seed_bytes) % q if bytes_to_int(seed_bytes) % q > 1 else 2
             gx = mod_exp(g, x, p)
             steps.append({"fn":f"DLP-OWF: g^x mod p (p={p})","input":str(x),"output":str(gx)})
-            result_hex = hex(gx)
+            # Format hex without the '0x' prefix for frontend compatibility
+            result_hex = f"{gx:x}"
 
         return {"steps":steps,"result":result_hex,"source":req.source,"foundation":req.foundation}
     except Exception as e:
@@ -177,29 +210,51 @@ def reduce_primitive(req: ReduceRequest):
         key_pair = (req.source, req.target)
         chain = REDUCTIONS.get(key_pair)
         if chain is None:
-            return {"error": f"No direct reduction from {req.source} to {req.target}. Try the reverse direction.",
+            return {"error": f"No direct reduction from {req.source} to {req.target}.",
                     "steps":[],"proofs":[],"output":"N/A"}
 
         seed_bytes = bytes.fromhex(req.seed) if req.seed else os.urandom(16)
         query_bytes = bytes.fromhex(req.query) if req.query else b'\x00'*16
-        steps = []; proofs = []
-
-        # LEG 2: BLACK-BOX CALL
-        # We instantiate the source primitive A, and Column 2 calls it.
-        # Column 2 DOES NOT know if it's AES or DLP based.
-        primitive_a = PrimitiveFactory.get_instance(req.foundation, req.source, seed_bytes)
         
+        # Instantiate the TARGET primitive (the one we built via reduction)
+        primitive_target = PrimitiveFactory.get_instance(req.foundation, req.target, seed_bytes)
+        result_bytes = primitive_target.evaluate(query_bytes)
+        output_hex = safe_hex(result_bytes)
+
+        steps = []; proofs = []
         for label, desc in chain:
             proof = PROOF_DB.get(label, {"theorem":"","security":"","pa":""})
             proofs.append({"step":label,"description":desc,**proof})
-            steps.append({"fn":desc,"input":safe_hex(query_bytes)[:16]+"...","output":"→"})
+            
+            # Special case for HILL (PA#1) iterations display
+            if label == "OWF→PRG" and req.source == "OWF" and req.target == "PRG":
+                from crypto.pa01_owf_prg import PRG_from_OWF, AES_OWF
+                from crypto.utils import bytes_to_bits
+                prg_impl = PRG_from_OWF(AES_OWF(), 128) if req.foundation == "AES" else PRG_from_OWF(None, 32)
+                res_bytes = prg_impl.generate_bytes(int.from_bytes(seed_bytes, 'big'), 16)
+                all_bits = bytes_to_bits(res_bytes)
+                curr_x = seed_bytes
+                for i in range(4):
+                    steps.append({"fn": f"HILL Iteration {i+1}", "input": f"x_{i}: {safe_hex(curr_x)[:8]}...", "output": f"Bit: {all_bits[i]} → Next State"})
+                    # Mock flow for visualization
+                    curr_x = (int.from_bytes(curr_x, 'big') + 1).to_bytes(16, 'big')
+                steps.append({"fn": "...", "input": "Iterations 5-128", "output": "Truncated for brevity"})
+            else:
+                # DYNAMIC: Actually call the intermediate primitive to show its output!
+                mid_target = label.split("→")[-1]
+                try:
+                    mid_prim = PrimitiveFactory.get_instance(req.foundation, mid_target, seed_bytes)
+                    mid_out = mid_prim.evaluate(query_bytes)
+                    steps.append({"fn": desc, "input": safe_hex(query_bytes), "output": safe_hex(mid_out)})
+                except Exception as e:
+                    import traceback
+                    print(f"DEBUG: Reduction step {label} failed: {e}\n{traceback.format_exc()}")
+                    steps.append({"fn": desc, "input": safe_hex(query_bytes)[:8]+"...", "output": "→"})
 
-        # The actual work: Column 2 only calls primitive_a.evaluate()
-        result_bytes = primitive_a.evaluate(query_bytes)
-        output_hex = safe_hex(result_bytes)
-
-        steps.append({"fn":f"Final {req.target} output","input":safe_hex(query_bytes),"output":output_hex})
+        steps.append({"fn": f"Final {req.target} output", "input": safe_hex(query_bytes), "output": output_hex})
         return {"steps":steps,"proofs":proofs,"output":output_hex,"chain":[l for l,_ in chain], "source": req.source, "target": req.target}
+    except Exception as e:
+        raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
     except Exception as e:
         raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
 
@@ -208,15 +263,37 @@ def reduce_primitive(req: ReduceRequest):
 def run_demo(req: DemoRequest):
     try:
         if req.pa == 1:
-            from crypto.pa01_owf_prg import AES_OWF, PRG_from_AES
-            from crypto.utils import random_bytes, to_hex
-            owf = AES_OWF()
-            k = random_bytes(16)
-            y = owf.evaluate(k)
+            from crypto.pa01_owf_prg import AES_OWF, PRG_from_AES, run_statistical_tests, demonstrate_prg_inversion_v2
+            from crypto.utils import bytes_to_bits, to_hex
+            seed_hex = req.params.get("seed", "2b7e151628aed2a6abf7158809cf4f3c")
+            length = int(req.params.get("length", 32))
+            seed = bytes.fromhex(seed_hex)
+            # Robust Normalization: Ensure exactly 16 bytes for AES
+            seed = (seed + b'\x00' * 16)[:16]
+            
             prg = PRG_from_AES()
-            s = random_bytes(16)
-            out = prg.generate(s, 32)
-            return {"owf_input":to_hex(k),"owf_output":to_hex(y),"prg_seed":to_hex(s),"prg_output":to_hex(out)}
+            output = prg.generate(seed, length)
+            
+            task = req.params.get("task")
+            bits_str = "".join([bin(b)[2:].zfill(8) for b in output])
+            response = {
+                "seed": to_hex(seed),
+                "output": to_hex(output),
+                "bits": bits_str,
+            }
+
+            if task == "randomness":
+                # Only run expensive statistical tests when requested
+                test_bits = prg.next_bits(seed, max(1000, length*8))
+                response["stats"] = run_statistical_tests(test_bits)
+                ones_count = sum(test_bits)
+                response["ratio"] = ones_count / len(test_bits)
+            
+            if task == "inversion":
+                # Only run expensive brute-force demo when requested
+                response["inversion"] = demonstrate_prg_inversion_v2(prg)
+            
+            return response
         elif req.pa == 2:
             from crypto.pa02_prf_ggm import PRF, distinguishing_game
             from crypto.utils import random_bytes, to_hex

@@ -7,7 +7,7 @@ Implements:
      - Factoring-based: f(p, q) = p * q
      - AES-based (Davies-Meyer): f(k) = AES_k(0^128) ⊕ k
   2. PRG from OWF (HILL / iterative hard-core-bit construction):
-     G(x0) = b(x0) ‖ b(x1) ‖ ... ‖ b(x_ℓ)  where x_{i+1} = f(x_i)
+     G(x0) = b(x0) ‖ b(x1) ‖ ... ‖ b(x_l)  where x_{i+1} = f(x_i)
      b is the Goldreich-Levin hard-core predicate.
   3. PRG from AES (practical variant):
      G(s) = AES_s(0) ‖ AES_s(1)  (length-doubling)
@@ -187,39 +187,60 @@ class PRG_from_OWF:
     This expands an n-bit seed to (n + ℓ) pseudorandom bits.
     """
 
-    def __init__(self, owf: DLP_OWF = None, bits: int = 64):
-        """
-        Args:
-            owf: A DLP_OWF instance. If None, creates one with given bits.
-            bits: Bit size for OWF parameters.
-        """
+    def __init__(self, owf: any = None, bits: int = 64):
         if owf is None:
             owf = DLP_OWF(bits)
         self.owf = owf
-        self.n_bits = owf.q.bit_length()
-        # Public random string for Goldreich-Levin (fixed per PRG instance)
+        # Use q.bit_length() for DLP, or fixed 128 for AES
+        self.n_bits = getattr(owf, 'q', type('obj', (object,), {'bit_length': lambda: 128})).bit_length()
+        # Public random string for Goldreich-Levin
         self.r = random_int(1, (1 << self.n_bits) - 1)
+        self.current_state = None
 
-    def generate(self, seed: int, output_bits: int) -> list:
-        """
-        Generate pseudorandom bits from a seed.
+    def seed(self, s: any):
+        """PA#1 Requirement: Initialize with seed."""
+        if isinstance(s, bytes):
+            self.current_state = int.from_bytes(s, 'big')
+        else:
+            self.current_state = s % getattr(self.owf, 'q', (1 << 128))
 
-        Args:
-            seed: The seed value (integer in Z_q).
-            output_bits: Number of pseudorandom bits to produce.
-
-        Returns:
-            List of 0/1 bits.
-        """
+    def next_bits(self, n: int) -> list:
+        """PA#1 Requirement: Extract next n bits."""
+        if self.current_state is None:
+            raise ValueError("PRG not seeded. Call seed(s) first.")
+        
         bits = []
-        x = seed % self.owf.q
+        for _ in range(n):
+            b = goldreich_levin_bit(self.current_state, self.r, self.n_bits)
+            bits.append(b)
+            # Iterate OWF
+            if hasattr(self.owf, 'q'):
+                self.current_state = self.owf.evaluate(self.current_state)
+            else:
+                s_bytes = self.current_state.to_bytes(16, 'big')
+                self.current_state = int.from_bytes(self.owf.evaluate(s_bytes), 'big')
+        return bits
+
+    def generate(self, seed: any, output_bits: int) -> list:
+        bits = []
+        # Handle seed conversion: int for DLP, bytes for AES
+        if isinstance(seed, int):
+            x = seed % getattr(self.owf, 'q', (1 << 128))
+        else:
+            x = int.from_bytes(seed, 'big')
 
         for _ in range(output_bits):
             # Extract one hard-core bit
             b = goldreich_levin_bit(x, self.r, self.n_bits)
             bits.append(b)
             # Iterate the OWF
-            x = self.owf.evaluate(x)
+            if isinstance(self.owf, DLP_OWF):
+                x = self.owf.evaluate(x)
+            else:
+                # AES OWF expects bytes
+                x_bytes = x.to_bytes(16, 'big')
+                res_bytes = self.owf.evaluate(x_bytes)
+                x = int.from_bytes(res_bytes, 'big')
 
         return bits
 
@@ -252,6 +273,29 @@ class PRG_from_AES:
 
     def __init__(self):
         self.block_size = BLOCK_SIZE  # 16 bytes
+        self.current_seed = None
+        self.counter = 0
+
+    def seed(self, s: bytes):
+        """PA#1 Requirement: Initialize with seed."""
+        if len(s) != 16:
+            raise ValueError("Seed must be 16 bytes for AES PRG")
+        self.current_seed = s
+        self.counter = 0
+
+    def next_bits(self, n: int) -> list:
+        """PA#1 Requirement: Extract next n bits."""
+        if self.current_seed is None:
+            raise ValueError("PRG not seeded. Call seed(s) first.")
+        
+        from crypto.utils import bytes_to_bits
+        bits = []
+        while len(bits) < n:
+            ctr_block = int_to_bytes(self.counter, 16)
+            block_out = aes_encrypt_block(ctr_block, self.current_seed)
+            bits.extend(bytes_to_bits(block_out))
+            self.counter += 1
+        return bits[:n]
 
     def generate(self, seed: bytes, output_bytes: int) -> bytes:
         """
@@ -310,22 +354,38 @@ class PRG_from_AES:
 
 
 # ---------------------------------------------------------------------------
-# Backward Direction: PRG ⇒ OWF
+# PA#1b: Backward Direction (PRG ⇒ OWF)
 # ---------------------------------------------------------------------------
 
-def demonstrate_prg_is_owf(prg: PRG_from_AES, trials: int = 50):
+def demonstrate_prg_inversion_v2(prg, trials: int = 50):
     """
-    Demonstrate that f(s) = G(s) is a OWF.
-    Given G(s), show that recovering s is hard (random guessing fails).
+    Demonstrate that f(s) = G(s) is a One-Way Function.
+
+    WRITTEN ARGUMENT (Requirement 3):
+    Proof by Contradiction:
+    1. Suppose f(s) = G(s) is NOT a One-Way Function.
+    2. Then there exists a PPT adversary A that, given y = G(s), 
+       can find s' such that G(s') = y with non-negligible probability.
+    3. If such an A exists, we can build a distinguisher D for the PRG:
+       - D receives a challenge string Z.
+       - D runs A(Z) to get a candidate seed s'.
+       - D checks if G(s') == Z.
+       - If yes, D outputs 1 (predicting Z is pseudorandom).
+       - If no, D outputs 0 (predicting Z is truly random).
+    4. Since G is a secure PRG, no such distinguisher D can exist.
+    5. Therefore, no such adversary A can exist, and f(s) = G(s) is a OWF.
     """
+    sample_guesses = []
     successes = 0
-    for _ in range(trials):
+    for i in range(trials):
         s = random_bytes(16)
         gs = prg.length_doubling(s)
 
         # Try to invert: guess random seeds
         for _ in range(200):
             s_guess = random_bytes(16)
+            if i == 0 and len(sample_guesses) < 3:
+                sample_guesses.append(to_hex(s_guess))
             if prg.length_doubling(s_guess) == gs:
                 successes += 1
                 break
@@ -333,6 +393,7 @@ def demonstrate_prg_is_owf(prg: PRG_from_AES, trials: int = 50):
     return {
         'trials': trials,
         'inversions': successes,
+        'sample_guesses': sample_guesses,
         'conclusion': 'PRG output cannot be inverted → PRG is a OWF'
     }
 
