@@ -333,9 +333,30 @@ def run_demo(req: DemoRequest):
             # Pad or truncate query bits to match depth
             query_bits = (query_bits + [0] * depth)[:depth]
             
-            ggm = GGM_PRF()
-            full_tree = ggm.generate_full_tree(key, depth)
-            trace = ggm.evaluate_with_trace(key, query_bits)
+            # Use the unified PRF wrapper with GGM mode
+            from crypto.pa02_prf_ggm import PRF
+            ggm = PRF(mode='ggm')
+            task = req.params.get("task")
+            
+            if task == "game":
+                from crypto.pa02_prf_ggm import distinguishing_game
+                game_result = distinguishing_game(ggm, 100)
+                return {"game": game_result}
+            
+            if task == "randomness":
+                from crypto.pa02_prf_ggm import PRG_from_PRF
+                from crypto.pa01_owf_prg import run_statistical_tests
+                prg = PRG_from_PRF(ggm)
+                test_bits = prg.next_bits(key, 2048)
+                return {
+                    "stats": run_statistical_tests(test_bits),
+                    "ratio": sum(test_bits) / len(test_bits)
+                }
+            
+            # For tree visualization, use the underlying GGM_PRF directly
+            ggm_impl = ggm._impl 
+            full_tree = ggm_impl.generate_full_tree(key, depth)
+            trace = ggm_impl.evaluate_with_trace(key, query_bits)
             
             return {
                 "key": to_hex(key),

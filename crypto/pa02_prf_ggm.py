@@ -218,6 +218,26 @@ class PRF:
         return self.F(key, x)
 
 
+class PRG_from_PRF:
+    """
+    Construct a PRG from a PRF.
+    G(s) = F_s(0) ‖ F_s(1)
+    """
+    def __init__(self, prf: PRF):
+        self.prf = prf
+
+    def next_bits(self, seed: bytes, n_bits: int) -> list:
+        """Generate bits using the PRF as a PRG."""
+        bits = []
+        counter = 0
+        while len(bits) < n_bits:
+            ctr_block = int_to_bytes(counter, 16)
+            output = self.prf.evaluate(seed, ctr_block)
+            bits.extend(bytes_to_bits(output))
+            counter += 1
+        return bits[:n_bits]
+
+
 # ---------------------------------------------------------------------------
 # Backward Direction: PRF ⇒ PRG
 # ---------------------------------------------------------------------------
@@ -300,10 +320,10 @@ def distinguishing_game(prf: PRF, num_queries: int = 100) -> dict:
     rand_ratio = rand_ones / total_bits
 
     return {
-        'num_queries': num_queries,
+        'trials': num_queries,
         'prf_ones_ratio': prf_ratio,
         'random_ones_ratio': rand_ratio,
-        'difference': abs(prf_ratio - rand_ratio),
+        'advantage': abs(prf_ratio - rand_ratio),
         'indistinguishable': abs(prf_ratio - rand_ratio) < 0.05,
         'conclusion': ('PRF is indistinguishable from random'
                        if abs(prf_ratio - rand_ratio) < 0.05
@@ -373,8 +393,8 @@ if __name__ == '__main__':
     # --- Distinguishing Game ---
     print("\n--- PRF Distinguishing Game ---")
     game = distinguishing_game(prf)
-    print(f"Queries: {game['num_queries']}")
+    print(f"Queries: {game['trials']}")
     print(f"PRF 1-bit ratio: {game['prf_ones_ratio']:.4f}")
     print(f"Random 1-bit ratio: {game['random_ones_ratio']:.4f}")
-    print(f"Difference: {game['difference']:.4f}")
+    print(f"Advantage: {game['advantage']:.4f}")
     print(f"Conclusion: {game['conclusion']}")

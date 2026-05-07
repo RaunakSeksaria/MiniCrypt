@@ -5,10 +5,13 @@ const GGMVisualizer = ({ tree, queryBits, output }) => {
 
   const depths = Object.keys(tree).sort((a, b) => a - b);
   const maxDepth = depths.length - 1;
-  const width = 800;
-  const height = 400;
-  const nodeRadius = 12;
-  const levelHeight = height / (maxDepth + 1);
+  
+  // Dynamic width: Bottom level nodes * 40px spacing
+  const nBottom = Math.pow(2, maxDepth);
+  const width = Math.max(800, nBottom * 40); 
+  const height = 500;
+  const nodeRadius = maxDepth > 6 ? 6 : 10;
+  const levelHeight = height / (maxDepth + 1.5);
 
   // Helper to check if a node is on the active path
   const isActive = (depth, index) => {
@@ -113,8 +116,16 @@ const GGMVisualizer = ({ tree, queryBits, output }) => {
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto', textAlign: 'center' }}>
-        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <div style={{ 
+        overflowX: 'auto', 
+        textAlign: 'center', 
+        padding: '10px', 
+        background: 'rgba(0,0,0,0.2)', 
+        borderRadius: '8px',
+        border: '1px solid var(--border)',
+        maxHeight: '600px'
+      }}>
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', margin: '0 auto' }}>
           {lines}
           {nodes}
         </svg>
