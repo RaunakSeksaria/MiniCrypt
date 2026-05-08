@@ -1377,6 +1377,85 @@ def pa3_simulate(req: PA3SimRequest):
         return result
 
 
+# ── PA#6 Malleability Attack Workbench ──
+
+class PA6InitRequest(BaseModel):
+    message: str
+
+@app.post("/api/pa6/malleability_init")
+def pa6_malleability_init(req: PA6InitRequest):
+    from crypto.pa03_cpa_enc import CPAEncryption
+    from crypto.pa06_cca_enc import CCAEncryption
+    from crypto.utils import random_bytes, to_hex
+    
+    msg_bytes = req.message.encode()
+    key_enc = random_bytes(16)
+    key_mac = random_bytes(16)
+    
+    cpa = CPAEncryption()
+    cca = CCAEncryption()
+    
+    cpa_r, cpa_ct = cpa.encrypt(key_enc, msg_bytes)
+    cca_r, cca_ct, cca_tag = cca.encrypt(key_enc, key_mac, msg_bytes)
+    
+    return {
+        "key_enc": to_hex(key_enc),
+        "key_mac": to_hex(key_mac),
+        "cpa_r": to_hex(cpa_r),
+        "cpa_ct": to_hex(cpa_ct),
+        "cca_r": to_hex(cca_r),
+        "cca_ct": to_hex(cca_ct),
+        "cca_tag": to_hex(cca_tag),
+    }
+
+class PA6FlipRequest(BaseModel):
+    key_enc: str
+    key_mac: str
+    cpa_r: str
+    cpa_ct: str
+    cca_r: str
+    cca_ct: str
+    cca_tag: str
+
+@app.post("/api/pa6/malleability_flip")
+def pa6_malleability_flip(req: PA6FlipRequest):
+    from crypto.pa03_cpa_enc import CPAEncryption
+    from crypto.pa06_cca_enc import CCAEncryption
+    
+    key_e = bytes.fromhex(req.key_enc)
+    key_m = bytes.fromhex(req.key_mac)
+    
+    cpa_ct = bytes.fromhex(req.cpa_ct)
+    cca_ct = bytes.fromhex(req.cca_ct)
+    
+    # CPA decrypt
+    cpa_dec = None
+    cpa_err = None
+    try:
+        cpa_dec = CPAEncryption().decrypt(key_e, bytes.fromhex(req.cpa_r), cpa_ct)
+    except Exception as e:
+        cpa_err = str(e)
+        
+    # CCA decrypt
+    cca_dec = None
+    cca_err = None
+    try:
+        cca_dec = CCAEncryption().decrypt(key_e, key_m, bytes.fromhex(req.cca_r), cca_ct, bytes.fromhex(req.cca_tag))
+    except Exception as e:
+        cca_err = str(e)
+        
+    cpa_str = cpa_dec.decode(errors='replace') if cpa_dec else None
+    cca_str = cca_dec.decode(errors='replace') if cca_dec else None
+    
+    return {
+        "cpa_decrypted": cpa_str,
+        "cpa_error": cpa_err,
+        "cca_decrypted": cca_str,
+        "cca_rejected": cca_dec is None,
+        "cca_error": cca_err,
+    }
+
+
 # ── PA#4 Visual Animation endpoints ──
 
 class PA4AnimateRequest(BaseModel):
@@ -1519,15 +1598,32 @@ def pa4_flip(req: PA4FlipRequest):
         iv = bytes.fromhex(req.iv_hex)
         ct = bytes.fromhex(req.ciphertext_hex)
 
-        # Original decryption
-        if mode == "CBC":
-            original_pt = cbc_decrypt(key, iv, ct)
-        elif mode == "OFB":
-            original_pt = ofb_decrypt(key, iv, ct)
-        elif mode == "CTR":
-            original_pt = ctr_decrypt(key, iv, ct)
-        else:
-            raise HTTPException(400, "bad mode")
+        from crypto.aes import aes_decrypt_block, aes_encrypt_block
+        from crypto.utils import xor_bytes, int_to_bytes, bytes_to_int
+
+        def decrypt_no_unpad(m_mode, m_key, m_iv, m_ct):
+            blocks = split_blocks(m_ct, BLOCK_SIZE)
+            pt = bytearray()
+            if m_mode == "CBC":
+                prev = m_iv
+                for b in blocks:
+                    dec = aes_decrypt_block(b, m_key)
+                    pt.extend(xor_bytes(dec, prev))
+                    prev = b
+            elif m_mode == "OFB":
+                state = m_iv
+                for b in blocks:
+                    state = aes_encrypt_block(state, m_key)
+                    pt.extend(xor_bytes(b, state))
+            elif m_mode == "CTR":
+                nonce_int = bytes_to_int(m_iv)
+                for i, b in enumerate(blocks):
+                    counter = int_to_bytes((nonce_int + i) % (1 << 128), BLOCK_SIZE)
+                    stream = aes_encrypt_block(counter, m_key)
+                    pt.extend(xor_bytes(b, stream))
+            return bytes(pt)
+
+        original_pt = decrypt_no_unpad(mode, key, iv, ct)
 
         # Flip first byte of chosen block
         ct_mod = bytearray(ct)
@@ -1536,15 +1632,7 @@ def pa4_flip(req: PA4FlipRequest):
             ct_mod[flip_idx] ^= 0x01
         ct_mod = bytes(ct_mod)
 
-        try:
-            if mode == "CBC":
-                modified_pt = cbc_decrypt(key, iv, ct_mod)
-            elif mode == "OFB":
-                modified_pt = ofb_decrypt(key, iv, ct_mod)
-            else:
-                modified_pt = ctr_decrypt(key, iv, ct_mod)
-        except Exception:
-            modified_pt = original_pt  # padding error etc — treat as fully corrupted
+        modified_pt = decrypt_no_unpad(mode, key, iv, ct_mod)
 
         orig_blocks = split_blocks(original_pt.ljust(3 * BLOCK_SIZE), BLOCK_SIZE)[:3]
         mod_blocks = split_blocks(modified_pt.ljust(3 * BLOCK_SIZE), BLOCK_SIZE)[:3]
@@ -1617,6 +1705,92 @@ def pa4_iv_reuse(req: PA4IvReuseRequest):
         raise
     except Exception as e:
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
+# ==============================================================================
+# PA#5 Endpoints (Interactive MACs)
+# ==============================================================================
+
+import uuid
+pa5_sessions = {}
+
+@app.get("/api/pa5/euf_init")
+def pa5_euf_init():
+    from crypto.pa05_mac import MAC
+    from crypto.utils import random_bytes, to_hex
+    
+    session_id = str(uuid.uuid4())
+    key = random_bytes(16)
+    pa5_sessions[session_id] = key
+    mac = MAC(mode='cbc')
+    
+    messages = []
+    for _ in range(50):
+        m = random_bytes(16)
+        t = mac.Mac(key, m)
+        messages.append({"message_hex": to_hex(m), "tag_hex": to_hex(t)})
+        
+    return {"session_id": session_id, "messages": messages}
+
+class PA5VerifyRequest(BaseModel):
+    session_id: str
+    message_hex: str
+    tag_hex: str
+
+@app.post("/api/pa5/euf_verify")
+def pa5_euf_verify(req: PA5VerifyRequest):
+    from crypto.pa05_mac import MAC
+    
+    key = pa5_sessions.get(req.session_id)
+    if not key:
+        raise HTTPException(400, "Invalid session")
+    
+    mac = MAC(mode='cbc')
+    try:
+        m = bytes.fromhex(req.message_hex)
+        t = bytes.fromhex(req.tag_hex)
+        if len(t) != 16:
+            return {"valid": False}
+        is_valid = mac.Vrfy(key, m, t)
+        return {"valid": is_valid}
+    except Exception:
+        return {"valid": False}
+
+class PA5CheatRequest(BaseModel):
+    session_id: str
+
+@app.post("/api/pa5/euf_cheat")
+def pa5_euf_cheat(req: PA5CheatRequest):
+    from crypto.pa05_mac import MAC
+    from crypto.utils import to_hex
+    
+    key = pa5_sessions.get(req.session_id)
+    if not key:
+        raise HTTPException(400, "Invalid session")
+    
+    mac = MAC(mode='cbc')
+    # Generate a new 16-byte message
+    m_star = b"Hacked message!!"
+    t_star = mac.Mac(key, m_star)
+    
+    return {
+        "message_hex": to_hex(m_star),
+        "tag_hex": to_hex(t_star),
+        "explanation": "This CBC-MAC implementation prepends the message length, making it mathematically secure against length-extension and splicing attacks. Therefore, a real forgery is computationally infeasible. To let you see the 'Forgery accepted' UI, this cheat button secretly asks the backend oracle to sign a brand new message using the hidden key."
+    }
+
+class PA5LengthExtensionRequest(BaseModel):
+    suffix: str
+
+@app.post("/api/pa5/length_extension")
+def pa5_length_extension(req: PA5LengthExtensionRequest):
+    from crypto.pa10_hmac import length_extension_demo
+    try:
+        suffix_bytes = req.suffix.encode()
+        res = length_extension_demo(suffix=suffix_bytes)
+        return res
+    except Exception as e:
+        raise HTTPException(400, str(e))
 
 
 # ── Routing table ──

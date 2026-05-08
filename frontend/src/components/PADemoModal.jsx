@@ -17,8 +17,8 @@ const PA_DEFINITIONS = {
   },
   3: { params: [] },  // PA3 has its own interactive renderer
   4: { params: [] },  // PA4 has its own visual animator renderer
-  5: { params: [{ name: 'message', label: 'Message to Authenticate', default: 'Authenticate me!' }] },
-  6: { params: [{ name: 'message', label: 'Plaintext Message', default: 'CCA-secure message!' }] },
+  5: { params: [] },  // PA5 has its own interactive renderer
+  6: { params: [] },  // PA6 has its own interactive renderer
   7: { params: [{ name: 'message', label: 'Message to Hash', default: 'Hello Hash!' }] },
   8: { params: [] },  // PA8 has its own input inside renderPA8Special
   9: { params: [] },  // PA9 has its own input inside renderPA9Special
@@ -112,6 +112,30 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa11CdhBits,     setPa11CdhBits]     = useState(20);
   const [pa11Loading,     setPa11Loading]     = useState({});
 
+  // PA5 State
+  const [pa5Tab, setPa5Tab] = useState('euf');
+  const [pa5Session, setPa5Session] = useState(null);
+  const [pa5Messages, setPa5Messages] = useState([]);
+  const [pa5EufMsg, setPa5EufMsg] = useState('');
+  const [pa5EufTag, setPa5EufTag] = useState('');
+  const [pa5EufResult, setPa5EufResult] = useState(null);
+  const [pa5Stats, setPa5Stats] = useState({ attempts: 0, successes: 0 });
+  const [pa5LeSuffix, setPa5LeSuffix] = useState('');
+  const [pa5LeData, setPa5LeData] = useState(null);
+  const [pa5Loading, setPa5Loading] = useState({});
+
+  // PA6 State
+  const [pa6Msg, setPa6Msg] = useState('Transfer $1000 to Bob');
+  const [pa6Data, setPa6Data] = useState(null);
+  const [pa6CpaFlipped, setPa6CpaFlipped] = useState(null);
+  const [pa6CcaFlipped, setPa6CcaFlipped] = useState(null);
+  const [pa6CpaDec, setPa6CpaDec] = useState(null);
+  const [pa6CcaDec, setPa6CcaDec] = useState(null);
+  const [pa6CpaErr, setPa6CpaErr] = useState(null);
+  const [pa6CcaErr, setPa6CcaErr] = useState(null);
+  const [pa6CcaRej, setPa6CcaRej] = useState(false);
+  const [pa6Loading, setPa6Loading] = useState({});
+
   const def = PA_DEFINITIONS[pa.pa] || { params: [] };
   const isPA11 = pa.pa === 11;
 
@@ -138,8 +162,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
     def.params.forEach(p => initialParams[p.name] = p.default);
     setParams(initialParams);
 
-    // Auto-run if no params (but NOT for PA3/PA4/PA8/PA9/PA10/PA11 — they have their own special renderers)
-    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11) {
+    // Auto-run if no params (but NOT for PA3/PA4/PA5/PA6/PA8/PA9/PA10/PA11 — they have their own special renderers)
+    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 5 && pa.pa !== 6 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11) {
       runDemo(initialParams);
     }
 
@@ -209,7 +233,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
             items.push(
               <div key={k}>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', margin: '16px 0 8px', color: 'var(--accent3)' }}>{k}</h3>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', margin: '16px 0 8px', color: 'var(--accent3)' }}>{k}</h3>
                 {renderSection(k, v)}
               </div>
             );
@@ -231,7 +255,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
             return (
               <div key={k}>
-                <h3 style={{ fontSize: '14px', fontWeight: '600', margin: '16px 0 8px', color: 'var(--accent3)' }}>{k}</h3>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', margin: '16px 0 8px', color: 'var(--accent3)' }}>{k}</h3>
                 {renderSection(k, v)}
               </div>
             );
@@ -250,7 +274,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
       <div className="pa1-special">
         <div className="result-section">
           <h3>Live PRG Output G(s)</h3>
-          <div className="output-box" style={{ wordBreak: 'break-all', fontFamily: 'monospace', fontSize: '12px', background: 'var(--bg)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+          <div className="output-box" style={{ wordBreak: 'break-all', fontFamily: 'monospace', fontSize: '14px', background: 'var(--bg)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)' }}>
             {result.output}
           </div>
         </div>
@@ -294,7 +318,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               <h3 style={{ margin: 0, marginBottom: '12px' }}>Randomness Analysis</h3>
               <div className="stats-container">
                 <div className="ratio-bar-container" style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
                     <span>Bit Ratio (Ones/Total)</span>
                     <span style={{ fontWeight: 600 }}>{result.ratio ? (result.ratio * 100).toFixed(1) : '...'}%</span>
                   </div>
@@ -313,8 +337,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       background: s.pass ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                       border: `1px solid ${s.pass ? '#22c55e' : '#ef4444'}`
                     }}>
-                      <div style={{ fontSize: '10px', fontWeight: 600, color: s.pass ? '#22c55e' : '#ef4444' }}>{s.test.toUpperCase()}</div>
-                      <div style={{ fontSize: '11px' }}>{s.pass ? 'PASS' : 'FAIL'}</div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: s.pass ? '#22c55e' : '#ef4444' }}>{s.test.toUpperCase()}</div>
+                      <div style={{ fontSize: '13px' }}>{s.pass ? 'PASS' : 'FAIL'}</div>
                     </div>
                   ))}
                 </div>
@@ -328,22 +352,22 @@ const PADemoModal = ({ pa, onClose, api }) => {
               {(!result || !result.inversion) ? (
                 <div style={{ textAlign: 'center', padding: '20px', background: 'var(--bg2)', borderRadius: '8px' }}>
                   <div className="spinner" style={{ margin: '0 auto 10px' }}></div>
-                  <div style={{ fontSize: '11px', color: 'var(--text3)' }}>Running 10,000+ Inversion Attempts...</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text3)' }}>Running 10,000+ Inversion Attempts...</div>
                 </div>
               ) : (
                 <div style={{ padding: '12px', background: 'rgba(var(--accent-rgb), 0.05)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
-                  <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>🔒 Backward Reduction: PRG ⇒ OWF</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text2)', lineHeight: '1.4', marginBottom: '12px' }}>
+                  <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>🔒 Backward Reduction: PRG ⇒ OWF</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: '1.4', marginBottom: '12px' }}>
                   <strong>Theoretical Proof:</strong> To show that <strong>f(s) = G(s)</strong> is a One-Way Function, we assume an adversary exists who can invert it. If they can recover <strong>s</strong> from <strong>G(s)</strong>, they can distinguish the PRG from random bits. Since <strong>G</strong> is secure, such an adversary cannot exist.
                 </div>
                 
-                <div style={{ background: 'var(--bg2)', padding: '10px', borderRadius: '6px', marginBottom: '12px', fontSize: '11px', borderLeft: '3px solid var(--accent)' }}>
+                <div style={{ background: 'var(--bg2)', padding: '10px', borderRadius: '6px', marginBottom: '12px', fontSize: '13px', borderLeft: '3px solid var(--accent)' }}>
                   <strong>Example from Current Run:</strong>
                   <div style={{ marginTop: '8px' }}>
-                    <strong>Input (s):</strong> <code style={{ fontSize: '10px', color: 'var(--accent)' }}>{result?.seed?.substring(0, 12)}...</code>
+                    <strong>Input (s):</strong> <code style={{ fontSize: '12px', color: 'var(--accent)' }}>{result?.seed?.substring(0, 12)}...</code>
                     <br />
-                    <strong>Output G(s):</strong> <code style={{ fontSize: '10px', color: 'var(--accent3)' }}>{result?.output?.substring(0, 12)}...</code>
-                    <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text3)' }}>
+                    <strong>Output G(s):</strong> <code style={{ fontSize: '12px', color: 'var(--accent3)' }}>{result?.output?.substring(0, 12)}...</code>
+                    <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text3)' }}>
                       <strong>Failed Adversary Attempts (Sample Seeds):</strong>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px', minHeight: '20px' }}>
                         {(result?.inversion?.sample_guesses && result.inversion.sample_guesses.length > 0) ? (
@@ -354,7 +378,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                               padding: '4px 8px', 
                               borderRadius: '4px', 
                               border: '1px solid rgba(239, 68, 68, 0.2)',
-                              fontSize: '9px',
+                              fontSize: '11px',
                               fontFamily: 'monospace',
                               wordBreak: 'break-all'
                             }}>
@@ -372,7 +396,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   </div>
                 </div>
 
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
                     <strong>Adversary Benchmarks:</strong> Tested against 50 different seeds with 10,000+ guesses each. Inversion Success Rate: <span style={{ color: 'var(--accent)' }}>0.000%</span>.
                     <br />
                     <strong>Current Run:</strong> Brute-force guessing 200 seeds for each of {result.inversion?.trials || 0} target outputs...
@@ -398,11 +422,11 @@ const PADemoModal = ({ pa, onClose, api }) => {
     const accentOk = '#22c55e'; const accentBad = '#ef4444';
     const accentBlue = '#6366f1'; const accentAmber = '#f59e0b';
     const mono = (txt, color = '#a5b4fc') => (
-      <code style={{ fontFamily:'monospace', fontSize:'11px', wordBreak:'break-all', color, background:'rgba(0,0,0,0.35)', borderRadius:'4px', padding:'2px 6px' }}>{txt}</code>
+      <code style={{ fontFamily:'monospace', fontSize: '13px', wordBreak:'break-all', color, background:'rgba(0,0,0,0.35)', borderRadius:'4px', padding:'2px 6px' }}>{txt}</code>
     );
     const card = (children, accent, title) => (
       <div style={{ background:`linear-gradient(135deg,${accent}14 0%,${accent}08 100%)`, border:`1px solid ${accent}50`, borderRadius:'12px', padding:'16px', marginBottom:'14px' }}>
-        {title && <div style={{ fontSize:'11px', fontWeight:700, letterSpacing:'0.08em', color:accent, marginBottom:'10px', textTransform:'uppercase' }}>{title}</div>}
+        {title && <div style={{ fontSize: '13px', fontWeight:700, letterSpacing:'0.08em', color:accent, marginBottom:'10px', textTransform:'uppercase' }}>{title}</div>}
         {children}
       </div>
     );
@@ -417,52 +441,52 @@ const PADemoModal = ({ pa, onClose, api }) => {
     return (
       <div style={{ display:'flex', flexDirection:'column', gap:'4px' }}>
         {card(<div>
-          <div style={{ fontSize:'12px', color:'var(--text2)', marginBottom:'12px', lineHeight:1.5 }}>
+          <div style={{ fontSize: '14px', color:'var(--text2)', marginBottom:'12px', lineHeight:1.5 }}>
             Choose <strong>Secure</strong> (fresh nonce each call) or <strong>Broken</strong> (fixed nonce reuse). Then start a session.
           </div>
           <div style={{ display:'flex', gap:'10px' }}>
-            <button id="pa3-secure-btn" onClick={() => initSession(false)} disabled={busy('init')} style={{ flex:1, padding:'10px', borderRadius:'8px', fontWeight:700, fontSize:'13px', cursor:busy('init')?'not-allowed':'pointer', background:(!pa3Broken&&pa3SessionId)?`linear-gradient(135deg,${accentOk}cc,${accentOk}88)`:'rgba(0,0,0,0.2)', border:`2px solid ${accentOk}`, color:(!pa3Broken&&pa3SessionId)?'white':accentOk }}>Secure Mode</button>
-            <button id="pa3-broken-btn" onClick={() => initSession(true)} disabled={busy('init')} style={{ flex:1, padding:'10px', borderRadius:'8px', fontWeight:700, fontSize:'13px', cursor:busy('init')?'not-allowed':'pointer', background:(pa3Broken&&pa3SessionId)?`linear-gradient(135deg,${accentBad}cc,${accentBad}88)`:'rgba(0,0,0,0.2)', border:`2px solid ${accentBad}`, color:(pa3Broken&&pa3SessionId)?'white':accentBad }}>Broken (Nonce Reuse)</button>
+            <button id="pa3-secure-btn" onClick={() => initSession(false)} disabled={busy('init')} style={{ flex:1, padding:'10px', borderRadius:'8px', fontWeight:700, fontSize: '15px', cursor:busy('init')?'not-allowed':'pointer', background:(!pa3Broken&&pa3SessionId)?`linear-gradient(135deg,${accentOk}cc,${accentOk}88)`:'rgba(0,0,0,0.2)', border:`2px solid ${accentOk}`, color:(!pa3Broken&&pa3SessionId)?'white':accentOk }}>Secure Mode</button>
+            <button id="pa3-broken-btn" onClick={() => initSession(true)} disabled={busy('init')} style={{ flex:1, padding:'10px', borderRadius:'8px', fontWeight:700, fontSize: '15px', cursor:busy('init')?'not-allowed':'pointer', background:(pa3Broken&&pa3SessionId)?`linear-gradient(135deg,${accentBad}cc,${accentBad}88)`:'rgba(0,0,0,0.2)', border:`2px solid ${accentBad}`, color:(pa3Broken&&pa3SessionId)?'white':accentBad }}>Broken (Nonce Reuse)</button>
           </div>
-          {pa3SessionId && <div style={{ marginTop:'10px', fontSize:'11px', color:'var(--text3)' }}>Session: {mono(pa3SessionId.slice(0,8)+'...')} &nbsp; Mode: <span style={{ fontWeight:700, color:pa3Broken?accentBad:accentOk }}>{pa3Broken?'BROKEN':'SECURE'}</span></div>}
+          {pa3SessionId && <div style={{ marginTop:'10px', fontSize: '13px', color:'var(--text3)' }}>Session: {mono(pa3SessionId.slice(0,8)+'...')} &nbsp; Mode: <span style={{ fontWeight:700, color:pa3Broken?accentBad:accentOk }}>{pa3Broken?'BROKEN':'SECURE'}</span></div>}
         </div>, accentBlue, '0. Game Session')}
 
         {pa3SessionId && (<>
           {card(<div>
-            <div style={{ fontSize:'12px', color:'var(--text2)', marginBottom:'10px' }}>Query the oracle — encrypt any message.</div>
+            <div style={{ fontSize: '14px', color:'var(--text2)', marginBottom:'10px' }}>Query the oracle — encrypt any message.</div>
             <div style={{ display:'flex', gap:'8px', marginBottom:'10px' }}>
-              <input id="pa3-oracle-input" type="text" value={pa3OracleMsg} onChange={e=>setPa3OracleMsg(e.target.value)} placeholder="Type any message..." style={{ flex:1, padding:'9px 12px', background:'rgba(0,0,0,0.35)', border:`1px solid ${accentBlue}60`, borderRadius:'8px', color:'var(--text1)', fontSize:'13px', fontFamily:'monospace', outline:'none' }}
+              <input id="pa3-oracle-input" type="text" value={pa3OracleMsg} onChange={e=>setPa3OracleMsg(e.target.value)} placeholder="Type any message..." style={{ flex:1, padding:'9px 12px', background:'rgba(0,0,0,0.35)', border:`1px solid ${accentBlue}60`, borderRadius:'8px', color:'var(--text1)', fontSize: '15px', fontFamily:'monospace', outline:'none' }}
                 onKeyDown={async e=>{ if(e.key==='Enter'&&pa3OracleMsg.trim()){setLoading('oracle',true);const d=await api.pa3Oracle(pa3SessionId,pa3OracleMsg);setPa3OracleLog(prev=>[d,...prev].slice(0,6));setPa3OracleMsg('');setLoading('oracle',false);}}}
               />
-              <button id="pa3-oracle-btn" disabled={busy('oracle')||!pa3OracleMsg.trim()} onClick={async()=>{setLoading('oracle',true);const d=await api.pa3Oracle(pa3SessionId,pa3OracleMsg);setPa3OracleLog(prev=>[d,...prev].slice(0,6));setPa3OracleMsg('');setLoading('oracle',false);}} style={{ padding:'9px 16px', borderRadius:'8px', border:`1px solid ${accentBlue}80`, background:`linear-gradient(135deg,${accentBlue}cc,${accentBlue}88)`, color:'white', fontWeight:700, fontSize:'12px', cursor:(busy('oracle')||!pa3OracleMsg.trim())?'not-allowed':'pointer' }}>
+              <button id="pa3-oracle-btn" disabled={busy('oracle')||!pa3OracleMsg.trim()} onClick={async()=>{setLoading('oracle',true);const d=await api.pa3Oracle(pa3SessionId,pa3OracleMsg);setPa3OracleLog(prev=>[d,...prev].slice(0,6));setPa3OracleMsg('');setLoading('oracle',false);}} style={{ padding:'9px 16px', borderRadius:'8px', border:`1px solid ${accentBlue}80`, background:`linear-gradient(135deg,${accentBlue}cc,${accentBlue}88)`, color:'white', fontWeight:700, fontSize: '14px', cursor:(busy('oracle')||!pa3OracleMsg.trim())?'not-allowed':'pointer' }}>
                 {busy('oracle')?'...':'Encrypt'}
               </button>
             </div>
             {pa3OracleLog.length>0 && <div style={{ display:'flex', flexDirection:'column', gap:'6px' }}>
               {pa3OracleLog.map((entry,i)=>(
                 <div key={i} style={{ background:'rgba(0,0,0,0.25)', borderRadius:'8px', padding:'8px 10px', border:`1px solid ${accentBlue}25` }}>
-                  <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:'3px 10px', fontSize:'11px' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', gap:'3px 10px', fontSize: '13px' }}>
                     <span style={{color:'var(--text3)'}}>msg</span>{mono(entry.message)}
                     <span style={{color:'var(--text3)'}}>nonce</span>{mono((entry.nonce_hex||'').slice(0,24)+'...', pa3Broken?'#fca5a5':'#a5b4fc')}
                     <span style={{color:'var(--text3)'}}>ct</span>{mono((entry.ciphertext_hex||'').slice(0,24)+'...')}
                   </div>
-                  {pa3Broken&&i>0&&pa3OracleLog[i-1]?.nonce_hex===entry.nonce_hex && <div style={{marginTop:'5px',fontSize:'10px',color:accentBad,fontWeight:700}}>Same nonce — nonce reuse detected!</div>}
+                  {pa3Broken&&i>0&&pa3OracleLog[i-1]?.nonce_hex===entry.nonce_hex && <div style={{marginTop:'5px',fontSize: '12px',color:accentBad,fontWeight:700}}>Same nonce — nonce reuse detected!</div>}
                 </div>
               ))}
             </div>}
           </div>, accentBlue, '1. Encryption Oracle')}
 
           {card(<div>
-            <div style={{ fontSize:'12px', color:'var(--text2)', marginBottom:'10px' }}>Submit equal-length <strong>m0</strong> and <strong>m1</strong>. Challenger picks random b, returns C*=Enc(m_b).</div>
-            {pa3LenError && <div style={{ color:accentBad, fontSize:'12px', marginBottom:'8px', padding:'6px 10px', background:'rgba(239,68,68,0.1)', borderRadius:'6px', border:`1px solid ${accentBad}40` }}>{pa3LenError}</div>}
+            <div style={{ fontSize: '14px', color:'var(--text2)', marginBottom:'10px' }}>Submit equal-length <strong>m0</strong> and <strong>m1</strong>. Challenger picks random b, returns C*=Enc(m_b).</div>
+            {pa3LenError && <div style={{ color:accentBad, fontSize: '14px', marginBottom:'8px', padding:'6px 10px', background:'rgba(239,68,68,0.1)', borderRadius:'6px', border:`1px solid ${accentBad}40` }}>{pa3LenError}</div>}
             <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginBottom:'10px' }}>
-              <div><label style={{fontSize:'11px',color:'var(--text3)',marginBottom:'3px',display:'block'}}>m0 — Message 0</label>
-                <input id="pa3-m0-input" type="text" value={pa3M0} onChange={e=>{setPa3M0(e.target.value);setPa3LenError(null);}} style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'rgba(0,0,0,0.35)',border:`1px solid ${accentOk}50`,borderRadius:'8px',color:'var(--text1)',fontSize:'13px',fontFamily:'monospace',outline:'none'}} />
+              <div><label style={{fontSize: '13px',color:'var(--text3)',marginBottom:'3px',display:'block'}}>m0 — Message 0</label>
+                <input id="pa3-m0-input" type="text" value={pa3M0} onChange={e=>{setPa3M0(e.target.value);setPa3LenError(null);}} style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'rgba(0,0,0,0.35)',border:`1px solid ${accentOk}50`,borderRadius:'8px',color:'var(--text1)',fontSize: '15px',fontFamily:'monospace',outline:'none'}} />
               </div>
-              <div><label style={{fontSize:'11px',color:'var(--text3)',marginBottom:'3px',display:'block'}}>m1 — Message 1 (same byte-length as m0)</label>
-                <input id="pa3-m1-input" type="text" value={pa3M1} onChange={e=>{setPa3M1(e.target.value);setPa3LenError(null);}} style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'rgba(0,0,0,0.35)',border:`1px solid ${accentOk}50`,borderRadius:'8px',color:'var(--text1)',fontSize:'13px',fontFamily:'monospace',outline:'none'}} />
+              <div><label style={{fontSize: '13px',color:'var(--text3)',marginBottom:'3px',display:'block'}}>m1 — Message 1 (same byte-length as m0)</label>
+                <input id="pa3-m1-input" type="text" value={pa3M1} onChange={e=>{setPa3M1(e.target.value);setPa3LenError(null);}} style={{width:'100%',boxSizing:'border-box',padding:'9px 12px',background:'rgba(0,0,0,0.35)',border:`1px solid ${accentOk}50`,borderRadius:'8px',color:'var(--text1)',fontSize: '15px',fontFamily:'monospace',outline:'none'}} />
               </div>
-              <div style={{fontSize:'10px',color:'var(--text3)'}}>
+              <div style={{fontSize: '12px',color:'var(--text3)'}}>
                 m0: <strong>{new TextEncoder().encode(pa3M0).length}B</strong> &middot; m1: <strong>{new TextEncoder().encode(pa3M1).length}B</strong>
                 {new TextEncoder().encode(pa3M0).length!==new TextEncoder().encode(pa3M1).length&&<span style={{color:accentBad,marginLeft:'6px'}}>lengths differ</span>}
               </div>
@@ -474,21 +498,21 @@ const PADemoModal = ({ pa, onClose, api }) => {
               try{const d=await api.pa3Challenge(pa3SessionId,pa3M0,pa3M1);if(d.detail)setPa3LenError(d.detail);else{setPa3Challenge(d);setPa3GuessResult(null);}}
               catch(e){setPa3LenError(String(e));}
               setLoading('challenge',false);
-            }} style={{width:'100%',padding:'10px',borderRadius:'8px',fontWeight:700,fontSize:'13px',cursor:(busy('challenge')||!!pa3Challenge)?'not-allowed':'pointer',background:(busy('challenge')||!!pa3Challenge)?'rgba(34,197,94,0.15)':`linear-gradient(135deg,${accentOk}cc,${accentOk}88)`,border:'none',color:(busy('challenge')||!!pa3Challenge)?accentOk:'white'}}>
+            }} style={{width:'100%',padding:'10px',borderRadius:'8px',fontWeight:700,fontSize: '15px',cursor:(busy('challenge')||!!pa3Challenge)?'not-allowed':'pointer',background:(busy('challenge')||!!pa3Challenge)?'rgba(34,197,94,0.15)':`linear-gradient(135deg,${accentOk}cc,${accentOk}88)`,border:'none',color:(busy('challenge')||!!pa3Challenge)?accentOk:'white'}}>
               {busy('challenge')?'Encrypting...':pa3Challenge?'Challenge Active — Guess Below':'Get Challenge Ciphertext C*'}
             </button>
             {pa3Challenge && <div style={{marginTop:'12px',background:'rgba(0,0,0,0.25)',borderRadius:'10px',padding:'12px',border:`1px solid ${accentOk}40`}}>
-              <div style={{fontSize:'11px',fontWeight:700,color:accentOk,marginBottom:'8px'}}>Challenge Ciphertext C*</div>
-              <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 10px',fontSize:'11px'}}>
+              <div style={{fontSize: '13px',fontWeight:700,color:accentOk,marginBottom:'8px'}}>Challenge Ciphertext C*</div>
+              <div style={{display:'grid',gridTemplateColumns:'auto 1fr',gap:'4px 10px',fontSize: '13px'}}>
                 <span style={{color:'var(--text3)'}}>nonce</span>{mono(pa3Challenge.nonce_hex, pa3Broken?'#fca5a5':'#a5b4fc')}
                 <span style={{color:'var(--text3)'}}>ct</span>{mono((pa3Challenge.ciphertext_hex||'').slice(0,32)+'...')}
               </div>
-              {pa3Broken&&pa3OracleLog.length>0&&<div style={{marginTop:'8px',padding:'6px 10px',background:'rgba(239,68,68,0.1)',borderRadius:'6px',border:`1px solid ${accentBad}40`,fontSize:'11px',color:accentBad}}>BROKEN: Fixed nonce — compare with oracle outputs to trivially win!</div>}
+              {pa3Broken&&pa3OracleLog.length>0&&<div style={{marginTop:'8px',padding:'6px 10px',background:'rgba(239,68,68,0.1)',borderRadius:'6px',border:`1px solid ${accentBad}40`,fontSize: '13px',color:accentBad}}>BROKEN: Fixed nonce — compare with oracle outputs to trivially win!</div>}
             </div>}
           </div>, accentOk, '2. Submit Challenge (m0, m1)')}
 
           {pa3Challenge && card(<div>
-            <div style={{fontSize:'12px',color:'var(--text2)',marginBottom:'10px'}}>Which message did the challenger encrypt?</div>
+            <div style={{fontSize: '14px',color:'var(--text2)',marginBottom:'10px'}}>Which message did the challenger encrypt?</div>
             <div style={{display:'flex',gap:'10px'}}>
               {[0,1].map(g=>(
                 <button key={g} id={`pa3-guess-btn-${g}`} disabled={busy('guess')} onClick={async()=>{
@@ -497,16 +521,16 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   setPa3GuessResult(d);setPa3Rounds(d.rounds);
                   setPa3Stats({total:d.total_rounds,correct:d.correct_rounds,advantage:d.advantage,win_rate:d.win_rate,secure:d.secure});
                   setPa3Challenge(null);setLoading('guess',false);
-                }} style={{flex:1,padding:'12px',borderRadius:'8px',fontWeight:700,fontSize:'14px',cursor:busy('guess')?'not-allowed':'pointer',background:`linear-gradient(135deg,${accentAmber}cc,${accentAmber}88)`,border:'none',color:'white'}}>
+                }} style={{flex:1,padding:'12px',borderRadius:'8px',fontWeight:700,fontSize: '16px',cursor:busy('guess')?'not-allowed':'pointer',background:`linear-gradient(135deg,${accentAmber}cc,${accentAmber}88)`,border:'none',color:'white'}}>
                   Guess b={g} (m{g})
                 </button>
               ))}
             </div>
             {pa3GuessResult && <div style={{marginTop:'12px',padding:'12px',borderRadius:'10px',border:`2px solid ${pa3GuessResult.correct?accentOk:accentBad}`,background:pa3GuessResult.correct?'rgba(34,197,94,0.1)':'rgba(239,68,68,0.1)'}}>
-              <div style={{fontWeight:700,fontSize:'14px',color:pa3GuessResult.correct?accentOk:accentBad,marginBottom:'6px'}}>
+              <div style={{fontWeight:700,fontSize: '16px',color:pa3GuessResult.correct?accentOk:accentBad,marginBottom:'6px'}}>
                 {pa3GuessResult.correct?'Correct!':'Wrong!'} Challenger chose b={pa3GuessResult.b}
               </div>
-              <div style={{fontSize:'11px',color:'var(--text2)'}}>
+              <div style={{fontSize: '13px',color:'var(--text2)'}}>
                 Rounds: <strong>{pa3GuessResult.total_rounds}</strong> &middot; Win rate: <strong>{(pa3GuessResult.win_rate*100).toFixed(1)}%</strong> &middot; Advantage: <strong style={{color:pa3GuessResult.advantage<0.15?accentOk:accentBad}}>{(pa3GuessResult.advantage*100).toFixed(1)}%</strong>
               </div>
             </div>}
@@ -516,15 +540,15 @@ const PADemoModal = ({ pa, onClose, api }) => {
             <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:'8px',marginBottom:'12px'}}>
               {[['Rounds',pa3Rounds.length,accentBlue],['Correct',correctRounds,accentOk],['Advantage',advantage!==null?`${(advantage*100).toFixed(1)}%`:'-',advantage!==null&&advantage<0.15?accentOk:accentBad]].map(([l,v,c])=>(
                 <div key={l} style={{textAlign:'center',background:'rgba(0,0,0,0.25)',borderRadius:'8px',padding:'10px',border:`1px solid ${c}40`}}>
-                  <div style={{fontSize:'10px',color:'var(--text3)',marginBottom:'3px'}}>{l}</div>
-                  <div style={{fontSize:'20px',fontWeight:800,color:c}}>{v}</div>
+                  <div style={{fontSize: '12px',color:'var(--text3)',marginBottom:'3px'}}>{l}</div>
+                  <div style={{fontSize: '22px',fontWeight:800,color:c}}>{v}</div>
                 </div>
               ))}
             </div>
-            {pa3Stats && <div style={{fontSize:'12px',color:pa3Stats.secure?accentOk:accentBad,fontStyle:'italic',marginBottom:'10px'}}>{pa3Stats.secure?`Advantage ${(pa3Stats.advantage*100).toFixed(1)}% — scheme appears CPA-secure`:`Advantage ${(pa3Stats.advantage*100).toFixed(1)}% — ${pa3Broken?'nonce reuse breaks security!':'keep playing...'}`}</div>}
+            {pa3Stats && <div style={{fontSize: '14px',color:pa3Stats.secure?accentOk:accentBad,fontStyle:'italic',marginBottom:'10px'}}>{pa3Stats.secure?`Advantage ${(pa3Stats.advantage*100).toFixed(1)}% — scheme appears CPA-secure`:`Advantage ${(pa3Stats.advantage*100).toFixed(1)}% — ${pa3Broken?'nonce reuse breaks security!':'keep playing...'}`}</div>}
             <div style={{maxHeight:'140px',overflowY:'auto',display:'flex',flexDirection:'column',gap:'4px'}}>
               {[...pa3Rounds].reverse().map(r=>(
-                <div key={r.round} style={{display:'flex',gap:'6px',alignItems:'center',fontSize:'11px',padding:'4px 8px',borderRadius:'6px',background:r.correct?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)',border:`1px solid ${r.correct?accentOk:accentBad}30`}}>
+                <div key={r.round} style={{display:'flex',gap:'6px',alignItems:'center',fontSize: '13px',padding:'4px 8px',borderRadius:'6px',background:r.correct?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)',border:`1px solid ${r.correct?accentOk:accentBad}30`}}>
                   <span style={{color:'var(--text3)',minWidth:'26px'}}>#{r.round}</span>
                   <span style={{color:r.correct?accentOk:accentBad,fontWeight:700}}>{r.correct?'Y':'N'}</span>
                   <span style={{color:'var(--text3)'}}>b={r.b} guess={r.guess}</span>
@@ -535,27 +559,27 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>, accentBlue, '4. Running Advantage')}
 
           {card(<div>
-            <div style={{fontSize:'12px',color:'var(--text2)',marginBottom:'10px'}}>20 rounds with dummy adversary — advantage approx 0 (secure) or approx 0.5 (broken).</div>
-            <button id="pa3-simulate-btn" disabled={busy('sim')} onClick={async()=>{setLoading('sim',true);const d=await api.pa3Simulate(20,pa3Broken);setPa3SimData(d);setLoading('sim',false);}} style={{width:'100%',padding:'10px',borderRadius:'8px',fontWeight:700,fontSize:'13px',cursor:busy('sim')?'not-allowed':'pointer',background:busy('sim')?'rgba(139,92,246,0.15)':'linear-gradient(135deg,#8b5cf6cc,#8b5cf688)',border:'none',color:busy('sim')?'#8b5cf6':'white'}}>
+            <div style={{fontSize: '14px',color:'var(--text2)',marginBottom:'10px'}}>20 rounds with dummy adversary — advantage approx 0 (secure) or approx 0.5 (broken).</div>
+            <button id="pa3-simulate-btn" disabled={busy('sim')} onClick={async()=>{setLoading('sim',true);const d=await api.pa3Simulate(20,pa3Broken);setPa3SimData(d);setLoading('sim',false);}} style={{width:'100%',padding:'10px',borderRadius:'8px',fontWeight:700,fontSize: '15px',cursor:busy('sim')?'not-allowed':'pointer',background:busy('sim')?'rgba(139,92,246,0.15)':'linear-gradient(135deg,#8b5cf6cc,#8b5cf688)',border:'none',color:busy('sim')?'#8b5cf6':'white'}}>
               {busy('sim')?'Simulating...':'Run 20-Round Automated Simulation'}
             </button>
             {pa3SimData && <div style={{marginTop:'12px'}}>
               <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'8px'}}>
                 {[['Rounds',pa3SimData.rounds,accentBlue],['Correct',pa3SimData.correct??pa3SimData.correct_guesses,accentOk],['Win Rate',`${((pa3SimData.win_rate||0)*100).toFixed(1)}%`,accentAmber],['Advantage',`${((pa3SimData.advantage||0)*100).toFixed(1)}%`,(pa3SimData.advantage||0)<0.15?accentOk:accentBad]].map(([l,v,c])=>(
                   <div key={l} style={{textAlign:'center',background:'rgba(0,0,0,0.25)',borderRadius:'8px',padding:'8px 4px',border:`1px solid ${c}40`}}>
-                    <div style={{fontSize:'10px',color:'var(--text3)',marginBottom:'3px'}}>{l}</div>
-                    <div style={{fontSize:'16px',fontWeight:800,color:c}}>{v}</div>
+                    <div style={{fontSize: '12px',color:'var(--text3)',marginBottom:'3px'}}>{l}</div>
+                    <div style={{fontSize: '18px',fontWeight:800,color:c}}>{v}</div>
                   </div>
                 ))}
               </div>
-              <div style={{marginTop:'10px',fontSize:'12px',color:pa3SimData.broken_mode?accentBad:accentOk,fontStyle:'italic'}}>
+              <div style={{marginTop:'10px',fontSize: '14px',color:pa3SimData.broken_mode?accentBad:accentOk,fontStyle:'italic'}}>
                 {pa3SimData.broken_mode?`Broken: advantage=${((pa3SimData.advantage||0)*100).toFixed(1)}% — identical ciphertexts trivially exposed`:`Secure: advantage=${((pa3SimData.advantage||0)*100).toFixed(1)}% approx 0`}
               </div>
             </div>}
           </div>, '#8b5cf6', '5. Automated Simulation (20 rounds)')}
         </>)}
 
-        {!pa3SessionId && <div style={{textAlign:'center',padding:'30px',color:'var(--text3)',fontSize:'13px',fontStyle:'italic'}}>Select a mode and start a session above to begin.</div>}
+        {!pa3SessionId && <div style={{textAlign:'center',padding:'30px',color:'var(--text3)',fontSize: '15px',fontStyle:'italic'}}>Select a mode and start a session above to begin.</div>}
       </div>
     );
   };
@@ -582,7 +606,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     };
 
     // Block diagram for a single mode
-    const BlockDiagram = ({ trace, mode, traceData }) => {
+    const renderBlockDiagram = (trace, mode, traceData) => {
       if (!trace || !trace.blocks) return null;
       const blocks = trace.blocks;
       const flip = pa4FlipResult;
@@ -668,20 +692,20 @@ const PADemoModal = ({ pa, onClose, api }) => {
       );
     };
 
-    const ErrorBadge = ({ corrupted }) => {
+    const renderErrorBadge = (corrupted) => {
       if (!corrupted) return null;
       const expected = { CBC: [pa4FlippedBlock, pa4FlippedBlock + 1].filter(n => n >= 0 && n < 3), OFB: [pa4FlippedBlock], CTR: [pa4FlippedBlock] };
       const exp = expected[pa4Mode] || [];
       return (
-        <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '12px' }}>
+        <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '14px' }}>
           <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: '4px' }}>⚡ Bit Flip Error Propagation</div>
           <div style={{ color: 'var(--text2)', lineHeight: 1.5 }}>
             Flipped C{pa4FlippedBlock} → corrupted plaintext blocks: {corrupted.length > 0 ? corrupted.map(b => `M${b}`).join(', ') : 'None'}
           </div>
-          <div style={{ marginTop: '6px', fontSize: '11px', color: '#94a3b8' }}>
+          <div style={{ marginTop: '6px', fontSize: '13px', color: '#94a3b8' }}>
             {pa4Mode === 'CBC' ? `CBC: flipped C${pa4FlippedBlock} corrupts M${pa4FlippedBlock} completely + flips 1 bit in M${pa4FlippedBlock + 1}` : `${pa4Mode}: error stays in exactly the same block — only M${pa4FlippedBlock} is affected`}
           </div>
-          <div style={{ marginTop: '4px', fontSize: '11px', color: corrupted.join(',') === exp.join(',') ? '#22c55e' : '#f59e0b' }}>
+          <div style={{ marginTop: '4px', fontSize: '13px', color: corrupted.join(',') === exp.join(',') ? '#22c55e' : '#f59e0b' }}>
             {corrupted.join(',') === exp.join(',') ? `✅ Matches expected pattern for ${pa4Mode}` : `Expected blocks: ${exp.map(b => `M${b}`).join(', ')}`}
           </div>
         </div>
@@ -700,7 +724,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               setL('anim', true);
               const d = await api.pa4Animate(m, pa4Msg);
               setPa4Trace(d); setL('anim', false);
-            }} style={{ flex: 1, padding: '9px 0', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', transition: 'all 0.18s', border: m === pa4Mode ? `2px solid ${modeColor[m]}` : `1px solid ${modeColor[m]}55`, background: m === pa4Mode ? `linear-gradient(135deg,${modeColor[m]}cc,${modeColor[m]}88)` : 'rgba(0,0,0,0.2)', color: m === pa4Mode ? 'white' : modeColor[m] }}>
+            }} style={{ flex: 1, padding: '9px 0', borderRadius: '8px', fontWeight: 700, fontSize: '15px', cursor: 'pointer', transition: 'all 0.18s', border: m === pa4Mode ? `2px solid ${modeColor[m]}` : `1px solid ${modeColor[m]}55`, background: m === pa4Mode ? `linear-gradient(135deg,${modeColor[m]}cc,${modeColor[m]}88)` : 'rgba(0,0,0,0.2)', color: m === pa4Mode ? 'white' : modeColor[m] }}>
               {m}
             </button>
           ))}
@@ -708,21 +732,21 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
         {/* ── Message input + Run ── */}
         <div style={{ display: 'flex', gap: '8px' }}>
-          <input id="pa4-msg-input" type="text" value={pa4Msg} onChange={e => setPa4Msg(e.target.value)} placeholder="3-block message (48 chars)..." style={{ flex: 1, padding: '9px 12px', background: 'rgba(0,0,0,0.35)', border: `1px solid ${ac}60`, borderRadius: '8px', color: 'var(--text1)', fontSize: '13px', fontFamily: 'monospace', outline: 'none' }} />
-          <button id="pa4-run-btn" disabled={busyPA4('anim')} onClick={() => runAnimate()} style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: busyPA4('anim') ? `${ac}44` : `linear-gradient(135deg,${ac}cc,${ac}88)`, color: 'white', fontWeight: 700, fontSize: '13px', cursor: busyPA4('anim') ? 'not-allowed' : 'pointer' }}>
+          <input id="pa4-msg-input" type="text" value={pa4Msg} onChange={e => setPa4Msg(e.target.value)} placeholder="3-block message (48 chars)..." style={{ flex: 1, padding: '9px 12px', background: 'rgba(0,0,0,0.35)', border: `1px solid ${ac}60`, borderRadius: '8px', color: 'var(--text1)', fontSize: '15px', fontFamily: 'monospace', outline: 'none' }} />
+          <button id="pa4-run-btn" disabled={busyPA4('anim')} onClick={() => runAnimate()} style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: busyPA4('anim') ? `${ac}44` : `linear-gradient(135deg,${ac}cc,${ac}88)`, color: 'white', fontWeight: 700, fontSize: '15px', cursor: busyPA4('anim') ? 'not-allowed' : 'pointer' }}>
             {busyPA4('anim') ? '⏳' : '▶ Animate'}
           </button>
         </div>
 
         {/* Mode info bar */}
-        <div style={{ fontSize: '11px', color: '#94a3b8', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', border: `1px solid ${ac}30` }}>
+        <div style={{ fontSize: '13px', color: '#94a3b8', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', border: `1px solid ${ac}30` }}>
           {pa4Mode === 'CBC' && '🔗 CBC: C_i = E_k(C_{i-1} ⊕ M_i) — sequential encryption, parallel decryption. Click any ciphertext block to flip a bit.'}
           {pa4Mode === 'OFB' && '🔄 OFB: C_i = M_i ⊕ E_k(E_k(…E_k(IV)…)) — pre-computable keystream, enc=dec. Click any ciphertext block to flip a bit.'}
           {pa4Mode === 'CTR' && '⚡ CTR: C_i = M_i ⊕ E_k(nonce+i) — fully parallel, stream-cipher mode. Click any ciphertext block to flip a bit.'}
         </div>
 
         {!pa4Trace && !busyPA4('anim') && (
-          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text3)', fontSize: '13px', fontStyle: 'italic' }}>
+          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text3)', fontSize: '15px', fontStyle: 'italic' }}>
             Press ▶ Animate to start the block diagram.
           </div>
         )}
@@ -732,16 +756,16 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {pa4Trace && !busyPA4('anim') && (<>
           {/* ── Block Diagram ── */}
           <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '12px', padding: '14px', border: `1px solid ${ac}40` }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: ac, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: ac, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
               Block Cipher Mode Diagram — Click a ciphertext block (C0, C1, C2) to flip a bit
             </div>
-            <BlockDiagram trace={pa4Trace} mode={pa4Mode} traceData={pa4Trace} />
-            {busyPA4('flip') && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>⏳ Re-decrypting with flipped bit…</div>}
-            <ErrorBadge corrupted={pa4FlipResult?.corrupted_pt_blocks} />
+            {renderBlockDiagram(pa4Trace, pa4Mode, pa4Trace)}
+            {busyPA4('flip') && <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>⏳ Re-decrypting with flipped bit…</div>}
+            {renderErrorBadge(pa4FlipResult?.corrupted_pt_blocks)}
           </div>
 
           {/* ── Key / IV info ── */}
-          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px 12px', border: '1px solid var(--border)', fontSize: '10px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 10px' }}>
+          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px 12px', border: '1px solid var(--border)', fontSize: '12px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 10px' }}>
             <span style={{ color: 'var(--text3)' }}>Key</span><code style={{ color: '#a5b4fc', wordBreak: 'break-all' }}>{pa4Trace.key_hex}</code>
             <span style={{ color: 'var(--text3)' }}>{pa4Trace.nonce_hex ? 'Nonce' : 'IV'}</span><code style={{ color: '#a5b4fc', wordBreak: 'break-all' }}>{pa4Trace.iv_hex || pa4Trace.nonce_hex}</code>
           </div>
@@ -749,22 +773,22 @@ const PADemoModal = ({ pa, onClose, api }) => {
           {/* ── IV Reuse attack (CBC only) ── */}
           {pa4Mode === 'CBC' && (
             <div style={{ background: 'linear-gradient(135deg,rgba(239,68,68,0.08),rgba(239,68,68,0.04))', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '12px', padding: '14px' }}>
-              <div style={{ fontSize: '11px', fontWeight: 700, color: '#ef4444', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>⚠️ CBC IV-Reuse Attack</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>⚠️ CBC IV-Reuse Attack</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
-                <input id="pa4-ivruse-m1" type="text" value={pa4IvMsg1} onChange={e => setPa4IvMsg1(e.target.value)} placeholder="Message 1 (first 16 chars shared)" style={{ padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '6px', color: 'var(--text1)', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }} />
-                <input id="pa4-ivruse-m2" type="text" value={pa4IvMsg2} onChange={e => setPa4IvMsg2(e.target.value)} placeholder="Message 2 (same first 16 chars)" style={{ padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '6px', color: 'var(--text1)', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }} />
+                <input id="pa4-ivruse-m1" type="text" value={pa4IvMsg1} onChange={e => setPa4IvMsg1(e.target.value)} placeholder="Message 1 (first 16 chars shared)" style={{ padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '6px', color: 'var(--text1)', fontSize: '14px', fontFamily: 'monospace', outline: 'none' }} />
+                <input id="pa4-ivruse-m2" type="text" value={pa4IvMsg2} onChange={e => setPa4IvMsg2(e.target.value)} placeholder="Message 2 (same first 16 chars)" style={{ padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '6px', color: 'var(--text1)', fontSize: '14px', fontFamily: 'monospace', outline: 'none' }} />
               </div>
               <button id="pa4-ivruse-btn" disabled={busyPA4('ivr')} onClick={async () => {
                 setL('ivr', true);
                 const d = await api.pa4IvReuse(pa4IvMsg1, pa4IvMsg2, pa4Trace?.key_hex || '', pa4Trace?.iv_hex || '');
                 setPa4IvReuseData(d); setPa4IvReuseOn(true); setL('ivr', false);
-              }} style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.6)', background: busyPA4('ivr') ? 'rgba(239,68,68,0.1)' : 'linear-gradient(135deg,#ef4444cc,#ef444488)', color: 'white', fontWeight: 700, fontSize: '13px', cursor: busyPA4('ivr') ? 'not-allowed' : 'pointer' }}>
+              }} style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.6)', background: busyPA4('ivr') ? 'rgba(239,68,68,0.1)' : 'linear-gradient(135deg,#ef4444cc,#ef444488)', color: 'white', fontWeight: 700, fontSize: '15px', cursor: busyPA4('ivr') ? 'not-allowed' : 'pointer' }}>
                 {busyPA4('ivr') ? '⏳ Running…' : '💥 Run IV-Reuse Attack'}
               </button>
 
               {pa4IvReuseData && pa4IvReuseOn && (
                 <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '8px' }}>
                     Both messages encrypted with the <strong style={{ color: '#fca5a5' }}>same IV = {pa4IvReuseData.iv_hex?.slice(0, 16)}…</strong>
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
@@ -773,14 +797,14 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       const match = (pa4IvReuseData.block_match || [])[i];
                       return (
                         <div key={i} style={{ borderRadius: '8px', padding: '8px', background: match ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.08)', border: `1px solid ${match ? '#ef4444' : '#22c55e'}` }}>
-                          <div style={{ fontSize: '10px', fontWeight: 700, color: match ? '#ef4444' : '#22c55e', marginBottom: '4px' }}>Block {i} {match ? '🔴 MATCH' : '🟢 diff'}</div>
-                          <div style={{ fontSize: '8px', fontFamily: 'monospace', color: '#a5b4fc', wordBreak: 'break-all', marginBottom: '2px' }}>M1: {ct1.slice(0, 10)}…</div>
-                          <div style={{ fontSize: '8px', fontFamily: 'monospace', color: '#a5b4fc', wordBreak: 'break-all' }}>M2: {ct2.slice(0, 10)}…</div>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: match ? '#ef4444' : '#22c55e', marginBottom: '4px' }}>Block {i} {match ? '🔴 MATCH' : '🟢 diff'}</div>
+                          <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#a5b4fc', wordBreak: 'break-all', marginBottom: '2px' }}>M1: {ct1.slice(0, 10)}…</div>
+                          <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#a5b4fc', wordBreak: 'break-all' }}>M2: {ct2.slice(0, 10)}…</div>
                         </div>
                       );
                     })}
                   </div>
-                  <div style={{ marginTop: '10px', fontSize: '11px', color: '#fca5a5', lineHeight: 1.5, padding: '8px 10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>
+                  <div style={{ marginTop: '10px', fontSize: '13px', color: '#fca5a5', lineHeight: 1.5, padding: '8px 10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>
                     {pa4IvReuseData.vulnerability}
                   </div>
                 </div>
@@ -790,8 +814,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
           {/* ── Comparison table ── */}
           <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px', border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mode Properties</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '6px', fontSize: '10px', textAlign: 'center' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mode Properties</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '6px', fontSize: '12px', textAlign: 'center' }}>
               {['', 'Para. Enc', 'Para. Dec', 'Error Prop', 'IV Reuse'].map((h, i) => (
                 <div key={i} style={{ fontWeight: 700, color: 'var(--text3)', paddingBottom: '4px', borderBottom: '1px solid var(--border)' }}>{h}</div>
               ))}
@@ -800,12 +824,341 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   <div style={{ fontWeight: 700, color: modeColor[m], padding: '4px' }}>{m}</div>
                   {[pe, pd].map((v, j) => <div key={j} style={{ color: v === '✓' ? '#22c55e' : '#ef4444', padding: '4px' }}>{v}</div>)}
                   <div style={{ color: '#f59e0b', padding: '4px' }}>{ep}</div>
-                  <div style={{ color: '#ef4444', padding: '4px', fontSize: '9px' }}>{ir}</div>
+                  <div style={{ color: '#ef4444', padding: '4px', fontSize: '11px' }}>{ir}</div>
                 </React.Fragment>
               ))}
             </div>
           </div>
         </>)}
+      </div>
+    );
+  };
+
+  const renderPA5Special = () => {
+    const card = (children, accent = '#818cf8', title = '') => (
+      <div style={{
+        background: `linear-gradient(135deg, ${accent}14 0%, ${accent}08 100%)`,
+        border: `1px solid ${accent}50`,
+        borderRadius: '12px', padding: '18px', marginBottom: '16px',
+      }}>
+        {title && <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: accent, marginBottom: '12px', textTransform: 'uppercase' }}>{title}</div>}
+        {children}
+      </div>
+    );
+
+    const btn = (label, onClick, accent = '#818cf8', loading = false) => (
+      <button onClick={onClick} disabled={loading} style={{
+        padding: '9px 18px', borderRadius: '8px', border: `1px solid ${accent}80`,
+        background: loading ? `${accent}22` : `linear-gradient(135deg, ${accent}cc, ${accent}88)`,
+        color: 'white', fontWeight: 700, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
+        transition: 'all 0.2s',
+      }}>
+        {loading ? '⏳ …' : label}
+      </button>
+    );
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        {/* ── Tabs ── */}
+        {card(
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            {['euf', 'le'].map(m => (
+              <button key={m} onClick={() => setPa5Tab(m)} style={{
+                padding: '6px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                background: pa5Tab === m ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(0,0,0,0.2)',
+                border: `1px solid ${pa5Tab === m ? '#818cf8' : 'rgba(99,102,241,0.25)'}`,
+                color: pa5Tab === m ? 'white' : 'var(--text2)', transition: 'all 0.18s',
+              }}>
+                {m === 'euf' ? '🎯 EUF-CMA Forgery Game' : '⚡ Length-Extension Demo'}
+              </button>
+            ))}
+          </div>,
+          '#6366f1', 'PA#5 Interactive Demos'
+        )}
+
+        {pa5Tab === 'euf' && card(
+          <div>
+            <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+              Act as the adversary! Get up to 50 signed messages from the oracle, then try to forge a valid tag for a <strong>new</strong> message.
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              {btn('📡 Get Signed Messages (Oracle)', async () => {
+                setPa5Loading(p => ({ ...p, eufInit: true }));
+                const d = await api.pa5EufInit();
+                setPa5Session(d.session_id);
+                setPa5Messages(d.messages);
+                setPa5Stats({ attempts: 0, successes: 0 });
+                setPa5EufResult(null);
+                setPa5Loading(p => ({ ...p, eufInit: false }));
+              }, '#6366f1', pa5Loading.eufInit)}
+            </div>
+
+            {pa5Messages.length > 0 && (
+              <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', padding: '10px', maxHeight: '150px', overflowY: 'auto', marginBottom: '16px' }}>
+                {pa5Messages.map((m, i) => (
+                  <div key={i} style={{ display: 'flex', gap: '10px', fontSize: '13px', fontFamily: 'monospace', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <span style={{ color: '#94a3b8', width: '20px' }}>{i+1}.</span>
+                    <span style={{ color: '#a5b4fc' }}>m: {m.message_hex}</span>
+                    <span style={{ color: '#34d399' }}>t: {m.tag_hex}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {pa5Session && (
+              <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', padding: '14px' }}>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>😈 Submit Forgery</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+                  <input type="text" value={pa5EufMsg} onChange={e => setPa5EufMsg(e.target.value)} placeholder="New message m* (hex, 32 chars)" style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '14px', outline: 'none' }} />
+                  <input type="text" value={pa5EufTag} onChange={e => setPa5EufTag(e.target.value)} placeholder="Forged tag t* (hex, 32 chars)" style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '14px', outline: 'none' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  {btn('Submit Forgery', async () => {
+                    setPa5Loading(p => ({ ...p, eufVerify: true }));
+                    const d = await api.pa5EufVerify(pa5Session, pa5EufMsg, pa5EufTag);
+                    setPa5EufResult(d.valid);
+                    setPa5Stats(s => ({ attempts: s.attempts + 1, successes: s.successes + (d.valid ? 1 : 0) }));
+                    setPa5Loading(p => ({ ...p, eufVerify: false }));
+                  }, '#f59e0b', pa5Loading.eufVerify)}
+                  
+                  <div style={{ fontSize: '14px', color: 'var(--text2)' }}>
+                    Attempts: <strong>{pa5Stats.attempts}</strong> | Successes: <strong style={{ color: pa5Stats.successes > 0 ? '#ef4444' : '#22c55e' }}>{pa5Stats.successes}</strong>
+                  </div>
+                </div>
+
+                {pa5EufResult !== null && (
+                  <div style={{ marginTop: '12px', padding: '10px', borderRadius: '6px', background: pa5EufResult ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)', color: pa5EufResult ? '#fca5a5' : '#86efac', fontWeight: 700, fontSize: '15px', border: `1px solid ${pa5EufResult ? '#ef4444' : '#22c55e'}` }}>
+                    {pa5EufResult ? '💥 Forgery accepted! (Security broken)' : '🔒 Forgery rejected!'}
+                  </div>
+                )}
+
+                {/* Cheat Section */}
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(245,158,11,0.2)' }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: '#fbbf24', marginBottom: '8px', textTransform: 'uppercase' }}>Need Help? (Cheat)</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '10px', lineHeight: 1.4 }}>
+                    This CBC-MAC implementation prepends the message length, making it mathematically secure against length-extension and splicing attacks. A real forgery is computationally infeasible. To let you test the 'Success' UI, click below to secretly query the backend oracle for a valid tag on a new message.
+                  </div>
+                  {btn('Cheat: Forge one for me', async () => {
+                    setPa5Loading(p => ({ ...p, eufCheat: true }));
+                    const d = await api.pa5EufCheat(pa5Session);
+                    setPa5EufMsg(d.message_hex);
+                    setPa5EufTag(d.tag_hex);
+                    setPa5EufResult(null);
+                    setPa5Loading(p => ({ ...p, eufCheat: false }));
+                  }, '#fbbf24', pa5Loading.eufCheat)}
+                </div>
+              </div>
+            )}
+          </div>,
+          '#f59e0b', 'Adversary Workbench'
+        )}
+
+        {pa5Tab === 'le' && card(
+          <div>
+            <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+              Naive MACs like <code>t = H(k||m)</code> are vulnerable to length extension. Type a suffix <code>m'</code> to compute a valid tag for <code>m || pad || m'</code> from <code>t</code> alone, bypassing <code>k</code>.
+            </div>
+            
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              <input type="text" value={pa5LeSuffix} onChange={e => setPa5LeSuffix(e.target.value)} placeholder="Type a suffix m'..." style={{ flex: 1, padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '14px', outline: 'none' }} />
+              {btn('Run Length Extension', async () => {
+                setPa5Loading(p => ({ ...p, leRun: true }));
+                const d = await api.pa5LengthExtension(pa5LeSuffix);
+                setPa5LeData(d);
+                setPa5Loading(p => ({ ...p, leRun: false }));
+              }, '#ef4444', pa5Loading.leRun)}
+            </div>
+
+            {pa5LeData && (
+              <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', padding: '14px', fontSize: '14px' }}>
+                <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: '10px' }}>⚠️ Vulnerability Demonstrated</div>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', color: 'var(--text2)' }}>
+                  <span>Original msg (m):</span> <code style={{ color: '#a5b4fc', wordBreak: 'break-all' }}>{pa5LeData.message}</code>
+                  <span>Original tag (t):</span> <code style={{ color: '#a5b4fc', wordBreak: 'break-all' }}>{pa5LeData.naive_tag}</code>
+                  <span>Forged msg:</span> <code style={{ color: '#fca5a5', wordBreak: 'break-all' }}>{pa5LeData.forged_message}</code>
+                  <span>Forged tag (t*):</span> <code style={{ color: '#fca5a5', wordBreak: 'break-all', fontWeight: 700 }}>{pa5LeData.forged_tag}</code>
+                </div>
+                
+                <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5', fontWeight: 700 }}>
+                  {pa5LeData.naive_vulnerable ? '💥 Attack Successful: The forged tag is perfectly valid for the extended message.' : 'Attack Failed'}
+                </div>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '6px', lineHeight: 1.4 }}>
+                  The extended tag was computed by resuming the hash function state from the original tag 't'. The secret key 'k' was not required. This is why HMAC uses a double-hash structure.
+                </div>
+              </div>
+            )}
+          </div>,
+          '#ef4444', 'Length-Extension Vulnerability'
+        )}
+      </div>
+    );
+  };
+
+  const renderPA6Special = () => {
+    const hexToBinaryArray = (hexStr) => {
+      let arr = [];
+      for (let i = 0; i < hexStr.length; i += 2) {
+        const byte = parseInt(hexStr.substring(i, i + 2), 16);
+        for (let b = 7; b >= 0; b--) {
+          arr.push((byte >> b) & 1);
+        }
+      }
+      return arr;
+    };
+
+    const handleFlip = async (type, bitIdx) => {
+      if (!pa6Data) return;
+      
+      // Toggle locally for instant UI update
+      const toggleBit = (hex, idx) => {
+        const byteIdx = Math.floor(idx / 8);
+        const bitOffset = 7 - (idx % 8);
+        let bytes = new Uint8Array(hex.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+        bytes[byteIdx] ^= (1 << bitOffset);
+        return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      };
+
+      let cpaFlipped = pa6CpaFlipped || pa6Data.cpa_ct;
+      let ccaFlipped = pa6CcaFlipped || pa6Data.cca_ct;
+
+      if (type === 'cpa') {
+        cpaFlipped = toggleBit(cpaFlipped, bitIdx);
+        setPa6CpaFlipped(cpaFlipped);
+      } else {
+        ccaFlipped = toggleBit(ccaFlipped, bitIdx);
+        setPa6CcaFlipped(ccaFlipped);
+      }
+      
+      // Call backend
+      setPa6Loading(p => ({ ...p, flip: true }));
+      const res = await api.pa6MalleabilityFlip({
+        key_enc: pa6Data.key_enc,
+        key_mac: pa6Data.key_mac,
+        cpa_r: pa6Data.cpa_r,
+        cpa_ct: cpaFlipped,
+        cca_r: pa6Data.cca_r,
+        cca_ct: ccaFlipped,
+        cca_tag: pa6Data.cca_tag,
+      });
+      
+      setPa6CpaDec(res.cpa_decrypted);
+      setPa6CpaErr(res.cpa_error);
+      setPa6CcaDec(res.cca_decrypted);
+      setPa6CcaRej(res.cca_rejected);
+      setPa6CcaErr(res.cca_error);
+      setPa6Loading(p => ({ ...p, flip: false }));
+    };
+
+    const renderBits = (hex, type) => {
+      const bits = hexToBinaryArray(hex);
+      return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px', fontFamily: 'monospace', fontSize: '12px' }}>
+          {bits.map((b, i) => (
+            <div 
+              key={i} 
+              onClick={() => handleFlip(type, i)}
+              style={{
+                width: '12px', height: '14px', 
+                background: b === 1 ? '#4ade80' : 'rgba(255,255,255,0.1)',
+                color: b === 1 ? '#000' : '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', userSelect: 'none', borderRadius: '2px',
+                border: '1px solid rgba(255,255,255,0.2)'
+              }}
+              title={`Click to flip bit ${i}`}
+            >
+              {b}
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px', textTransform: 'uppercase' }}>Initialize Malleability Workbench</div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input 
+              type="text" 
+              value={pa6Msg} 
+              onChange={e => setPa6Msg(e.target.value)} 
+              placeholder="Plaintext message..."
+              style={{ flex: 1, padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', outline: 'none' }}
+            />
+            <button 
+              onClick={async () => {
+                setPa6Loading(p => ({ ...p, init: true }));
+                const d = await api.pa6MalleabilityInit(pa6Msg);
+                setPa6Data(d);
+                setPa6CpaFlipped(d.cpa_ct);
+                setPa6CcaFlipped(d.cca_ct);
+                setPa6CpaDec(pa6Msg);
+                setPa6CcaDec(pa6Msg);
+                setPa6CpaErr(null);
+                setPa6CcaErr(null);
+                setPa6CcaRej(false);
+                setPa6Loading(p => ({ ...p, init: false }));
+              }}
+              disabled={pa6Loading.init}
+              style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none' }}
+            >
+              {pa6Loading.init ? '⏳...' : 'Encrypt & Load'}
+            </button>
+          </div>
+        </div>
+
+        {pa6Data && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            
+            {/* Left: CPA */}
+            <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '16px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '12px', textTransform: 'uppercase' }}>❌ CPA-Only (Malleable)</div>
+              
+              <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '8px' }}>Ciphertext Bits (Click to flip):</div>
+              <div style={{ marginBottom: '16px', opacity: pa6Loading.flip ? 0.5 : 1, pointerEvents: pa6Loading.flip ? 'none' : 'auto' }}>
+                {renderBits(pa6CpaFlipped || pa6Data.cpa_ct, 'cpa')}
+              </div>
+              
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '4px' }}>Live Decryption:</div>
+                {pa6CpaErr ? (
+                  <div style={{ color: '#ef4444', fontFamily: 'monospace', fontSize: '14px' }}>[Padding Error]</div>
+                ) : (
+                  <div style={{ color: pa6CpaDec === pa6Msg ? '#4ade80' : '#fca5a5', fontFamily: 'monospace', fontSize: '16px', wordBreak: 'break-all' }}>
+                    {pa6CpaDec}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: CCA */}
+            <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '12px', padding: '16px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e', marginBottom: '12px', textTransform: 'uppercase' }}>✅ CCA (Encrypt-then-MAC)</div>
+              
+              <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '8px' }}>Ciphertext Bits (Click to flip):</div>
+              <div style={{ marginBottom: '16px', opacity: pa6Loading.flip ? 0.5 : 1, pointerEvents: pa6Loading.flip ? 'none' : 'auto' }}>
+                {renderBits(pa6CcaFlipped || pa6Data.cca_ct, 'cca')}
+              </div>
+              
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '4px' }}>Live Decryption:</div>
+                {pa6CcaRej ? (
+                  <div style={{ color: '#ef4444', fontFamily: 'monospace', fontSize: '15px', fontWeight: 700 }}>
+                    ⊥ REJECTED (MAC Failure)
+                  </div>
+                ) : (
+                  <div style={{ color: '#4ade80', fontFamily: 'monospace', fontSize: '16px', wordBreak: 'break-all' }}>
+                    {pa6CcaDec}
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        )}
       </div>
     );
   };
@@ -827,7 +1180,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           borderRadius: '12px',
           padding: '18px',
         }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase' }}>🔢 Live DLP Hash</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase' }}>🔢 Live DLP Hash</div>
           <input
             id="pa8-message-input"
             type="text"
@@ -836,7 +1189,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             style={{
               width: '100%', boxSizing: 'border-box', padding: '10px 14px',
               background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(99,102,241,0.4)',
-              borderRadius: '8px', color: 'var(--text1)', fontSize: '14px',
+              borderRadius: '8px', color: 'var(--text1)', fontSize: '16px',
               outline: 'none', fontFamily: 'monospace',
             }}
             onChange={async (e) => {
@@ -858,9 +1211,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
           {pa8Hash && !pa8Loading && (
             <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '2px' }}>Full hash  ({pa8Hash.digest_bytes} bytes — group element mod p):</div>
+              <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '2px' }}>Full hash  ({pa8Hash.digest_bytes} bytes — group element mod p):</div>
               <div style={{
-                fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all',
+                fontFamily: 'monospace', fontSize: '14px', wordBreak: 'break-all',
                 background: 'rgba(0,0,0,0.4)', borderRadius: '6px', padding: '10px 12px',
                 border: '1px solid rgba(99,102,241,0.25)', color: '#a5b4fc', lineHeight: 1.6,
               }}>
@@ -868,12 +1221,12 @@ const PADemoModal = ({ pa, onClose, api }) => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '4px' }}>
                 <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '6px', padding: '8px 10px', border: '1px solid rgba(99,102,241,0.15)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>16-bit truncation</div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '13px', color: '#c4b5fd', fontWeight: 700 }}>0x{pa8Hash.truncated_hex}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '3px' }}>16-bit truncation</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: '15px', color: '#c4b5fd', fontWeight: 700 }}>0x{pa8Hash.truncated_hex}</div>
                 </div>
                 <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '6px', padding: '8px 10px', border: '1px solid rgba(99,102,241,0.15)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>Decimal</div>
-                  <div style={{ fontFamily: 'monospace', fontSize: '13px', color: '#c4b5fd', fontWeight: 700 }}>{pa8Hash.truncated_16bit}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '3px' }}>Decimal</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: '15px', color: '#c4b5fd', fontWeight: 700 }}>{pa8Hash.truncated_16bit}</div>
                 </div>
               </div>
             </div>
@@ -884,7 +1237,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {pa8Hash && (
           <div style={{
             background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '14px',
-            border: '1px solid var(--border)', fontSize: '11px',
+            border: '1px solid var(--border)', fontSize: '13px',
           }}>
             <div style={{ fontWeight: 700, color: 'var(--text2)', marginBottom: '8px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>⚙️ Group Parameters (q ≈ 2³²)</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px' }}>
@@ -895,7 +1248,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 </React.Fragment>
               ))}
             </div>
-            <div style={{ marginTop: '10px', fontSize: '10px', color: 'var(--text3)', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
+            <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text3)', borderTop: '1px solid var(--border)', paddingTop: '8px' }}>
               Compression: <code style={{ color: '#a5b4fc' }}>h(x,y) = gˣ · ĥʸ mod p</code> — collision ⇒ log<sub>g</sub>(ĥ)
             </div>
           </div>
@@ -908,9 +1261,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           borderRadius: '12px',
           padding: '18px',
         }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>🎯 Collision Hunt  (birthday bound demo)</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>🎯 Collision Hunt  (birthday bound demo)</div>
 
-          <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '14px', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '14px', lineHeight: 1.5 }}>
             Truncates the hash to <strong>16 bits</strong> (output space = 65 536). Birthday bound ≈ 2<sup>16/2</sup> = <strong>256 evaluations</strong>.
           </div>
 
@@ -919,7 +1272,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               id="pa8-collision-start-btn"
               disabled={huntRunning}
               style={{
-                flex: 1, padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: huntRunning ? 'not-allowed' : 'pointer',
+                flex: 1, padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '15px', cursor: huntRunning ? 'not-allowed' : 'pointer',
                 background: huntRunning ? 'rgba(245,158,11,0.15)' : 'linear-gradient(135deg, #f59e0b, #ef4444)',
                 border: 'none', color: huntRunning ? '#f59e0b' : 'white',
                 transition: 'all 0.2s',
@@ -949,7 +1302,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               <button
                 id="pa8-collision-stop-btn"
                 style={{
-                  padding: '10px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                  padding: '10px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '15px', cursor: 'pointer',
                   background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444',
                 }}
                 onClick={async () => {
@@ -965,7 +1318,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           {/* Progress bar */}
           {huntStatus && (
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text3)', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text3)', marginBottom: '6px' }}>
                 <span>Evaluations: <strong style={{ color: 'var(--text1)' }}>{evals.toLocaleString()}</strong></span>
                 <span>Birthday bound 2<sup>16/2</sup>: <strong style={{ color: '#f59e0b' }}>{bound}</strong></span>
               </div>
@@ -981,7 +1334,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   borderRadius: '5px',
                 }} />
               </div>
-              <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '4px', textAlign: 'right' }}>
+              <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '4px', textAlign: 'right' }}>
                 {pct.toFixed(1)}% of birthday bound
                 {evals > bound && <span style={{ color: '#f59e0b' }}>  (+{(evals - bound).toLocaleString()} over)</span>}
               </div>
@@ -1000,8 +1353,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 animation: 'fadeIn 0.4s ease',
               }}
             >
-              <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '10px', fontSize: '14px' }}>💥 Collision Found after {evals.toLocaleString()} evaluations!</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: '12px' }}>
+              <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '10px', fontSize: '16px' }}>💥 Collision Found after {evals.toLocaleString()} evaluations!</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: '14px' }}>
                 <span style={{ color: 'var(--text3)' }}>Input 1</span>
                 <code style={{ color: '#86efac', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>{collision.msg1}</code>
                 <span style={{ color: 'var(--text3)' }}>Input 2</span>
@@ -1009,7 +1362,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 <span style={{ color: 'var(--text3)' }}>Hash (16-bit)</span>
                 <code style={{ color: '#fbbf24', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>0x{collision.hash_16bit} = {collision.hash_decimal}</code>
               </div>
-              <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text3)', borderTop: '1px solid rgba(34,197,94,0.2)', paddingTop: '10px', lineHeight: 1.5 }}>
+              <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text3)', borderTop: '1px solid rgba(34,197,94,0.2)', paddingTop: '10px', lineHeight: 1.5 }}>
                 <strong style={{ color: 'var(--text2)' }}>Why this doesn't break security:</strong> Finding a collision on a <em>truncated</em> 16-bit output is easy (birthday ≈ 256). Breaking the <em>full</em> DLP Hash requires solving
                 the discrete log to find (x,y) ≠ (x′,y′) with gˣ·ĥʸ = gˣ′·ĥʸ′ mod p.
               </div>
@@ -1017,7 +1370,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           )}
 
           {status === 'exhausted' && !collision && (
-            <div style={{ color: '#f87171', fontSize: '12px', padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <div style={{ color: '#f87171', fontSize: '14px', padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
               Safety cap reached without collision. This can happen in rare cases — try again.
             </div>
           )}
@@ -1084,7 +1437,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           borderRadius: '12px',
           padding: '18px',
         }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase' }}>🎛️ Output Bit-Length n</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase' }}>🎛️ Output Bit-Length n</div>
 
           {/* Segmented pill selector */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1103,7 +1456,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                     : 'rgba(0,0,0,0.2)',
                   color: n === nBits ? '#c4b5fd' : 'var(--text2)',
                   fontWeight: n === nBits ? 700 : 400,
-                  fontSize: '13px',
+                  fontSize: '15px',
                   cursor: 'pointer',
                   transition: 'all 0.18s',
                 }}
@@ -1113,7 +1466,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             ))}
           </div>
 
-          <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '11px' }}>
+          <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '13px' }}>
             <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '6px', padding: '8px 10px', border: '1px solid rgba(99,102,241,0.15)', textAlign: 'center' }}>
               <div style={{ color: 'var(--text3)', marginBottom: '2px' }}>Output space</div>
               <div style={{ fontFamily: 'monospace', color: '#a5b4fc', fontWeight: 700 }}>2<sup>{nBits}</sup> = {Math.pow(2, nBits).toLocaleString()}</div>
@@ -1136,14 +1489,14 @@ const PADemoModal = ({ pa, onClose, api }) => {
           borderRadius: '12px',
           padding: '18px',
         }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>🎯 Birthday Attack</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>🎯 Birthday Attack</div>
 
           <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
             <button
               id="pa9-run-btn"
               disabled={pa9Running}
               style={{
-                flex: 1, padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '13px',
+                flex: 1, padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '15px',
                 cursor: pa9Running ? 'not-allowed' : 'pointer',
                 background: pa9Running
                   ? 'rgba(245,158,11,0.15)'
@@ -1176,7 +1529,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               <button
                 id="pa9-stop-btn"
                 style={{
-                  padding: '10px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                  padding: '10px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '15px', cursor: 'pointer',
                   background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444',
                 }}
                 onClick={async () => {
@@ -1192,7 +1545,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           {/* Progress bar */}
           {pa9Status && (
             <div style={{ marginBottom: '14px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text3)', marginBottom: '6px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text3)', marginBottom: '6px' }}>
                 <span>Hashes computed: <strong style={{ color: 'var(--text1)' }}>{evals.toLocaleString()}</strong></span>
                 <span>P(collision): <strong style={{ color: '#34d399' }}>{(empiricalProb * 100).toFixed(1)}%</strong></span>
               </div>
@@ -1219,7 +1572,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             borderRadius: '12px',
             padding: '14px',
           }}>
-            <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text2)', marginBottom: '10px', textTransform: 'uppercase' }}>📈 Collision Probability vs Hashes Computed</div>
+            <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text2)', marginBottom: '10px', textTransform: 'uppercase' }}>📈 Collision Probability vs Hashes Computed</div>
             <svg
               id="pa9-probability-chart"
               width={W}
@@ -1278,7 +1631,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             </svg>
 
             {/* Legend */}
-            <div style={{ display: 'flex', gap: '16px', marginTop: '8px', fontSize: '10px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '16px', marginTop: '8px', fontSize: '12px', flexWrap: 'wrap' }}>
               <span><span style={{ display: 'inline-block', width: 20, height: 2, background: '#818cf8', verticalAlign: 'middle', marginRight: 4 }} />Theory: 1−e<sup>−k(k−1)/2<sup>n</sup></sup></span>
               <span><span style={{ display: 'inline-block', width: 20, height: 2, background: '#34d399', verticalAlign: 'middle', marginRight: 4 }} />Empirical P(collision)</span>
               <span><span style={{ display: 'inline-block', width: 14, height: 2, background: '#f59e0b', verticalAlign: 'middle', marginRight: 4, borderTop: '1px dashed #f59e0b' }} />Birthday bound 2<sup>n/2</sup></span>
@@ -1298,8 +1651,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
               animation: 'fadeIn 0.4s ease',
             }}
           >
-            <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '10px', fontSize: '14px' }}>💥 Collision Found in {evals.toLocaleString()} evaluations! (expected ≈ {Math.round(bound)})</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: '12px' }}>
+            <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '10px', fontSize: '16px' }}>💥 Collision Found in {evals.toLocaleString()} evaluations! (expected ≈ {Math.round(bound)})</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: '14px' }}>
               <span style={{ color: 'var(--text3)' }}>Input 1</span>
               <code style={{ color: '#86efac', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px', wordBreak: 'break-all' }}>0x{collision.input1}</code>
               <span style={{ color: 'var(--text3)' }}>Input 2</span>
@@ -1307,7 +1660,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               <span style={{ color: 'var(--text3)' }}>Shared hash ({nBits}-bit)</span>
               <code style={{ color: '#fbbf24', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>0x{collision.hash_hex} = {collision.hash_value}</code>
             </div>
-            <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text3)', borderTop: '1px solid rgba(34,197,94,0.2)', paddingTop: '10px', lineHeight: 1.5 }}>
+            <div style={{ marginTop: '12px', fontSize: '13px', color: 'var(--text3)', borderTop: '1px solid rgba(34,197,94,0.2)', paddingTop: '10px', lineHeight: 1.5 }}>
               <strong style={{ color: 'var(--text2)' }}>Birthday paradox:</strong> With only {nBits} output bits (2<sup>{nBits}</sup> = {Math.pow(2,nBits).toLocaleString()} possible values),
               a collision appears after ≈ 2<sup>{nBits}/2</sup> = {Math.round(bound)} hashes — far fewer than the full output space.
               Ratio empirical/expected: <strong style={{ color: '#34d399' }}>{(evals / bound).toFixed(2)}×</strong>.
@@ -1316,7 +1669,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         )}
 
         {status === 'exhausted' && !collision && (
-          <div style={{ color: '#f87171', fontSize: '12px', padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <div style={{ color: '#f87171', fontSize: '14px', padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
             Safety cap reached without collision. Try again.
           </div>
         )}
@@ -1375,7 +1728,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               <h3 style={{ margin: 0, marginBottom: '12px' }}>PRF as PRG Randomness</h3>
               <div className="stats-container">
                 <div className="ratio-bar-container" style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
                     <span>Bit Ratio (Ones/Total)</span>
                     <span style={{ fontWeight: 600 }}>{result.ratio ? (result.ratio * 100).toFixed(1) : '...'}%</span>
                   </div>
@@ -1394,8 +1747,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       background: s.pass ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                       border: `1px solid ${s.pass ? '#22c55e' : '#ef4444'}`
                     }}>
-                      <div style={{ fontSize: '10px', fontWeight: 600, color: s.pass ? '#22c55e' : '#ef4444' }}>{s.test.toUpperCase()}</div>
-                      <div style={{ fontSize: '11px' }}>{s.pass ? 'PASS' : 'FAIL'}</div>
+                      <div style={{ fontSize: '12px', fontWeight: 600, color: s.pass ? '#22c55e' : '#ef4444' }}>{s.test.toUpperCase()}</div>
+                      <div style={{ fontSize: '13px' }}>{s.pass ? 'PASS' : 'FAIL'}</div>
                     </div>
                   ))}
                 </div>
@@ -1407,23 +1760,23 @@ const PADemoModal = ({ pa, onClose, api }) => {
             <div className="result-section animate-fade-in">
               <h3 style={{ margin: 0, marginBottom: '12px' }}>Distinguishing Game (PRF Security)</h3>
               <div style={{ padding: '12px', background: 'rgba(var(--accent-rgb), 0.05)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>🎯 Goal: Is it PRF or Random?</div>
-                <div style={{ fontSize: '11px', color: 'var(--text2)', lineHeight: '1.4', marginBottom: '12px' }}>
+                <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>🎯 Goal: Is it PRF or Random?</div>
+                <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: '1.4', marginBottom: '12px' }}>
                   The adversary tries to distinguish between your <strong>GGM PRF</strong> and a <strong>True Random Function</strong>. If the success rate is close to 50%, the PRF is secure.
                 </div>
                 
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                   <div style={{ flex: 1, background: 'var(--bg2)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Trials</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700 }}>{result.game.trials}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Trials</div>
+                    <div style={{ fontSize: '20px', fontWeight: 700 }}>{result.game.trials}</div>
                   </div>
                   <div style={{ flex: 1, background: 'var(--bg2)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Advantage</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>{(Math.abs(result.game.advantage) * 100).toFixed(1)}%</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text3)' }}>Advantage</div>
+                    <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent)' }}>{(Math.abs(result.game.advantage) * 100).toFixed(1)}%</div>
                   </div>
                 </div>
 
-                <div style={{ fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', fontStyle: 'italic' }}>
                   {result.game.advantage < 0.1 ? 
                     "✅ Success! The adversary has no significant advantage. The PRF is indistinguishable from random." : 
                     "⚠️ Noticeable bias detected in this trial."}
@@ -1446,17 +1799,17 @@ const PADemoModal = ({ pa, onClose, api }) => {
         border: `1px solid ${accent}50`,
         borderRadius: '12px', padding: '18px', marginBottom: '16px',
       }}>
-        {title && <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: accent, marginBottom: '12px', textTransform: 'uppercase' }}>{title}</div>}
+        {title && <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: accent, marginBottom: '12px', textTransform: 'uppercase' }}>{title}</div>}
         {children}
       </div>
     );
 
     const mono = (txt, color = '#a5b4fc') => (
-      <code style={{ fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all', color, background: 'rgba(0,0,0,0.35)', borderRadius: '4px', padding: '2px 6px' }}>{txt}</code>
+      <code style={{ fontFamily: 'monospace', fontSize: '13px', wordBreak: 'break-all', color, background: 'rgba(0,0,0,0.35)', borderRadius: '4px', padding: '2px 6px' }}>{txt}</code>
     );
 
     const badge = (ok, yes = 'Secure ✓', no = 'Vulnerable ✗') => (
-      <span style={{ fontWeight: 700, color: ok ? '#22c55e' : '#ef4444', background: ok ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${ok ? '#22c55e' : '#ef4444'}`, borderRadius: '6px', padding: '2px 10px', fontSize: '12px' }}>
+      <span style={{ fontWeight: 700, color: ok ? '#22c55e' : '#ef4444', background: ok ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${ok ? '#22c55e' : '#ef4444'}`, borderRadius: '6px', padding: '2px 10px', fontSize: '14px' }}>
         {ok ? yes : no}
       </span>
     );
@@ -1465,7 +1818,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
       <button onClick={onClick} disabled={loading} style={{
         padding: '9px 18px', borderRadius: '8px', border: `1px solid ${accent}80`,
         background: loading ? `${accent}22` : `linear-gradient(135deg, ${accent}cc, ${accent}88)`,
-        color: 'white', fontWeight: 700, fontSize: '12px', cursor: loading ? 'not-allowed' : 'pointer',
+        color: 'white', fontWeight: 700, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
         transition: 'all 0.2s',
       }}>
         {loading ? '⏳ …' : label}
@@ -1478,10 +1831,10 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {/* ── Hash toggle ── */}
         {card(
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text2)' }}>Underlying hash:</span>
+            <span style={{ fontSize: '14px', color: 'var(--text2)' }}>Underlying hash:</span>
             {['dlp', 'sha256'].map(m => (
               <button key={m} onClick={() => { setPa10HashMode(m); setPa10LeData(null); }} style={{
-                padding: '6px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '12px', cursor: 'pointer',
+                padding: '6px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
                 background: pa10HashMode === m ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(0,0,0,0.2)',
                 border: `1px solid ${pa10HashMode === m ? '#818cf8' : 'rgba(99,102,241,0.25)'}`,
                 color: pa10HashMode === m ? 'white' : 'var(--text2)', transition: 'all 0.18s',
@@ -1496,7 +1849,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {/* ── Side-by-side length-extension ── */}
         {card(
           <div>
-            <div style={{ marginBottom: '12px', fontSize: '12px', color: 'var(--text2)', lineHeight: 1.5 }}>
+            <div style={{ marginBottom: '12px', fontSize: '14px', color: 'var(--text2)', lineHeight: 1.5 }}>
               Type a suffix m′. Left: naive <code>H(k‖m)</code> is forged. Right: HMAC resists.
             </div>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'center' }}>
@@ -1506,7 +1859,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 value={pa10LeSuffix}
                 placeholder="Type suffix m′…"
                 onChange={e => setPa10LeSuffix(e.target.value)}
-                style={{ flex: 1, padding: '9px 13px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', color: 'var(--text1)', fontSize: '13px', fontFamily: 'monospace', outline: 'none' }}
+                style={{ flex: 1, padding: '9px 13px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', color: 'var(--text1)', fontSize: '15px', fontFamily: 'monospace', outline: 'none' }}
               />
               {btn('⚡ Attack!', async () => {
                 setPa10LeLoading(true);
@@ -1518,40 +1871,40 @@ const PADemoModal = ({ pa, onClose, api }) => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {/* LEFT — broken */}
               <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '10px', padding: '14px' }}>
-                <div style={{ fontWeight: 700, color: '#f87171', marginBottom: '10px', fontSize: '12px' }}>⚠️ Naive H(k‖m) — BROKEN</div>
+                <div style={{ fontWeight: 700, color: '#f87171', marginBottom: '10px', fontSize: '14px' }}>⚠️ Naive H(k‖m) — BROKEN</div>
                 {pa10LeLoading && <div className="spinner" style={{ margin: '10px auto' }} />}
                 {pa10LeData && <>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Original message</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>Original message</div>
                   <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.message)}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Naive tag t = H(k‖m)</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>Naive tag t = H(k‖m)</div>
                   <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.naive_tag?.slice(0, 24) + '…', '#fca5a5')}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Forged message (m‖pad‖m′)</div>
-                  <div style={{ marginBottom: '8px', fontSize: '10px', fontFamily: 'monospace', wordBreak: 'break-all', color: '#fca5a5', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '6px' }}>{pa10LeData.forged_message}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>Forged message (m‖pad‖m′)</div>
+                  <div style={{ marginBottom: '8px', fontSize: '12px', fontFamily: 'monospace', wordBreak: 'break-all', color: '#fca5a5', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '6px' }}>{pa10LeData.forged_message}</div>
                   <div style={{ marginBottom: '8px' }}>{badge(false, '', '🔥 Forgery Succeeded!')}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.4 }}>
                     Attacker used naive_tag as IV, continued hashing m′ — valid without knowing k.
                   </div>
                 </>}
-                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press ⚡ Attack!</div>}
+                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press ⚡ Attack!</div>}
               </div>
 
               {/* RIGHT — HMAC */}
               <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.35)', borderRadius: '10px', padding: '14px' }}>
-                <div style={{ fontWeight: 700, color: '#4ade80', marginBottom: '10px', fontSize: '12px' }}>✅ HMAC — SECURE</div>
+                <div style={{ fontWeight: 700, color: '#4ade80', marginBottom: '10px', fontSize: '14px' }}>✅ HMAC — SECURE</div>
                 {pa10LeLoading && <div className="spinner" style={{ margin: '10px auto' }} />}
                 {pa10LeData && <>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Original message</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>Original message</div>
                   <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.message)}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>HMAC tag</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>HMAC tag</div>
                   <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.hmac_tag?.slice(0, 24) + '…', '#86efac')}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Same forged message attempted</div>
-                  <div style={{ marginBottom: '8px', fontSize: '10px', fontFamily: 'monospace', wordBreak: 'break-all', color: '#86efac', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '6px' }}>{pa10LeData.forged_message}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>Same forged message attempted</div>
+                  <div style={{ marginBottom: '8px', fontSize: '12px', fontFamily: 'monospace', wordBreak: 'break-all', color: '#86efac', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '6px' }}>{pa10LeData.forged_message}</div>
                   <div style={{ marginBottom: '8px' }}>{badge(true, '🔒 Forgery Failed!')}</div>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.4 }}>
                     HMAC wraps with outer hash — leaked state can't be reused without k.
                   </div>
                 </>}
-                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press ⚡ Attack!</div>}
+                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press ⚡ Attack!</div>}
               </div>
             </div>
           </div>,
@@ -1561,7 +1914,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {/* ── EUF-CMA game ── */}
         {card(
           <div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
               50 oracle queries → 20 random forgery attempts. A secure MAC has 0 successes.
             </div>
             {btn('▶ Run EUF-CMA Game', async () => {
@@ -1577,8 +1930,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   ['Successes', pa10EufData.successes, pa10EufData.successes === 0 ? '#22c55e' : '#ef4444'],
                 ].map(([l, v, c]) => (
                   <div key={l} style={{ textAlign: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: `1px solid ${c}40` }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
-                    <div style={{ fontSize: '22px', fontWeight: 800, color: c }}>{v}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
+                    <div style={{ fontSize: '24px', fontWeight: 800, color: c }}>{v}</div>
                   </div>
                 ))}
                 <div style={{ gridColumn: '1/-1', marginTop: '4px' }}>
@@ -1593,7 +1946,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {/* ── MAC ⇒ CRHF ── */}
         {card(
           <div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
               Use HMAC as compression h′(cv, block) = HMAC_k(cv‖block) in Merkle-Damgård. All 5 messages hash to distinct values.
             </div>
             {btn('▶ Run MAC⇒CRHF Demo', async () => {
@@ -1609,13 +1962,13 @@ const PADemoModal = ({ pa, onClose, api }) => {
                     ['Distinct Hashes', pa10MacData.distinct_hashes],
                   ].map(([l, v]) => (
                     <div key={l} style={{ textAlign: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(139,92,246,0.3)' }}>
-                      <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
-                      <div style={{ fontSize: '22px', fontWeight: 800, color: '#c4b5fd' }}>{v}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
+                      <div style={{ fontSize: '24px', fontWeight: 800, color: '#c4b5fd' }}>{v}</div>
                     </div>
                   ))}
                 </div>
                 {badge(pa10MacData.all_distinct, 'No Collisions — MAC⇒CRHF Holds ✓')}
-                <div style={{ marginTop: '10px', fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                <div style={{ marginTop: '10px', fontSize: '12px', color: 'var(--text3)', lineHeight: 1.4 }}>
                   {pa10MacData.conclusion}
                 </div>
               </div>
@@ -1627,7 +1980,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {/* ── Encrypt-then-HMAC ── */}
         {card(
           <div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
               EtH_Enc: encrypt with PA#3 CPA scheme, then HMAC the ciphertext. EtH_Dec: verify HMAC first, then decrypt.
             </div>
             <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'center' }}>
@@ -1637,7 +1990,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 value={pa10EthMsg}
                 onChange={e => setPa10EthMsg(e.target.value)}
                 placeholder="Plaintext to encrypt…"
-                style={{ flex: 1, padding: '9px 13px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', color: 'var(--text1)', fontSize: '13px', fontFamily: 'monospace', outline: 'none' }}
+                style={{ flex: 1, padding: '9px 13px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', color: 'var(--text1)', fontSize: '15px', fontFamily: 'monospace', outline: 'none' }}
               />
               {btn('🔒 Encrypt', async () => {
                 setPa10Loading(p => ({ ...p, eth: true }));
@@ -1649,7 +2002,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
             {pa10EthData && (
               <div style={{ marginTop: '4px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: '11px', marginBottom: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: '13px', marginBottom: '12px' }}>
                   {[
                     ['Plaintext', pa10EthData.plaintext, '#34d399'],
                     ['Nonce (r)', pa10EthData.nonce_hex?.slice(0, 20) + '…', '#a5b4fc'],
@@ -1678,9 +2031,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
                 {pa10DecData && (
                   <div style={{ marginTop: '12px', padding: '12px', background: pa10DecData.success ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${pa10DecData.success ? '#22c55e' : '#ef4444'}50`, borderRadius: '8px' }}>
-                    <div style={{ fontWeight: 700, fontSize: '12px', color: pa10DecData.success ? '#4ade80' : '#f87171', marginBottom: '6px' }}>{pa10DecData.result}</div>
-                    {pa10DecData.success && <div style={{ fontFamily: 'monospace', fontSize: '12px', color: '#34d399' }}>Decrypted: "{pa10DecData.plaintext}"</div>}
-                    {!pa10DecData.success && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>HMAC verification failed — ciphertext rejected before decryption (CCA2 safety).</div>}
+                    <div style={{ fontWeight: 700, fontSize: '14px', color: pa10DecData.success ? '#4ade80' : '#f87171', marginBottom: '6px' }}>{pa10DecData.result}</div>
+                    {pa10DecData.success && <div style={{ fontFamily: 'monospace', fontSize: '14px', color: '#34d399' }}>Decrypted: "{pa10DecData.plaintext}"</div>}
+                    {!pa10DecData.success && <div style={{ fontSize: '13px', color: 'var(--text3)' }}>HMAC verification failed — ciphertext rejected before decryption (CCA2 safety).</div>}
                   </div>
                 )}
               </div>
@@ -1692,7 +2045,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {/* ── IND-CCA2 game ── */}
         {card(
           <div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
               30 rounds: adversary guesses randomly, all tampered ciphertexts must be rejected.
             </div>
             {btn('▶ Run IND-CCA2 Game', async () => {
@@ -1710,13 +2063,13 @@ const PADemoModal = ({ pa, onClose, api }) => {
                     ['Tamper Rej.', pa10CcaData.tamper_rejection_rate === 1 ? '100%' : (pa10CcaData.tamper_rejection_rate * 100).toFixed(0) + '%', pa10CcaData.tamper_rejection_rate === 1 ? '#22c55e' : '#ef4444'],
                   ].map(([l, v, c]) => (
                     <div key={l} style={{ textAlign: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: `1px solid ${c}40` }}>
-                      <div style={{ fontSize: '9px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
-                      <div style={{ fontSize: '18px', fontWeight: 800, color: c }}>{v}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
+                      <div style={{ fontSize: '20px', fontWeight: 800, color: c }}>{v}</div>
                     </div>
                   ))}
                 </div>
                 {badge(pa10CcaData.secure, 'IND-CCA2 Secure ✓', 'Security Broken!')}
-                <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text3)', lineHeight: 1.4 }}>
                   Tag size: {pa10CcaData.tag_size_bytes} bytes. {pa10CcaData.note}
                 </div>
               </div>
@@ -1728,7 +2081,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {/* ── Timing attack ── */}
         {card(
           <div>
-            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+            <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
               Naive early-exit comparison leaks the tag byte-by-byte via timing. Constant-time comparison runs in fixed time.
             </div>
             {btn('⏱️ Run Timing Demo', async () => {
@@ -1745,8 +2098,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
                     ['Correct avg', `${pa10TimingData.avg_correct_ns?.toFixed(0)} ns`, '#34d399'],
                   ].map(([l, v, c]) => (
                     <div key={l} style={{ textAlign: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: `1px solid ${c}40` }}>
-                      <div style={{ fontSize: '9px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
-                      <div style={{ fontSize: '15px', fontWeight: 800, color: c }}>{v}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
+                      <div style={{ fontSize: '17px', fontWeight: 800, color: c }}>{v}</div>
                     </div>
                   ))}
                 </div>
@@ -1761,7 +2114,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                     const pct = max > 0 ? (val / max) * 100 : 0;
                     return (
                       <div key={label} style={{ marginBottom: '6px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text3)', marginBottom: '2px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text3)', marginBottom: '2px' }}>
                           <span>{label}</span><span style={{ color: c }}>{val?.toFixed(0)} ns</span>
                         </div>
                         <div style={{ height: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', overflow: 'hidden' }}>
@@ -1772,7 +2125,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   })}
                 </div>
                 {badge(pa10TimingData.timing_leak, 'Timing Leak Detected in Naive Compare!', 'No Clear Timing Leak')}
-                <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text3)', lineHeight: 1.4 }}>
                   {pa10TimingData.note}. Constant-time secure_compare() prevents this attack.
                 </div>
               </div>
@@ -1859,18 +2212,18 @@ const PADemoModal = ({ pa, onClose, api }) => {
         border: `1px solid ${matched === true ? matchClr : matched === false ? nomatchClr : 'rgba(255,255,255,0.1)'}`,
         borderRadius: '8px', padding: '10px 12px',
       }}>
-        <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-        <div style={{ fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all', color: matched === true ? matchClr : matched === false ? nomatchClr : color, fontWeight: 700 }}>
+        <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+        <div style={{ fontFamily: 'monospace', fontSize: '14px', wordBreak: 'break-all', color: matched === true ? matchClr : matched === false ? nomatchClr : color, fontWeight: 700 }}>
           0x{hexShort(val)}
         </div>
-        {matched === true  && <div style={{ fontSize: '10px', color: matchClr, marginTop: '4px' }}>✓ Matches</div>}
-        {matched === false && <div style={{ fontSize: '10px', color: nomatchClr, marginTop: '4px' }}>✗ No match</div>}
+        {matched === true  && <div style={{ fontSize: '12px', color: matchClr, marginTop: '4px' }}>✓ Matches</div>}
+        {matched === false && <div style={{ fontSize: '12px', color: nomatchClr, marginTop: '4px' }}>✗ No match</div>}
       </div>
     );
 
     const inputField = (label, val, setter, placeholder, color) => (
       <div>
-        <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+        <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
         <div style={{ display: 'flex', gap: '6px' }}>
           <input
             type="text"
@@ -1880,7 +2233,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             style={{
               flex: 1, padding: '7px 10px', background: 'rgba(0,0,0,0.35)',
               border: `1px solid ${color}55`, borderRadius: '6px',
-              color: color, fontFamily: 'monospace', fontSize: '12px', outline: 'none',
+              color: color, fontFamily: 'monospace', fontSize: '14px', outline: 'none',
             }}
           />
           <button
@@ -1888,7 +2241,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             title="Randomise"
             style={{
               padding: '7px 10px', borderRadius: '6px', border: `1px solid ${color}55`,
-              background: 'rgba(0,0,0,0.2)', color: color, cursor: 'pointer', fontSize: '14px',
+              background: 'rgba(0,0,0,0.2)', color: color, cursor: 'pointer', fontSize: '16px',
             }}
           >🎲</button>
         </div>
@@ -1902,7 +2255,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {pa11Data && (
           <div style={{
             background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px 16px',
-            border: '1px solid var(--border)', fontSize: '11px',
+            border: '1px solid var(--border)', fontSize: '13px',
             display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 14px',
           }}>
             <span style={{ color: 'var(--text3)', fontWeight: 600 }}>⚙️ Group</span>
@@ -1924,7 +2277,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             background: 'linear-gradient(135deg, rgba(129,140,248,0.1) 0%, rgba(99,102,241,0.05) 100%)',
             border: `1px solid ${aliceClr}55`, borderRadius: '12px', padding: '16px',
           }}>
-            <div style={{ fontWeight: 700, color: aliceClr, fontSize: '13px', marginBottom: '14px' }}>👩 Alice</div>
+            <div style={{ fontWeight: 700, color: aliceClr, fontSize: '15px', marginBottom: '14px' }}>👩 Alice</div>
             {inputField('Private exponent a (hex)', pa11AliceExp, setPa11AliceExp, 'random', aliceClr)}
             {pa11Data && (
               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1943,7 +2296,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             background: 'linear-gradient(135deg, rgba(52,211,153,0.1) 0%, rgba(16,185,129,0.05) 100%)',
             border: `1px solid ${bobClr}55`, borderRadius: '12px', padding: '16px',
           }}>
-            <div style={{ fontWeight: 700, color: bobClr, fontSize: '13px', marginBottom: '14px' }}>👨 Bob</div>
+            <div style={{ fontWeight: 700, color: bobClr, fontSize: '15px', marginBottom: '14px' }}>👨 Bob</div>
             {inputField('Private exponent b (hex)', pa11BobExp, setPa11BobExp, 'random', bobClr)}
             {pa11Data && (
               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1967,8 +2320,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
               transform: pa11Animating ? 'translateX(6px)' : 'translateX(0)',
               transition: 'transform 0.6s ease, opacity 0.3s ease',
             }}>
-              <span style={{ fontFamily: 'monospace', fontSize: '11px', color: aliceClr }}>A=0x{hexShort(pa11Data.A).slice(0,6)}…</span>
-              <span style={{ color: bobClr, fontSize: '16px' }}>→</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '13px', color: aliceClr }}>A=0x{hexShort(pa11Data.A).slice(0,6)}…</span>
+              <span style={{ color: bobClr, fontSize: '18px' }}>→</span>
             </div>
             <div style={{
               display: 'flex', alignItems: 'center', gap: '6px',
@@ -1976,14 +2329,14 @@ const PADemoModal = ({ pa, onClose, api }) => {
               transform: pa11Animating ? 'translateX(-6px)' : 'translateX(0)',
               transition: 'transform 0.6s ease 0.1s, opacity 0.3s ease',
             }}>
-              <span style={{ color: aliceClr, fontSize: '16px' }}>←</span>
-              <span style={{ fontFamily: 'monospace', fontSize: '11px', color: bobClr }}>B=0x{hexShort(pa11Data.B).slice(0,6)}…</span>
+              <span style={{ color: aliceClr, fontSize: '18px' }}>←</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '13px', color: bobClr }}>B=0x{hexShort(pa11Data.B).slice(0,6)}…</span>
             </div>
             {pa11Data.match && !pa11EveEnabled && (
               <div style={{
                 background: 'rgba(34,197,94,0.15)', border: '1px solid #22c55e',
                 borderRadius: '6px', padding: '4px 10px',
-                color: '#22c55e', fontSize: '12px', fontWeight: 700,
+                color: '#22c55e', fontSize: '14px', fontWeight: 700,
               }}>
                 K matches ✓
               </div>
@@ -1998,7 +2351,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             disabled={busy('exchange')}
             onClick={doExchange}
             style={{
-              flex: 1, padding: '11px', borderRadius: '9px', fontWeight: 700, fontSize: '13px',
+              flex: 1, padding: '11px', borderRadius: '9px', fontWeight: 700, fontSize: '15px',
               cursor: busy('exchange') ? 'not-allowed' : 'pointer',
               background: busy('exchange')
                 ? 'rgba(129,140,248,0.15)'
@@ -2028,11 +2381,11 @@ const PADemoModal = ({ pa, onClose, api }) => {
               border: `2px solid ${pa11EveEnabled ? eveClr : 'rgba(255,255,255,0.3)'}`,
               background: pa11EveEnabled ? eveClr : 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '10px', color: 'white', transition: 'all 0.2s',
+              fontSize: '12px', color: 'white', transition: 'all 0.2s',
             }}>
               {pa11EveEnabled ? '✓' : ''}
             </span>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: pa11EveEnabled ? eveClr : 'var(--text2)', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: pa11EveEnabled ? eveClr : 'var(--text2)', whiteSpace: 'nowrap' }}>
               👿 Enable Eve
             </span>
           </label>
@@ -2046,19 +2399,19 @@ const PADemoModal = ({ pa, onClose, api }) => {
             borderRadius: '12px', padding: '16px',
             animation: 'fadeIn 0.35s ease',
           }}>
-            <div style={{ fontWeight: 700, color: eveClr, fontSize: '13px', marginBottom: '14px' }}>
+            <div style={{ fontWeight: 700, color: eveClr, fontSize: '15px', marginBottom: '14px' }}>
               👿 Eve — Man-in-the-Middle
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
               <div>
-                <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '6px', textTransform: 'uppercase' }}>← toward Alice</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '6px', textTransform: 'uppercase' }}>← toward Alice</div>
                 {keyBadge('e₂ (private)', pa11MitmData.e2, eveClr)}
                 {keyBadge("A' = gᵉ² sent to Alice", pa11MitmData.A_prime, eveClr)}
                 {keyBadge('K_eve_alice = Aᵉ²', pa11MitmData.K_eve_alice, eveClr, pa11MitmData.alice_eve_match)}
               </div>
               <div>
-                <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '6px', textTransform: 'uppercase' }}>→ toward Bob</div>
+                <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '6px', textTransform: 'uppercase' }}>→ toward Bob</div>
                 {keyBadge('e₁ (private)', pa11MitmData.e1, eveClr)}
                 {keyBadge("B' = gᵉ¹ sent to Bob", pa11MitmData.B_prime, eveClr)}
                 {keyBadge('K_eve_bob = Bᵉ¹', pa11MitmData.K_eve_bob, eveClr, pa11MitmData.bob_eve_match)}
@@ -2069,7 +2422,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               <div style={{
                 background: 'rgba(248,113,113,0.15)', border: '1px solid #f87171',
                 borderRadius: '8px', padding: '10px 14px',
-                fontSize: '12px', color: '#fca5a5', lineHeight: 1.5,
+                fontSize: '14px', color: '#fca5a5', lineHeight: 1.5,
               }}>
                 💥 <strong>Attack successful!</strong> Eve holds both shared secrets.
                 She can decrypt all traffic from Alice, re-encrypt for Bob, and vice versa — completely transparently.
@@ -2085,10 +2438,10 @@ const PADemoModal = ({ pa, onClose, api }) => {
           border: '1px solid rgba(245,158,11,0.3)',
           borderRadius: '12px', padding: '16px',
         }}>
-          <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '12px' }}>
+          <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '12px' }}>
             🔬 CDH Hardness Demonstration
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+          <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
             For tiny parameters (q ≈ 2<sup>{pa11CdhBits}</sup>), brute-forcing the discrete log is feasible.
             At 2048-bit parameters it would take ~2<sup>1024</sup> operations.
           </div>
@@ -2100,7 +2453,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 key={n}
                 onClick={() => { setPa11CdhBits(n); setPa11CdhData(null); }}
                 style={{
-                  flex: 1, padding: '7px 0', borderRadius: '7px', fontSize: '12px', cursor: 'pointer',
+                  flex: 1, padding: '7px 0', borderRadius: '7px', fontSize: '14px', cursor: 'pointer',
                   border: n === pa11CdhBits ? '2px solid #f59e0b' : '1px solid rgba(245,158,11,0.25)',
                   background: n === pa11CdhBits ? 'rgba(245,158,11,0.2)' : 'rgba(0,0,0,0.2)',
                   color: n === pa11CdhBits ? '#fbbf24' : 'var(--text2)', fontWeight: n === pa11CdhBits ? 700 : 400,
@@ -2115,7 +2468,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             disabled={busy('cdh')}
             onClick={doCdh}
             style={{
-              width: '100%', padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '13px',
+              width: '100%', padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '15px',
               cursor: busy('cdh') ? 'not-allowed' : 'pointer',
               background: busy('cdh') ? 'rgba(245,158,11,0.15)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
               border: 'none', color: busy('cdh') ? '#f59e0b' : 'white', transition: 'all 0.2s',
@@ -2128,20 +2481,20 @@ const PADemoModal = ({ pa, onClose, api }) => {
             <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>Bit size</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '3px' }}>Bit size</div>
                   <div style={{ fontFamily: 'monospace', color: '#fbbf24', fontWeight: 700 }}>{pa11CdhData.bits} bits</div>
                 </div>
                 <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>Time taken</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '3px' }}>Time taken</div>
                   <div style={{ fontFamily: 'monospace', color: '#fbbf24', fontWeight: 700 }}>{pa11CdhData.time_sec}s</div>
                 </div>
                 <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>Secret a</div>
-                  <div style={{ fontFamily: 'monospace', color: '#fbbf24', fontSize: '11px', wordBreak: 'break-all' }}>0x{hexShort(pa11CdhData.a)}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '3px' }}>Secret a</div>
+                  <div style={{ fontFamily: 'monospace', color: '#fbbf24', fontSize: '13px', wordBreak: 'break-all' }}>0x{hexShort(pa11CdhData.a)}</div>
                 </div>
                 <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
-                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>Found by brute force</div>
-                  <div style={{ fontFamily: 'monospace', color: pa11CdhData.correct ? '#22c55e' : '#ef4444', fontSize: '11px', wordBreak: 'break-all' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '3px' }}>Found by brute force</div>
+                  <div style={{ fontFamily: 'monospace', color: pa11CdhData.correct ? '#22c55e' : '#ef4444', fontSize: '13px', wordBreak: 'break-all' }}>
                     0x{hexShort(pa11CdhData.brute_force_found)}
                   </div>
                 </div>
@@ -2153,14 +2506,14 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   flex: 1, background: pa11CdhData.key_recovered ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
                   border: `1px solid ${pa11CdhData.key_recovered ? '#22c55e' : '#ef4444'}`,
                   borderRadius: '8px', padding: '10px', textAlign: 'center',
-                  fontSize: '12px', fontWeight: 700, color: pa11CdhData.key_recovered ? '#22c55e' : '#ef4444',
+                  fontSize: '14px', fontWeight: 700, color: pa11CdhData.key_recovered ? '#22c55e' : '#ef4444',
                 }}>
                   {pa11CdhData.key_recovered ? '✓ Key Recovered' : '✗ Key Not Found'}
                 </div>
               </div>
               <div style={{
                 background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px 12px',
-                fontSize: '11px', color: 'var(--text2)', lineHeight: 1.5,
+                fontSize: '13px', color: 'var(--text2)', lineHeight: 1.5,
                 borderLeft: '3px solid #f59e0b',
               }}>
                 {pa11CdhData.conclusion}
@@ -2176,6 +2529,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const isPA2 = pa.pa === 2;
   const isPA3 = pa.pa === 3;
   const isPA4 = pa.pa === 4;
+  const isPA5 = pa.pa === 5;
+  const isPA6 = pa.pa === 6;
   const isPA8 = pa.pa === 8;
   const isPA9 = pa.pa === 9;
   const isPA10 = pa.pa === 10;
@@ -2189,7 +2544,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         </div>
         <div className="modal-body">
           <div style={{ marginBottom: '20px', paddingBottom: '16px', borderBottom: '1px solid var(--border)' }}>
-            <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '16px' }}>{pa.desc}</p>
+            <p style={{ color: 'var(--text2)', fontSize: '15px', marginBottom: '16px' }}>{pa.desc}</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
               {def.params.map(p => (
@@ -2235,7 +2590,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPA1 && !isPA3 && !isPA4 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && (
+            {!isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && (
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
@@ -2243,9 +2598,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPA1 && !isPA3 && !isPA4 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : (result && renderResult(result))}
+            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA5 ? renderPA5Special() : isPA6 ? renderPA6Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>

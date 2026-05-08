@@ -30,6 +30,56 @@ const api = {
     return r.json();
   },
 
+  async pa5EufInit() {
+    const r = await fetch(`${API_BASE}/api/pa5/euf_init`);
+    return r.json();
+  },
+
+  async pa5EufVerify(sessionId, messageHex, tagHex) {
+    const r = await fetch(`${API_BASE}/api/pa5/euf_verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, message_hex: messageHex, tag_hex: tagHex }),
+    });
+    return r.json();
+  },
+
+  async pa5EufCheat(sessionId) {
+    const r = await fetch(`${API_BASE}/api/pa5/euf_cheat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+    return r.json();
+  },
+
+  async pa5LengthExtension(suffix) {
+    const r = await fetch(`${API_BASE}/api/pa5/length_extension`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suffix }),
+    });
+    return r.json();
+  },
+
+  async pa6MalleabilityInit(message) {
+    const r = await fetch(`${API_BASE}/api/pa6/malleability_init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    return r.json();
+  },
+
+  async pa6MalleabilityFlip(payload) {
+    const r = await fetch(`${API_BASE}/api/pa6/malleability_flip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return r.json();
+  },
+
   async pa8Hash(message) {
     const r = await fetch(`${API_BASE}/api/pa8/hash`, {
       method: 'POST',
