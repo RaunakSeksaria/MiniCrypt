@@ -1208,6 +1208,7 @@ def pa11_cdh(req: PA11CdhRequest):
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
+
 # ── PA#18 Oblivious Transfer dedicated endpoints ──
 
 class PA18PlayRequest(BaseModel):
@@ -1298,6 +1299,212 @@ def pa18_privacy():
         return {'receiver': rp, 'sender': sp}
     except Exception as e:
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+# ── PA#3 Interactive IND-CPA Game endpoints ──
+
+_pa3_sessions: dict = {}
+
+
+class PA3InitRequest(BaseModel):
+    broken: bool = False  # If True, use deterministic (nonce-reuse) encryption
+
+
+@app.post("/api/pa3/init")
+def pa3_init(req: PA3InitRequest):
+    """Start a new IND-CPA game session. Returns session_id and optionally the fixed nonce (broken mode)."""
+    from crypto.utils import random_bytes, to_hex
+    from crypto.pa03_cpa_enc import CPAEncryption
+    import random as _random
+
+    session_id = str(uuid.uuid4())
+    key = random_bytes(16)
+    # In broken mode, reuse a fixed nonce across all encryptions
+    fixed_r = random_bytes(16) if req.broken else None
+
+    _pa3_sessions[session_id] = {
+        "session_id": session_id,
+        "key": key,
+        "broken": req.broken,
+        "fixed_r": fixed_r,
+        "oracle_queries": [],
+        "challenge_b": None,       # hidden bit
+        "challenge_ct": None,
+        "challenge_r": None,
+        "rounds": [],              # list of {correct, advantage_running}
+        "total_rounds": 0,
+        "correct_rounds": 0,
+    }
+    return {
+        "session_id": session_id,
+        "broken": req.broken,
+        "fixed_r_hex": to_hex(fixed_r) if fixed_r else None,
+    }
+
+
+class PA3OracleRequest(BaseModel):
+    session_id: str
+    message: str   # plaintext string
+
+
+@app.post("/api/pa3/oracle")
+def pa3_oracle(req: PA3OracleRequest):
+    """Encryption oracle: adversary can request encryptions of arbitrary messages."""
+    from crypto.pa03_cpa_enc import CPAEncryption
+    from crypto.utils import to_hex
+
+    state = _pa3_sessions.get(req.session_id)
+    if state is None:
+        raise HTTPException(404, "Session not found")
+
+    enc = CPAEncryption()
+    key = state["key"]
+    msg = req.message.encode()
+
+    if state["broken"] and state["fixed_r"] is not None:
+        r, ct = enc.encrypt_deterministic(key, msg, state["fixed_r"])
+    else:
+        r, ct = enc.encrypt(key, msg)
+
+    entry = {
+        "message": req.message,
+        "nonce_hex": to_hex(r),
+        "ciphertext_hex": to_hex(ct),
+    }
+    state["oracle_queries"].append(entry)
+    return entry
+
+
+class PA3ChallengeRequest(BaseModel):
+    session_id: str
+    m0: str   # message 0 (must equal length of m1 when encoded)
+    m1: str   # message 1
+
+
+@app.post("/api/pa3/challenge")
+def pa3_challenge(req: PA3ChallengeRequest):
+    """Submit m0, m1. Challenger picks random b and returns C* = Enc_k(m_b)."""
+    import random as _random
+    from crypto.pa03_cpa_enc import CPAEncryption
+    from crypto.utils import to_hex
+
+    state = _pa3_sessions.get(req.session_id)
+    if state is None:
+        raise HTTPException(404, "Session not found")
+
+    m0 = req.m0.encode()
+    m1 = req.m1.encode()
+    if len(m0) != len(m1):
+        raise HTTPException(400, f"Messages must have equal byte-length (got {len(m0)} vs {len(m1)})")
+
+    enc = CPAEncryption()
+    key = state["key"]
+    b = _random.randint(0, 1)
+    chosen = m0 if b == 0 else m1
+
+    if state["broken"] and state["fixed_r"] is not None:
+        r, ct = enc.encrypt_deterministic(key, chosen, state["fixed_r"])
+    else:
+        r, ct = enc.encrypt(key, chosen)
+
+    state["challenge_b"] = b
+    state["challenge_ct"] = ct
+    state["challenge_r"] = r
+
+    return {
+        "nonce_hex": to_hex(r),
+        "ciphertext_hex": to_hex(ct),
+        "message_length": len(m0),
+    }
+
+
+class PA3GuessRequest(BaseModel):
+    session_id: str
+    guess: int   # 0 or 1
+
+
+@app.post("/api/pa3/guess")
+def pa3_guess(req: PA3GuessRequest):
+    """Adversary submits guess b'. Reveal b and update running advantage."""
+    state = _pa3_sessions.get(req.session_id)
+    if state is None:
+        raise HTTPException(404, "Session not found")
+    if state["challenge_b"] is None:
+        raise HTTPException(400, "No active challenge — call /pa3/challenge first")
+
+    b = state["challenge_b"]
+    correct = (req.guess == b)
+
+    state["total_rounds"] += 1
+    if correct:
+        state["correct_rounds"] += 1
+
+    win_rate = state["correct_rounds"] / state["total_rounds"]
+    advantage = abs(win_rate - 0.5)
+
+    round_entry = {
+        "round": state["total_rounds"],
+        "correct": correct,
+        "b": b,
+        "guess": req.guess,
+        "win_rate": round(win_rate, 4),
+        "advantage": round(advantage, 4),
+    }
+    state["rounds"].append(round_entry)
+
+    # Reset challenge so a new one can be submitted
+    state["challenge_b"] = None
+    state["challenge_ct"] = None
+    state["challenge_r"] = None
+
+    return {
+        "correct": correct,
+        "b": b,
+        "total_rounds": state["total_rounds"],
+        "correct_rounds": state["correct_rounds"],
+        "win_rate": round(win_rate, 4),
+        "advantage": round(advantage, 4),
+        "secure": advantage < 0.15,
+        "rounds": state["rounds"],
+    }
+
+
+class PA3SimRequest(BaseModel):
+    rounds: int = 20
+    broken: bool = False
+
+
+@app.post("/api/pa3/simulate")
+def pa3_simulate(req: PA3SimRequest):
+    """Run automated IND-CPA simulation (dummy adversary) and return advantage."""
+    from crypto.pa03_cpa_enc import CPAEncryption, ind_cpa_game, demonstrate_deterministic_attack
+    from crypto.utils import random_bytes
+
+    rounds = max(5, min(100, req.rounds))
+    enc = CPAEncryption()
+
+    if req.broken:
+        # Broken mode: adversary queries oracle with same msg twice, detects identical CTs
+        key = random_bytes(16)
+        correct = 0
+        for _ in range(rounds):
+            m0 = random_bytes(8)
+            m1 = random_bytes(8)
+            # Use deterministic encrypt with fixed nonce
+            fixed_r = b'\x42' * 16
+            _, ct0 = enc.encrypt_deterministic(key, m0, fixed_r)
+            _, ct1 = enc.encrypt_deterministic(key, m0, fixed_r)  # same msg → same CT
+            _, ctb = enc.encrypt_deterministic(key, m0, fixed_r)  # challenge (always m0 with fixed r)
+            # Adversary checks: is challenge CT == CT of m0? (always yes since r is fixed)
+            if ctb == ct0:
+                correct += 1  # adversary always wins
+        win_rate = correct / rounds
+        advantage = abs(win_rate - 0.5)
+        return {"rounds": rounds, "correct": correct, "win_rate": round(win_rate, 4), "advantage": round(advantage, 4), "secure": False, "broken_mode": True}
+    else:
+        result = ind_cpa_game(enc, rounds)
+        result["broken_mode"] = False
+        return result
+
 
 
 # ── Routing table ──

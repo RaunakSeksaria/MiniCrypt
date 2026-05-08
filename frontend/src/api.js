@@ -175,6 +175,16 @@ const api = {
     return r.json();
   },
 
+  // ── PA#3 IND-CPA Interactive Game ──
+  async pa3Init(broken = false) {
+    const r = await fetch(`${API_BASE}/api/pa3/init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ broken }),
+    });
+    return r.json();
+  },
+
   async pa18Correctness() {
     const r = await fetch(`${API_BASE}/api/pa18/ot/correctness`, { method: 'POST' });
     return r.json();
@@ -182,6 +192,42 @@ const api = {
 
   async pa18Privacy() {
     const r = await fetch(`${API_BASE}/api/pa18/ot/privacy`, { method: 'POST' });
+    return r.json();
+  },
+
+  async pa3Oracle(sessionId, message) {
+    const r = await fetch(`${API_BASE}/api/pa3/oracle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, message }),
+    });
+    return r.json();
+  },
+
+  async pa3Challenge(sessionId, m0, m1) {
+    const r = await fetch(`${API_BASE}/api/pa3/challenge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, m0, m1 }),
+    });
+    return r.json();
+  },
+
+  async pa3Guess(sessionId, guess) {
+    const r = await fetch(`${API_BASE}/api/pa3/guess`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, guess }),
+    });
+    return r.json();
+  },
+
+  async pa3Simulate(rounds = 20, broken = false) {
+    const r = await fetch(`${API_BASE}/api/pa3/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rounds, broken }),
+    });
     return r.json();
   },
 };
