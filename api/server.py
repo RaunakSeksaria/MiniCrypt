@@ -1033,6 +1033,144 @@ def pa10_cca_game(req: PA10CCAGameRequest):
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
+
+# ── PA#11 Diffie-Hellman dedicated endpoints ──
+
+# Cached DH group (32-bit safe prime) so every request reuses the same p/g/q
+_pa11_dh = None
+
+def _get_pa11_dh():
+    global _pa11_dh
+    if _pa11_dh is None:
+        from crypto.pa11_diffie_hellman import DiffieHellman
+        _pa11_dh = DiffieHellman(bits=32)
+    return _pa11_dh
+
+
+class PA11ExchangeRequest(BaseModel):
+    a: Optional[int] = None   # Alice's private exponent (None → random)
+    b: Optional[int] = None   # Bob's private exponent   (None → random)
+
+
+@app.post("/api/pa11/exchange")
+def pa11_exchange(req: PA11ExchangeRequest):
+    """Full DH key exchange. Accepts optional private exponents; randomises if omitted."""
+    try:
+        from crypto.pa11_diffie_hellman import DiffieHellman
+        from crypto.utils import mod_exp, random_int
+        dh = _get_pa11_dh()
+
+        a = req.a if req.a is not None else random_int(2, dh.q - 1)
+        b = req.b if req.b is not None else random_int(2, dh.q - 1)
+
+        A = mod_exp(dh.g, a, dh.p)
+        B = mod_exp(dh.g, b, dh.p)
+        K_alice = mod_exp(B, a, dh.p)
+        K_bob   = mod_exp(A, b, dh.p)
+
+        return {
+            "p":       hex(dh.p),
+            "q":       hex(dh.q),
+            "g":       hex(dh.g),
+            "a":       hex(a),
+            "A":       hex(A),
+            "b":       hex(b),
+            "B":       hex(B),
+            "K_alice": hex(K_alice),
+            "K_bob":   hex(K_bob),
+            "match":   K_alice == K_bob,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
+class PA11MitmRequest(BaseModel):
+    a: Optional[int] = None
+    b: Optional[int] = None
+
+
+@app.post("/api/pa11/mitm")
+def pa11_mitm(req: PA11MitmRequest):
+    """MITM demo. Eve intercepts A and B, substitutes A'=g^e1 and B'=g^e2."""
+    try:
+        from crypto.utils import mod_exp, random_int
+        dh = _get_pa11_dh()
+
+        a  = req.a if req.a is not None else random_int(2, dh.q - 1)
+        b  = req.b if req.b is not None else random_int(2, dh.q - 1)
+        e1 = random_int(2, dh.q - 1)   # Eve's key toward Alice
+        e2 = random_int(2, dh.q - 1)   # Eve's key toward Bob
+
+        A  = mod_exp(dh.g, a,  dh.p)
+        B  = mod_exp(dh.g, b,  dh.p)
+        E1 = mod_exp(dh.g, e1, dh.p)   # sent to Bob   instead of A
+        E2 = mod_exp(dh.g, e2, dh.p)   # sent to Alice instead of B
+
+        # Alice computes K = E2^a  (she thinks she's talking to Bob)
+        K_alice     = mod_exp(E2, a,  dh.p)
+        # Eve holds K_eve_alice = A^e2
+        K_eve_alice = mod_exp(A,  e2, dh.p)
+
+        # Bob computes K = E1^b  (he thinks he's talking to Alice)
+        K_bob       = mod_exp(E1, b,  dh.p)
+        # Eve holds K_eve_bob = B^e1
+        K_eve_bob   = mod_exp(B,  e1, dh.p)
+
+        return {
+            "p":  hex(dh.p),
+            "g":  hex(dh.g),
+            # Alice's world
+            "a":  hex(a),
+            "A":  hex(A),
+            "A_prime": hex(E2),          # what Alice received (Eve's substitute)
+            "K_alice": hex(K_alice),
+            # Bob's world
+            "b":  hex(b),
+            "B":  hex(B),
+            "B_prime": hex(E1),          # what Bob received (Eve's substitute)
+            "K_bob":   hex(K_bob),
+            # Eve's world
+            "e1":          hex(e1),
+            "e2":          hex(e2),
+            "E1":          hex(E1),
+            "E2":          hex(E2),
+            "K_eve_alice": hex(K_eve_alice),
+            "K_eve_bob":   hex(K_eve_bob),
+            # verification flags
+            "alice_eve_match": K_alice     == K_eve_alice,
+            "bob_eve_match":   K_bob       == K_eve_bob,
+            "alice_bob_match": K_alice     == K_bob,        # should be False
+            "attack_success":  K_alice == K_eve_alice and K_bob == K_eve_bob,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
+class PA11CdhRequest(BaseModel):
+    bits: int = 20
+
+
+@app.post("/api/pa11/cdh")
+def pa11_cdh(req: PA11CdhRequest):
+    """CDH hardness demo: brute-force DL at tiny bit-size, report time taken."""
+    try:
+        from crypto.pa11_diffie_hellman import cdh_hardness_demo, DiffieHellman
+        bits = max(8, min(24, req.bits))
+        dh   = DiffieHellman(bits=bits)
+        res  = cdh_hardness_demo(dh=dh, tiny_bits=bits)
+        return {
+            "bits":              bits,
+            "a":                 hex(res["a"]) if res.get("a") else None,
+            "brute_force_found": hex(res["brute_force_found"]) if res.get("brute_force_found") else None,
+            "correct":           res["correct"],
+            "key_recovered":     res["key_recovered"],
+            "time_sec":          round(res["time_sec"], 4),
+            "conclusion":        res["conclusion"],
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
 # ── Routing table ──
 @app.get("/api/reductions")
 def get_reductions():

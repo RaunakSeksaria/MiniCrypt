@@ -136,6 +136,34 @@ const api = {
     });
     return r.json();
   },
+
+  // ── PA#11 Diffie-Hellman ──
+  async pa11Exchange(a = null, b = null) {
+    const r = await fetch(`${API_BASE}/api/pa11/exchange`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ a, b }),
+    });
+    return r.json();
+  },
+
+  async pa11Mitm(a = null, b = null) {
+    const r = await fetch(`${API_BASE}/api/pa11/mitm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ a, b }),
+    });
+    return r.json();
+  },
+
+  async pa11Cdh(bits = 20) {
+    const r = await fetch(`${API_BASE}/api/pa11/cdh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bits }),
+    });
+    return r.json();
+  },
 };
 
 export default api;

@@ -73,7 +73,19 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa10EthMsg, setPa10EthMsg]       = useState('Secret & authenticated!');
   const [pa10Loading, setPa10Loading]     = useState({});
 
+  // PA#11 state
+  const [pa11Data,        setPa11Data]        = useState(null);   // exchange result
+  const [pa11MitmData,    setPa11MitmData]    = useState(null);   // MITM result
+  const [pa11CdhData,     setPa11CdhData]     = useState(null);   // CDH result
+  const [pa11AliceExp,    setPa11AliceExp]    = useState('');     // custom 'a'
+  const [pa11BobExp,      setPa11BobExp]      = useState('');     // custom 'b'
+  const [pa11EveEnabled,  setPa11EveEnabled]  = useState(false);
+  const [pa11Animating,   setPa11Animating]   = useState(false);  // arrow anim
+  const [pa11CdhBits,     setPa11CdhBits]     = useState(20);
+  const [pa11Loading,     setPa11Loading]     = useState({});
+
   const def = PA_DEFINITIONS[pa.pa] || { params: [] };
+  const isPA11 = pa.pa === 11;
 
   // Stop polling helper — defined before useEffect so cleanup can reference it
   const stopHunt = useCallback(() => {
@@ -98,12 +110,12 @@ const PADemoModal = ({ pa, onClose, api }) => {
     def.params.forEach(p => initialParams[p.name] = p.default);
     setParams(initialParams);
 
-    // Auto-run if no params (but NOT for PA8/PA9/PA10 — they have their own special renderers)
-    if (def.params.length === 0 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10) {
+    // Auto-run if no params (but NOT for PA8/PA9/PA10/PA11 — they have their own special renderers)
+    if (def.params.length === 0 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11) {
       runDemo(initialParams);
     }
 
-    // Reset PA8 / PA9 / PA10 state when modal switches PA
+    // Reset PA8 / PA9 / PA10 / PA11 state when modal switches PA
     setPa8Hash(null);
     setHuntStatus(null);
     stopHunt();
@@ -111,6 +123,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
     stopPa9Hunt();
     setPa10LeData(null); setPa10EufData(null); setPa10MacData(null);
     setPa10EthData(null); setPa10DecData(null); setPa10TimingData(null); setPa10CcaData(null);
+    setPa11Data(null); setPa11MitmData(null); setPa11CdhData(null);
+    setPa11EveEnabled(false); setPa11Animating(false); setPa11AliceExp(''); setPa11BobExp('');
 
     return () => { stopHunt(); stopPa9Hunt(); };
   }, [pa]);
@@ -1316,6 +1330,393 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  // ─────────────────────────────────────────────────────────────────
+  // PA#11 — Diffie-Hellman Key Exchange interactive demo
+  // ─────────────────────────────────────────────────────────────────
+  const renderPA11Special = () => {
+    const busy      = (k) => !!pa11Loading[k];
+    const setLoading = (k, v) => setPa11Loading(prev => ({ ...prev, [k]: v }));
+
+    const hexShort = (h) => h ? h.replace('0x', '').toUpperCase() : '—';
+
+    // ── Run normal exchange ──
+    const doExchange = async () => {
+      setLoading('exchange', true);
+      setPa11MitmData(null);
+      try {
+        const a = pa11AliceExp ? parseInt(pa11AliceExp, 16) : null;
+        const b = pa11BobExp   ? parseInt(pa11BobExp,   16) : null;
+        const d = await api.pa11Exchange(a, b);
+        setPa11Data(d);
+        // Trigger arrow animation
+        setPa11Animating(true);
+        setTimeout(() => setPa11Animating(false), 1200);
+        // If Eve is enabled, run MITM with same exponents
+        if (pa11EveEnabled) {
+          const m = await api.pa11Mitm(
+            d.a ? parseInt(d.a, 16) : null,
+            d.b ? parseInt(d.b, 16) : null
+          );
+          setPa11MitmData(m);
+        }
+      } finally { setLoading('exchange', false); }
+    };
+
+    // ── Toggle Eve ──
+    const toggleEve = async () => {
+      const next = !pa11EveEnabled;
+      setPa11EveEnabled(next);
+      if (next && pa11Data) {
+        setLoading('mitm', true);
+        try {
+          const m = await api.pa11Mitm(
+            parseInt(pa11Data.a, 16),
+            parseInt(pa11Data.b, 16)
+          );
+          setPa11MitmData(m);
+        } finally { setLoading('mitm', false); }
+      } else {
+        setPa11MitmData(null);
+      }
+    };
+
+    // ── CDH brute force ──
+    const doCdh = async () => {
+      setLoading('cdh', true);
+      try {
+        const d = await api.pa11Cdh(pa11CdhBits);
+        setPa11CdhData(d);
+      } finally { setLoading('cdh', false); }
+    };
+
+    // Colours
+    const aliceClr  = '#818cf8';
+    const bobClr    = '#34d399';
+    const eveClr    = '#f87171';
+    const matchClr  = '#22c55e';
+    const nomatchClr= '#ef4444';
+
+    const keyBadge = (label, val, color, matched = null) => (
+      <div style={{
+        background: matched === true  ? 'rgba(34,197,94,0.12)'  :
+                    matched === false ? 'rgba(239,68,68,0.12)' :
+                    'rgba(0,0,0,0.25)',
+        border: `1px solid ${matched === true ? matchClr : matched === false ? nomatchClr : 'rgba(255,255,255,0.1)'}`,
+        borderRadius: '8px', padding: '10px 12px',
+      }}>
+        <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+        <div style={{ fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all', color: matched === true ? matchClr : matched === false ? nomatchClr : color, fontWeight: 700 }}>
+          0x{hexShort(val)}
+        </div>
+        {matched === true  && <div style={{ fontSize: '10px', color: matchClr, marginTop: '4px' }}>✓ Matches</div>}
+        {matched === false && <div style={{ fontSize: '10px', color: nomatchClr, marginTop: '4px' }}>✗ No match</div>}
+      </div>
+    );
+
+    const inputField = (label, val, setter, placeholder, color) => (
+      <div>
+        <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input
+            type="text"
+            value={val}
+            placeholder={placeholder}
+            onChange={e => setter(e.target.value)}
+            style={{
+              flex: 1, padding: '7px 10px', background: 'rgba(0,0,0,0.35)',
+              border: `1px solid ${color}55`, borderRadius: '6px',
+              color: color, fontFamily: 'monospace', fontSize: '12px', outline: 'none',
+            }}
+          />
+          <button
+            onClick={() => setter('')}
+            title="Randomise"
+            style={{
+              padding: '7px 10px', borderRadius: '6px', border: `1px solid ${color}55`,
+              background: 'rgba(0,0,0,0.2)', color: color, cursor: 'pointer', fontSize: '14px',
+            }}
+          >🎲</button>
+        </div>
+      </div>
+    );
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+        {/* ── Group parameters banner ── */}
+        {pa11Data && (
+          <div style={{
+            background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px 16px',
+            border: '1px solid var(--border)', fontSize: '11px',
+            display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 14px',
+          }}>
+            <span style={{ color: 'var(--text3)', fontWeight: 600 }}>⚙️ Group</span>
+            <span />
+            {[['p (safe prime)', pa11Data.p], ['q (order)', pa11Data.q], ['g (generator)', pa11Data.g]].map(([k, v]) => (
+              <React.Fragment key={k}>
+                <span style={{ color: 'var(--text3)', whiteSpace: 'nowrap' }}>{k}</span>
+                <span style={{ fontFamily: 'monospace', color: 'var(--text1)', wordBreak: 'break-all' }}>0x{hexShort(v)}</span>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+
+        {/* ── Alice / Bob two-panel ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+
+          {/* Alice */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(129,140,248,0.1) 0%, rgba(99,102,241,0.05) 100%)',
+            border: `1px solid ${aliceClr}55`, borderRadius: '12px', padding: '16px',
+          }}>
+            <div style={{ fontWeight: 700, color: aliceClr, fontSize: '13px', marginBottom: '14px' }}>👩 Alice</div>
+            {inputField('Private exponent a (hex)', pa11AliceExp, setPa11AliceExp, 'random', aliceClr)}
+            {pa11Data && (
+              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {keyBadge('a (private)', pa11Data.a, aliceClr)}
+                {keyBadge('A = gᵃ (public)', pa11Data.A, aliceClr)}
+                {pa11EveEnabled && pa11MitmData
+                  ? keyBadge('K (shared w/ Eve)', pa11MitmData.K_alice, eveClr, false)
+                  : keyBadge('K = Bᵃ (shared)', pa11Data.K_alice, matchClr, pa11Data.match)
+                }
+              </div>
+            )}
+          </div>
+
+          {/* Bob */}
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(52,211,153,0.1) 0%, rgba(16,185,129,0.05) 100%)',
+            border: `1px solid ${bobClr}55`, borderRadius: '12px', padding: '16px',
+          }}>
+            <div style={{ fontWeight: 700, color: bobClr, fontSize: '13px', marginBottom: '14px' }}>👨 Bob</div>
+            {inputField('Private exponent b (hex)', pa11BobExp, setPa11BobExp, 'random', bobClr)}
+            {pa11Data && (
+              <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {keyBadge('b (private)', pa11Data.b, bobClr)}
+                {keyBadge('B = gᵇ (public)', pa11Data.B, bobClr)}
+                {pa11EveEnabled && pa11MitmData
+                  ? keyBadge('K (shared w/ Eve)', pa11MitmData.K_bob, eveClr, false)
+                  : keyBadge('K = Aᵇ (shared)', pa11Data.K_bob, matchClr, pa11Data.match)
+                }
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Animated exchange arrows ── */}
+        {pa11Data && (
+          <div style={{ position: 'relative', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              opacity: pa11Animating ? 1 : 0.8,
+              transform: pa11Animating ? 'translateX(6px)' : 'translateX(0)',
+              transition: 'transform 0.6s ease, opacity 0.3s ease',
+            }}>
+              <span style={{ fontFamily: 'monospace', fontSize: '11px', color: aliceClr }}>A=0x{hexShort(pa11Data.A).slice(0,6)}…</span>
+              <span style={{ color: bobClr, fontSize: '16px' }}>→</span>
+            </div>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              opacity: pa11Animating ? 1 : 0.8,
+              transform: pa11Animating ? 'translateX(-6px)' : 'translateX(0)',
+              transition: 'transform 0.6s ease 0.1s, opacity 0.3s ease',
+            }}>
+              <span style={{ color: aliceClr, fontSize: '16px' }}>←</span>
+              <span style={{ fontFamily: 'monospace', fontSize: '11px', color: bobClr }}>B=0x{hexShort(pa11Data.B).slice(0,6)}…</span>
+            </div>
+            {pa11Data.match && !pa11EveEnabled && (
+              <div style={{
+                background: 'rgba(34,197,94,0.15)', border: '1px solid #22c55e',
+                borderRadius: '6px', padding: '4px 10px',
+                color: '#22c55e', fontSize: '12px', fontWeight: 700,
+              }}>
+                K matches ✓
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Exchange / Eve controls ── */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            id="pa11-exchange-btn"
+            disabled={busy('exchange')}
+            onClick={doExchange}
+            style={{
+              flex: 1, padding: '11px', borderRadius: '9px', fontWeight: 700, fontSize: '13px',
+              cursor: busy('exchange') ? 'not-allowed' : 'pointer',
+              background: busy('exchange')
+                ? 'rgba(129,140,248,0.15)'
+                : 'linear-gradient(135deg, #6366f1, #818cf8)',
+              border: 'none', color: busy('exchange') ? aliceClr : 'white',
+              transition: 'all 0.2s',
+            }}
+          >
+            {busy('exchange') ? '⚡ Exchanging…' : pa11Data ? '🔄 Re-Exchange' : '🔑 Exchange'}
+          </button>
+
+          {/* Eve checkbox */}
+          <label
+            id="pa11-eve-toggle"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
+              background: pa11EveEnabled ? 'rgba(248,113,113,0.12)' : 'rgba(0,0,0,0.2)',
+              border: `1px solid ${pa11EveEnabled ? eveClr : 'rgba(255,255,255,0.1)'}`,
+              borderRadius: '8px', padding: '9px 14px', transition: 'all 0.2s',
+              userSelect: 'none',
+            }}
+            onClick={pa11Data ? toggleEve : undefined}
+            title={pa11Data ? 'Enable Eve MITM' : 'Run Exchange first'}
+          >
+            <span style={{
+              width: '16px', height: '16px', borderRadius: '4px',
+              border: `2px solid ${pa11EveEnabled ? eveClr : 'rgba(255,255,255,0.3)'}`,
+              background: pa11EveEnabled ? eveClr : 'transparent',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '10px', color: 'white', transition: 'all 0.2s',
+            }}>
+              {pa11EveEnabled ? '✓' : ''}
+            </span>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: pa11EveEnabled ? eveClr : 'var(--text2)', whiteSpace: 'nowrap' }}>
+              👿 Enable Eve
+            </span>
+          </label>
+        </div>
+
+        {/* ── Eve MITM panel ── */}
+        {pa11EveEnabled && pa11MitmData && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(248,113,113,0.1) 0%, rgba(239,68,68,0.05) 100%)',
+            border: `2px solid ${eveClr}88`,
+            borderRadius: '12px', padding: '16px',
+            animation: 'fadeIn 0.35s ease',
+          }}>
+            <div style={{ fontWeight: 700, color: eveClr, fontSize: '13px', marginBottom: '14px' }}>
+              👿 Eve — Man-in-the-Middle
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+              <div>
+                <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '6px', textTransform: 'uppercase' }}>← toward Alice</div>
+                {keyBadge('e₂ (private)', pa11MitmData.e2, eveClr)}
+                {keyBadge("A' = gᵉ² sent to Alice", pa11MitmData.A_prime, eveClr)}
+                {keyBadge('K_eve_alice = Aᵉ²', pa11MitmData.K_eve_alice, eveClr, pa11MitmData.alice_eve_match)}
+              </div>
+              <div>
+                <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '6px', textTransform: 'uppercase' }}>→ toward Bob</div>
+                {keyBadge('e₁ (private)', pa11MitmData.e1, eveClr)}
+                {keyBadge("B' = gᵉ¹ sent to Bob", pa11MitmData.B_prime, eveClr)}
+                {keyBadge('K_eve_bob = Bᵉ¹', pa11MitmData.K_eve_bob, eveClr, pa11MitmData.bob_eve_match)}
+              </div>
+            </div>
+
+            {pa11MitmData.attack_success && (
+              <div style={{
+                background: 'rgba(248,113,113,0.15)', border: '1px solid #f87171',
+                borderRadius: '8px', padding: '10px 14px',
+                fontSize: '12px', color: '#fca5a5', lineHeight: 1.5,
+              }}>
+                💥 <strong>Attack successful!</strong> Eve holds both shared secrets.
+                She can decrypt all traffic from Alice, re-encrypt for Bob, and vice versa — completely transparently.
+                Alice and Bob each believe they share a secret, but Eve reads everything.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── CDH Hardness panel ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(245,158,11,0.07) 0%, rgba(234,179,8,0.05) 100%)',
+          border: '1px solid rgba(245,158,11,0.3)',
+          borderRadius: '12px', padding: '16px',
+        }}>
+          <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '12px' }}>
+            🔬 CDH Hardness Demonstration
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+            For tiny parameters (q ≈ 2<sup>{pa11CdhBits}</sup>), brute-forcing the discrete log is feasible.
+            At 2048-bit parameters it would take ~2<sup>1024</sup> operations.
+          </div>
+
+          {/* Bit-size picker */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            {[12, 16, 20, 24].map(n => (
+              <button
+                key={n}
+                onClick={() => { setPa11CdhBits(n); setPa11CdhData(null); }}
+                style={{
+                  flex: 1, padding: '7px 0', borderRadius: '7px', fontSize: '12px', cursor: 'pointer',
+                  border: n === pa11CdhBits ? '2px solid #f59e0b' : '1px solid rgba(245,158,11,0.25)',
+                  background: n === pa11CdhBits ? 'rgba(245,158,11,0.2)' : 'rgba(0,0,0,0.2)',
+                  color: n === pa11CdhBits ? '#fbbf24' : 'var(--text2)', fontWeight: n === pa11CdhBits ? 700 : 400,
+                  transition: 'all 0.15s',
+                }}
+              >{n}-bit</button>
+            ))}
+          </div>
+
+          <button
+            id="pa11-cdh-btn"
+            disabled={busy('cdh')}
+            onClick={doCdh}
+            style={{
+              width: '100%', padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '13px',
+              cursor: busy('cdh') ? 'not-allowed' : 'pointer',
+              background: busy('cdh') ? 'rgba(245,158,11,0.15)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
+              border: 'none', color: busy('cdh') ? '#f59e0b' : 'white', transition: 'all 0.2s',
+            }}
+          >
+            {busy('cdh') ? '⏳ Brute-forcing…' : '💪 Run Brute Force'}
+          </button>
+
+          {pa11CdhData && (
+            <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>Bit size</div>
+                  <div style={{ fontFamily: 'monospace', color: '#fbbf24', fontWeight: 700 }}>{pa11CdhData.bits} bits</div>
+                </div>
+                <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>Time taken</div>
+                  <div style={{ fontFamily: 'monospace', color: '#fbbf24', fontWeight: 700 }}>{pa11CdhData.time_sec}s</div>
+                </div>
+                <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>Secret a</div>
+                  <div style={{ fontFamily: 'monospace', color: '#fbbf24', fontSize: '11px', wordBreak: 'break-all' }}>0x{hexShort(pa11CdhData.a)}</div>
+                </div>
+                <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '3px' }}>Found by brute force</div>
+                  <div style={{ fontFamily: 'monospace', color: pa11CdhData.correct ? '#22c55e' : '#ef4444', fontSize: '11px', wordBreak: 'break-all' }}>
+                    0x{hexShort(pa11CdhData.brute_force_found)}
+                  </div>
+                </div>
+              </div>
+              <div style={{
+                display: 'flex', gap: '8px',
+              }}>
+                <div style={{
+                  flex: 1, background: pa11CdhData.key_recovered ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
+                  border: `1px solid ${pa11CdhData.key_recovered ? '#22c55e' : '#ef4444'}`,
+                  borderRadius: '8px', padding: '10px', textAlign: 'center',
+                  fontSize: '12px', fontWeight: 700, color: pa11CdhData.key_recovered ? '#22c55e' : '#ef4444',
+                }}>
+                  {pa11CdhData.key_recovered ? '✓ Key Recovered' : '✗ Key Not Found'}
+                </div>
+              </div>
+              <div style={{
+                background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px 12px',
+                fontSize: '11px', color: 'var(--text2)', lineHeight: 1.5,
+                borderLeft: '3px solid #f59e0b',
+              }}>
+                {pa11CdhData.conclusion}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const isPA1 = pa.pa === 1;
   const isPA2 = pa.pa === 2;
   const isPA8 = pa.pa === 8;
@@ -1377,7 +1778,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPA1 && !isPA8 && !isPA9 && !isPA10 && (
+            {!isPA1 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && (
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
@@ -1385,9 +1786,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPA1 && !isPA8 && !isPA9 && !isPA10 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPA1 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : (result && renderResult(result))}
+            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>
