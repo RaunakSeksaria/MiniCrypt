@@ -29,7 +29,7 @@ const PA_DEFINITIONS = {
   14: { params: [{ name: 'residues', label: 'Residues (comma separated)', default: '2,3,2' }, { name: 'moduli', label: 'Moduli (comma separated)', default: '3,5,7' }] },
   15: { params: [{ name: 'message', label: 'Message to Sign', default: 'Sign this!' }] },
   16: { params: [{ name: 'message_int', label: 'ElGamal Message (Int)', default: '42' }] },
-  17: { params: [{ name: 'message_int', label: 'CCA-PKC Message (Int)', default: '42' }] },
+  17: { params: [] },  // PA17 has its own interactive renderer
   18: { params: [{ name: 'm0', label: 'Message 0 (Int)', default: '42' }, { name: 'm1', label: 'Message 1 (Int)', default: '99' }, { name: 'b', label: 'Choice Bit (0 or 1)', default: '0' }] },
   19: { params: [{ name: 'a', label: 'Alice Input (0 or 1)', default: '1' }, { name: 'b', label: 'Bob Input (0 or 1)', default: '1' }] },
   20: { params: [{ name: 'alice_val', label: 'Alice Value (0-15)', default: '7' }, { name: 'bob_val', label: 'Bob Value (0-15)', default: '3' }] },
@@ -136,6 +136,16 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa6CcaRej, setPa6CcaRej] = useState(false);
   const [pa6Loading, setPa6Loading] = useState({});
 
+  // PA17 State
+  const [pa17Msg, setPa17Msg] = useState('42');
+  const [pa17Data, setPa17Data] = useState(null);
+  const [pa17CpaTampered, setPa17CpaTampered] = useState(false);
+  const [pa17CcaTampered, setPa17CcaTampered] = useState(false);
+  const [pa17CpaDec, setPa17CpaDec] = useState(null);
+  const [pa17CcaDec, setPa17CcaDec] = useState(null);
+  const [pa17CcaRej, setPa17CcaRej] = useState(false);
+  const [pa17Loading, setPa17Loading] = useState({});
+
   const def = PA_DEFINITIONS[pa.pa] || { params: [] };
   const isPA11 = pa.pa === 11;
 
@@ -162,8 +172,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
     def.params.forEach(p => initialParams[p.name] = p.default);
     setParams(initialParams);
 
-    // Auto-run if no params (but NOT for PA3/PA4/PA5/PA6/PA8/PA9/PA10/PA11 — they have their own special renderers)
-    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 5 && pa.pa !== 6 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11) {
+    // Auto-run if no params (but NOT for those with special renderers)
+    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 5 && pa.pa !== 6 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11 && pa.pa !== 17) {
       runDemo(initialParams);
     }
 
@@ -1152,6 +1162,159 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 ) : (
                   <div style={{ color: '#4ade80', fontFamily: 'monospace', fontSize: '16px', wordBreak: 'break-all' }}>
                     {pa6CcaDec}
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderPA17Special = () => {
+    const handleTamper = async (type) => {
+      if (!pa17Data) return;
+      
+      let cpaC2 = BigInt(pa17Data.cpa.c2);
+      let ccaC2 = BigInt(pa17Data.cca.c2);
+      let p = BigInt(pa17Data.p);
+
+      const isCpaNowTampered = (type === 'cpa') || pa17CpaTampered;
+      const isCcaNowTampered = (type === 'cca') || pa17CcaTampered;
+
+      if (isCpaNowTampered) {
+        cpaC2 = (cpaC2 * 2n) % p;
+      }
+      if (isCcaNowTampered) {
+        ccaC2 = (ccaC2 * 2n) % p;
+      }
+      
+      if (type === 'cpa') setPa17CpaTampered(true);
+      if (type === 'cca') setPa17CcaTampered(true);
+      
+      setPa17Loading(p => ({ ...p, flip: true }));
+      const res = await api.pa17MalleabilityFlip({
+        cpa_c1: pa17Data.cpa.c1,
+        cpa_c2: cpaC2.toString(),
+        cca_c1: pa17Data.cca.c1,
+        cca_c2: ccaC2.toString(),
+        cca_sigma: pa17Data.cca.sigma,
+      });
+      
+      setPa17CpaDec(res.cpa_decrypted);
+      setPa17CcaDec(res.cca_decrypted);
+      setPa17CcaRej(res.cca_rejected);
+      setPa17Loading(p => ({ ...p, flip: false }));
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px', textTransform: 'uppercase' }}>Initialize Malleability Workbench (ElGamal)</div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <input 
+              type="number" 
+              value={pa17Msg} 
+              onChange={e => setPa17Msg(e.target.value)} 
+              placeholder="Plaintext message (integer)..."
+              style={{ flex: 1, padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', outline: 'none', fontSize: '14px' }}
+            />
+            <button 
+              onClick={async () => {
+                setPa17Loading(p => ({ ...p, init: true }));
+                const d = await api.pa17MalleabilityInit(pa17Msg);
+                setPa17Data(d);
+                setPa17CpaTampered(false);
+                setPa17CcaTampered(false);
+                setPa17CpaDec(d.m);
+                setPa17CcaDec(d.m);
+                setPa17CcaRej(false);
+                setPa17Loading(p => ({ ...p, init: false }));
+              }}
+              disabled={pa17Loading.init}
+              style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}
+            >
+              {pa17Loading.init ? '⏳...' : 'Encrypt & Load'}
+            </button>
+          </div>
+        </div>
+
+        {pa17Data && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            
+            {/* Left: CPA */}
+            <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '16px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '12px', textTransform: 'uppercase' }}>❌ CPA-Only (ElGamal)</div>
+              
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '4px' }}>Ciphertext <span style={{ fontFamily: 'serif', fontStyle: 'italic' }}>C<sub>E</sub> = (c<sub>1</sub>, c<sub>2</sub>)</span>:</div>
+                <div style={{ fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all', color: 'var(--text2)', maxHeight: '100px', overflowY: 'auto' }}>
+                  c1 = {pa17Data.cpa.c1}<br />
+                  <br />
+                  c2 = {pa17CpaTampered ? <span style={{ color: '#fca5a5', textDecoration: 'underline' }}>{((BigInt(pa17Data.cpa.c2) * 2n) % BigInt(pa17Data.p)).toString()}</span> : pa17Data.cpa.c2}
+                </div>
+              </div>
+
+              <button 
+                onClick={() => handleTamper('cpa')} 
+                disabled={pa17CpaTampered || pa17Loading.flip}
+                className="btn btn-ghost" 
+                style={{ width: '100%', marginBottom: '16px', color: '#fca5a5', borderColor: '#fca5a5' }}
+              >
+                {pa17CpaTampered ? 'Tampered!' : 'Tamper with C_E (c2 = 2 * c2)'}
+              </button>
+              
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '4px' }}>Live Decryption Oracle:</div>
+                <div style={{ color: pa17CpaDec === pa17Data.m ? '#4ade80' : '#fca5a5', fontFamily: 'monospace', fontSize: '16px', wordBreak: 'break-all' }}>
+                  {pa17CpaDec}
+                </div>
+                {pa17CpaTampered && (
+                  <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '6px' }}>
+                    Notice how the plaintext doubled to 2m! The CCA attacker won.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: CCA */}
+            <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '12px', padding: '16px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e', marginBottom: '12px', textTransform: 'uppercase' }}>✅ CCA-Secure (Encrypt-then-Sign)</div>
+              
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '16px' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '4px' }}>Ciphertext & Signature <span style={{ fontFamily: 'serif', fontStyle: 'italic' }}>C = (C<sub>E</sub>, σ)</span>:</div>
+                <div style={{ fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all', color: 'var(--text2)', maxHeight: '100px', overflowY: 'auto' }}>
+                  c1 = {pa17Data.cca.c1}<br />
+                  <br />
+                  c2 = {pa17CcaTampered ? <span style={{ color: '#fca5a5', textDecoration: 'underline' }}>{((BigInt(pa17Data.cca.c2) * 2n) % BigInt(pa17Data.p)).toString()}</span> : pa17Data.cca.c2}<br />
+                  <br />
+                  σ = {pa17Data.cca.sigma}
+                </div>
+              </div>
+
+              <button 
+                onClick={() => handleTamper('cca')} 
+                disabled={pa17CcaTampered || pa17Loading.flip}
+                className="btn btn-ghost" 
+                style={{ width: '100%', marginBottom: '16px', color: '#86efac', borderColor: '#86efac' }}
+              >
+                {pa17CcaTampered ? 'Tampered!' : 'Tamper with C_E (c2 = 2 * c2)'}
+              </button>
+              
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '4px' }}>Live Decryption Oracle:</div>
+                {pa17CcaRej ? (
+                  <div style={{ color: '#ef4444', fontFamily: 'monospace', fontSize: '15px', fontWeight: 700 }}>
+                    ⊥ REJECTED
+                    <div style={{ fontSize: '12px', fontWeight: 'normal', marginTop: '4px', color: '#fca5a5' }}>
+                      Signature invalid, decryption aborted, output ⊥
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: '#4ade80', fontFamily: 'monospace', fontSize: '16px', wordBreak: 'break-all' }}>
+                    {pa17CcaDec}
                   </div>
                 )}
               </div>
@@ -2534,6 +2697,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const isPA8 = pa.pa === 8;
   const isPA9 = pa.pa === 9;
   const isPA10 = pa.pa === 10;
+  const isPA17 = pa.pa === 17;
 
   return (
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -2590,7 +2754,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && (
+            {!isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA17 && (
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
@@ -2598,9 +2762,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA17 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA5 ? renderPA5Special() : isPA6 ? renderPA6Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : (result && renderResult(result))}
+            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA5 ? renderPA5Special() : isPA6 ? renderPA6Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : isPA17 ? renderPA17Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>

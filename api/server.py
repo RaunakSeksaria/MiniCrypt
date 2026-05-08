@@ -1455,6 +1455,73 @@ def pa6_malleability_flip(req: PA6FlipRequest):
         "cca_error": cca_err,
     }
 
+# ── PA#17 Malleability Attack Workbench ──
+
+# Global CCA_PKC instance to avoid generating keys repeatedly
+_pa17_cca_pkc = None
+
+def get_pa17_cca_pkc():
+    global _pa17_cca_pkc
+    if _pa17_cca_pkc is None:
+        from crypto.pa17_cca_pkc import CCA_PKC
+        _pa17_cca_pkc = CCA_PKC(eg_bits=128, rsa_bits=256)
+    return _pa17_cca_pkc
+
+class PA17InitRequest(BaseModel):
+    message: int
+
+@app.post("/api/pa17/malleability_init")
+def pa17_malleability_init(req: PA17InitRequest):
+    cca = get_pa17_cca_pkc()
+    m = req.message % cca.eg_key.p
+    if m == 0:
+        m = 1
+    
+    # CPA (ElGamal only)
+    from crypto.pa16_elgamal import elgamal_encrypt
+    c1_cpa, c2_cpa = elgamal_encrypt(cca.eg_key.pk, m)
+    
+    # CCA (Encrypt-then-Sign)
+    ct_cca = cca.encrypt(m)
+    
+    return {
+        "p": str(cca.eg_key.p),
+        "m": str(m),
+        "cpa": {
+            "c1": str(c1_cpa),
+            "c2": str(c2_cpa)
+        },
+        "cca": {
+            "c1": str(ct_cca['c1']),
+            "c2": str(ct_cca['c2']),
+            "sigma": str(ct_cca['sigma'])
+        }
+    }
+
+class PA17FlipRequest(BaseModel):
+    cpa_c1: str
+    cpa_c2: str
+    cca_c1: str
+    cca_c2: str
+    cca_sigma: str
+
+@app.post("/api/pa17/malleability_flip")
+def pa17_malleability_flip(req: PA17FlipRequest):
+    cca = get_pa17_cca_pkc()
+    
+    # Decrypt CPA (ElGamal)
+    from crypto.pa16_elgamal import elgamal_decrypt
+    cpa_dec = elgamal_decrypt(cca.eg_key.sk, cca.eg_key.p, int(req.cpa_c1), int(req.cpa_c2))
+    
+    # Decrypt CCA (Encrypt-then-Sign)
+    cca_dec = cca.decrypt(int(req.cca_c1), int(req.cca_c2), int(req.cca_sigma))
+    
+    return {
+        "cpa_decrypted": str(cpa_dec) if cpa_dec is not None else None,
+        "cca_decrypted": str(cca_dec) if cca_dec is not None else None,
+        "cca_rejected": cca_dec is None
+    }
+
 
 # ── PA#4 Visual Animation endpoints ──
 

@@ -89,6 +89,24 @@ const api = {
     return r.json();
   },
 
+  async pa17MalleabilityInit(message) {
+    const r = await fetch(`${API_BASE}/api/pa17/malleability_init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: parseInt(message) || 42 }),
+    });
+    return r.json();
+  },
+
+  async pa17MalleabilityFlip(payload) {
+    const r = await fetch(`${API_BASE}/api/pa17/malleability_flip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return r.json();
+  },
+
   async pa8CollisionStart() {
     const r = await fetch(`${API_BASE}/api/pa8/collision/start`, { method: 'POST' });
     return r.json();
