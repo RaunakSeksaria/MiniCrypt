@@ -45,17 +45,21 @@ def birthday_attack_naive(hash_fn, n_bits: int, max_trials: int = None):
         h = hash_fn(x)
         evaluations += 1
 
-        if h in seen and seen[h] != x:
-            return {
-                'found': True,
-                'input1': seen[h],
-                'input2': x,
-                'hash_value': h,
-                'evaluations': evaluations,
-                'expected': 2 ** (n_bits / 2),
-                'ratio': evaluations / (2 ** (n_bits / 2)),
-            }
-        seen[h] = x
+        if h in seen:
+            if seen[h] != x:
+                # Genuine collision: two distinct inputs with the same hash
+                return {
+                    'found': True,
+                    'input1': seen[h],
+                    'input2': x,
+                    'hash_value': h,
+                    'evaluations': evaluations,
+                    'expected': 2 ** (n_bits / 2),
+                    'ratio': evaluations / (2 ** (n_bits / 2)),
+                }
+            # else: exact same bytes drawn again — skip without overwriting
+        else:
+            seen[h] = x  # Only store on first encounter
 
     return {
         'found': False,
@@ -72,68 +76,127 @@ def birthday_attack_floyd(hash_fn, n_bits: int, max_iterations: int = None):
     """
     Space-efficient collision finder using Floyd's tortoise-and-hare.
 
-    Treats hash as f: {0,1}^n → {0,1}^n (truncated).
-    Uses tortoise and hare to find a cycle, then extracts collision.
+    Treats the hash as f: {0,1}^n → {0,1}^n (truncated), builds the sequence
+    x0, f(x0), f(f(x0)), ... which must eventually cycle.  Once the cycle is
+    found, the two distinct predecessors of the cycle-entry node are a valid
+    collision pair: f(tail_pred) == f(cycle_pred) == cycle_entry.
+
+    Phases:
+      1. Detect cycle  — tortoise (+1), hare (+2) until they meet.
+      2. Find μ        — reset tortoise to x0, advance both at speed 1;
+                         meeting point is the cycle entry x_μ.
+      3. Extract pair  — tail_pred  = x_{μ-1}  (last node on the tail)
+                         cycle_pred = x_{μ+λ-1} (last node in the cycle)
+                         Both map to x_μ; they are distinct because one is on
+                         the tail and one is in the cycle.
+
+    If μ == 0 the starting point is already inside the cycle and no tail exists,
+    so no collision can be extracted from this trajectory.  The function retries
+    with a fresh random x0 (up to 20 attempts) before giving up.
 
     Args:
-        hash_fn: Callable that takes int → int (maps n-bit → n-bit).
-        n_bits: Output bit length.
+        hash_fn: Callable bytes → int (n_bits output).
+        n_bits:  Output bit length.
 
     Returns:
-        dict with collision details.
+        dict with collision details, or {'found': False, ...}.
     """
     if max_iterations is None:
-        max_iterations = int(10 * (2 ** (n_bits / 2)))
+        max_iterations = (1 << n_bits) + 10
 
     mask = (1 << n_bits) - 1
+    evals = 0
 
-    def f(x):
-        """Treat hash as a function on n-bit integers."""
-        x_bytes = x.to_bytes(max(1, (x.bit_length() + 7) // 8), 'big')
-        return hash_fn(x_bytes) & mask
+    def f(x: int) -> int:
+        nonlocal evals
+        evals += 1
+        n_bytes = max(1, (x.bit_length() + 7) // 8)
+        return hash_fn(x.to_bytes(n_bytes, 'big')) & mask
 
-    # Phase 1: Find a point in the cycle
-    # Start from a random point
-    x0 = bytes_to_int(random_bytes(2)) & mask
-    tortoise = f(x0)
-    hare = f(f(x0))
+    def to_bytes(v: int) -> bytes:
+        return v.to_bytes(max(1, (v.bit_length() + 7) // 8), 'big')
 
-    iterations = 0
-    while tortoise != hare:
-        tortoise = f(tortoise)
-        hare = f(f(hare))
-        iterations += 1
-        if iterations > max_iterations:
-            return {'found': False, 'evaluations': iterations * 3}
+    for _attempt in range(20):
+        evals = 0
+        x0 = bytes_to_int(random_bytes(2)) & mask
 
-    # Phase 2: Find the actual collision
-    # Both pointers start from the beginning of the cycle entry
-    tortoise = x0
-    while tortoise != hare:
-        prev_t, prev_h = tortoise, hare
-        tortoise = f(tortoise)
-        hare = f(hare)
-        iterations += 1
+        # ------------------------------------------------------------------
+        # Phase 1: Detect the cycle.
+        # tortoise advances one step per iteration; hare advances two.
+        # They meet somewhere inside the cycle after O(λ) iterations.
+        # ------------------------------------------------------------------
+        tortoise = f(x0)
+        hare = f(f(x0))
 
-    # Phase 3: Find two distinct inputs that produce the same output
-    # Walk until we find f(a) == f(b) with a ≠ b
-    if tortoise == x0:
-        # Special case: cycle starts at x0
-        a = tortoise
-        b = f(a)
-        while f(a) != f(b) or a == b:
-            a = f(a)
-            b = f(f(b))
-            iterations += 1
-            if iterations > max_iterations:
-                return {'found': False, 'evaluations': iterations}
+        while tortoise != hare:
+            tortoise = f(tortoise)
+            hare = f(f(hare))
+            if evals > max_iterations:
+                return {'found': False, 'evaluations': evals}
 
-    return {
-        'found': True,
-        'evaluations': iterations * 3,  # Approximate
-        'expected': 2 ** (n_bits / 2),
-        'cycle_detected': True,
-    }
+        # ------------------------------------------------------------------
+        # Phase 2: Find μ (the cycle entry index).
+        # Reset tortoise to x0; advance both at speed 1.
+        # They meet exactly at x_μ after μ more steps.
+        # ------------------------------------------------------------------
+        tortoise = x0
+        mu = 0
+        while tortoise != hare:
+            tortoise = f(tortoise)
+            hare = f(hare)
+            mu += 1
+            if evals > max_iterations:
+                return {'found': False, 'evaluations': evals}
+
+        if mu == 0:
+            # x0 is already inside the cycle; there is no tail, so we cannot
+            # extract a collision from this trajectory.  Retry with new x0.
+            continue
+
+        cycle_entry = tortoise  # == x_μ == f^μ(x0)
+
+        # ------------------------------------------------------------------
+        # Phase 3a: Find tail_pred = x_{μ-1}.
+        # Walk μ-1 steps from x0 along the sequence.
+        # f(tail_pred) == cycle_entry by construction.
+        # ------------------------------------------------------------------
+        tail_pred = x0
+        for _ in range(mu - 1):
+            tail_pred = f(tail_pred)
+            if evals > max_iterations:
+                return {'found': False, 'evaluations': evals}
+
+        # ------------------------------------------------------------------
+        # Phase 3b: Find cycle_pred = x_{μ+λ-1}.
+        # Start at cycle_entry and walk until the next step returns to
+        # cycle_entry.  That predecessor is the last node in the cycle.
+        # f(cycle_pred) == cycle_entry by construction.
+        # ------------------------------------------------------------------
+        cycle_pred = cycle_entry
+        while True:
+            nxt = f(cycle_pred)
+            if nxt == cycle_entry:
+                break
+            cycle_pred = nxt
+            if evals > max_iterations:
+                return {'found': False, 'evaluations': evals}
+
+        # tail_pred is on the tail, cycle_pred is in the cycle → always distinct
+        # (degenerate equal case is theoretically impossible when μ > 0, but guard)
+        if tail_pred == cycle_pred:
+            continue
+
+        return {
+            'found': True,
+            'input1': to_bytes(tail_pred),
+            'input2': to_bytes(cycle_pred),
+            'hash_value': cycle_entry,
+            'evaluations': evals,
+            'expected': 2 ** (n_bits / 2),
+            'cycle_detected': True,
+        }
+
+    return {'found': False, 'evaluations': evals}
 
 
 # ---------------------------------------------------------------------------
@@ -143,16 +206,14 @@ def birthday_attack_floyd(hash_fn, n_bits: int, max_iterations: int = None):
 def make_toy_hash(n_bits: int):
     """
     Create a simple toy hash function with n_bits output.
-    Uses a polynomial hash truncated to n bits.
+    Uses SHA-256 truncated to n bits to ensure pseudorandom behavior.
     """
     mask = (1 << n_bits) - 1
+    import hashlib
 
     def toy_hash(data: bytes) -> int:
-        # Simple polynomial hash
-        h = 0x12345
-        for b in data:
-            h = ((h * 31) + b) & 0xFFFFFFFF
-        return h & mask
+        h = hashlib.sha256(data).digest()
+        return bytes_to_int(h) & mask
 
     return toy_hash
 
@@ -166,28 +227,57 @@ def attack_toy_hash(n_bits_list=None, num_trials: int = 20):
     Run birthday attacks on toy hashes of various output sizes.
     """
     if n_bits_list is None:
-        n_bits_list = [8, 10, 12, 14, 16]
+        n_bits_list = [8, 12, 16]
 
     results = {}
     for n in n_bits_list:
         hash_fn = make_toy_hash(n)
-        evals_list = []
+        evals_list_naive = []
+        evals_list_floyd = []
 
         for _ in range(num_trials):
-            result = birthday_attack_naive(hash_fn, n)
-            if result['found']:
-                evals_list.append(result['evaluations'])
+            res_naive = birthday_attack_naive(hash_fn, n)
+            if res_naive['found']:
+                evals_list_naive.append(res_naive['evaluations'])
 
-        if evals_list:
-            avg_evals = sum(evals_list) / len(evals_list)
-            expected = 2 ** (n / 2)
-            results[n] = {
-                'avg_evaluations': avg_evals,
-                'expected_birthday': expected,
-                'ratio': avg_evals / expected,
-                'successes': len(evals_list),
-                'trials': num_trials,
-            }
+            res_floyd = birthday_attack_floyd(hash_fn, n)
+            if res_floyd['found']:
+                evals_list_floyd.append(res_floyd['evaluations'])
+
+        avg_naive = sum(evals_list_naive) / len(evals_list_naive) if evals_list_naive else 0
+        avg_floyd = sum(evals_list_floyd) / len(evals_list_floyd) if evals_list_floyd else 0
+        expected = 2 ** (n / 2)
+        results[n] = {
+            'avg_evaluations_naive': avg_naive,
+            'avg_evaluations_floyd': avg_floyd,
+            'expected_birthday': expected,
+            'ratio_naive': avg_naive / expected if expected else 0,
+            'ratio_floyd': avg_floyd / expected if expected else 0,
+            'trials': num_trials,
+        }
+
+    try:
+        import matplotlib.pyplot as plt
+        n_vals = sorted(results.keys())
+        expected_vals = [results[n]['expected_birthday'] for n in n_vals]
+        naive_vals = [results[n]['avg_evaluations_naive'] for n in n_vals]
+        floyd_vals = [results[n]['avg_evaluations_floyd'] for n in n_vals]
+
+        plt.figure(figsize=(8, 5))
+        plt.plot(n_vals, expected_vals, 'k--', label='Theoretical $2^{n/2}$')
+        plt.plot(n_vals, naive_vals, 'bo-', label='Empirical (Naive)')
+        plt.plot(n_vals, floyd_vals, 'rs-', label='Empirical (Floyd)')
+        plt.xlabel('Hash Output Bits (n)')
+        plt.ylabel('Evaluations until Collision')
+        plt.title('Birthday Attack: Evaluations vs Output Size')
+        plt.yscale('log')
+        plt.legend()
+        plt.grid(True, which="both", ls="-", alpha=0.2)
+        plt.savefig('toy_hash_evals.png')
+        plt.close()
+        print("Plot saved as 'toy_hash_evals.png'")
+    except ImportError:
+        pass
 
     return results
 
@@ -206,10 +296,12 @@ def attack_dlp_hash_truncated(output_bits: int = 16,
         return bytes_to_int(crhf.hash(data)) & mask
 
     evals_list = []
+    last_collision = None
     for _ in range(num_trials):
         result = birthday_attack_naive(truncated_hash, output_bits)
         if result['found']:
             evals_list.append(result['evaluations'])
+            last_collision = result
 
     avg = sum(evals_list) / len(evals_list) if evals_list else 0
     expected = 2 ** (output_bits / 2)
@@ -221,52 +313,111 @@ def attack_dlp_hash_truncated(output_bits: int = 16,
         'ratio': avg / expected if expected > 0 else 0,
         'trials': num_trials,
         'successes': len(evals_list),
+        'input1': last_collision['input1'].hex() if last_collision else None,
+        'input2': last_collision['input2'].hex() if last_collision else None,
+        'hash_value': last_collision['hash_value'] if last_collision else None,
     }
 
 
-def empirical_birthday_curve(n_bits: int = 12, num_trials: int = 100):
+def empirical_birthday_curve(n_bits_list=None, num_trials: int = 100):
     """
     Run many trials and plot the distribution of evaluations until collision.
-    Returns data points for plotting.
     """
-    hash_fn = make_toy_hash(n_bits)
-    evaluations_list = []
+    if n_bits_list is None:
+        n_bits_list = [8, 10, 12, 14, 16]
 
-    for _ in range(num_trials):
-        result = birthday_attack_naive(hash_fn, n_bits)
-        if result['found']:
-            evaluations_list.append(result['evaluations'])
+    all_data = {}
 
-    evaluations_list.sort()
-    expected = 2 ** (n_bits / 2)
+    try:
+        import matplotlib.pyplot as plt
+        import numpy as np
+        plt.figure(figsize=(10, 6))
+    except ImportError:
+        plt = None
+        np = None
 
-    return {
-        'n_bits': n_bits,
-        'num_trials': num_trials,
-        'evaluations': evaluations_list,
-        'median': evaluations_list[len(evaluations_list) // 2] if evaluations_list else 0,
-        'mean': sum(evaluations_list) / len(evaluations_list) if evaluations_list else 0,
-        'expected_birthday': expected,
-    }
+    for n_bits in n_bits_list:
+        hash_fn = make_toy_hash(n_bits)
+        evaluations_list = []
+
+        for _ in range(num_trials):
+            result = birthday_attack_naive(hash_fn, n_bits)
+            if result['found']:
+                evaluations_list.append(result['evaluations'])
+
+        evaluations_list.sort()
+        expected = 2 ** (n_bits / 2)
+
+        if plt is not None:
+            # Plot Empirical CDF
+            y_vals = np.arange(1, len(evaluations_list) + 1) / len(evaluations_list)
+            p = plt.plot(evaluations_list, y_vals, label=f'Empirical n={n_bits}',
+                         marker='.', linestyle='none', alpha=0.6)
+
+            # Overlay Theoretical Curve: 1 - exp(-k*(k-1)/(2 * 2^n))
+            k_vals = np.linspace(1, max(evaluations_list) if evaluations_list else 100, 200)
+            theo_y = 1.0 - np.exp(-k_vals * (k_vals - 1) / (2.0 * (2 ** n_bits)))
+            plt.plot(k_vals, theo_y, color=p[0].get_color(), linestyle='-', alpha=0.8)
+
+        all_data[n_bits] = {
+            'num_trials': num_trials,
+            'mean': sum(evaluations_list) / len(evaluations_list) if evaluations_list else 0,
+            'expected_birthday': expected,
+        }
+
+    if plt is not None:
+        plt.xlabel('Evaluations (k)')
+        plt.ylabel('Probability of Collision')
+        plt.title('Empirical vs Theoretical Birthday Curve')
+        plt.legend()
+        plt.grid(True, alpha=0.3)
+        plt.savefig('empirical_birthday_curve.png')
+        plt.close()
+        print("Plot saved as 'empirical_birthday_curve.png'")
+
+    return all_data
 
 
 def practical_context():
     """
-    Compute 2^{n/2} for practical hash functions to contextualize security.
+    Compute 2^{n/2} for practical hash functions to contextualise security.
+
+    Note: these figures assume a *generic* birthday attack with no structural
+    weaknesses exploited.  Real-world attacks on MD5 and SHA-1 used differential
+    cryptanalysis to find collisions far below 2^{n/2}; the birthday bound is a
+    ceiling, not a description of the actual attack cost.
     """
+    _interpretations = {
+        'MD5': (
+            'Broken. Wang et al. (2004) found collisions in ~2^24 ops using '
+            'differential cryptanalysis — orders of magnitude below the 2^64 '
+            'birthday bound. MD5 should never be used for integrity or signing.'
+        ),
+        'SHA-1': (
+            'Deprecated. The SHAttered attack (2017) produced a practical PDF '
+            'collision at an estimated cost of ~2^63 ops, roughly half the '
+            '2^80 birthday bound. All major browsers and CAs have dropped SHA-1.'
+        ),
+        'SHA-256': (
+            'Currently secure. No structural attack is known; the full 2^128 '
+            'birthday cost is computationally infeasible with any foreseeable '
+            'technology. Recommended for new systems.'
+        ),
+    }
+
     results = {}
     for name, n in [('MD5', 128), ('SHA-1', 160), ('SHA-256', 256)]:
         cost = 2 ** (n / 2)
-        # Assume 10^9 hashes/sec
-        seconds = cost / 1e9
+        seconds = cost / 1e9          # at 10^9 hashes/sec
         years = seconds / (365.25 * 24 * 3600)
 
         results[name] = {
             'output_bits': n,
-            'collision_cost': f'2^{n//2}',
+            'collision_cost': f'2^{n // 2}',
             'cost_decimal': f'{cost:.2e}',
             'seconds_at_1ghz': f'{seconds:.2e}',
             'years_at_1ghz': f'{years:.2e}',
+            'interpretation': _interpretations[name],
         }
 
     return results
@@ -283,23 +434,32 @@ if __name__ == '__main__':
 
     # Toy hash attacks
     print("\n--- Birthday Attack on Toy Hashes ---")
-    results = attack_toy_hash([8, 10, 12, 14, 16], num_trials=10)
-    print(f"{'n':>4} | {'Avg Evals':>10} | {'Expected':>10} | {'Ratio':>6}")
-    print("-" * 40)
+    results = attack_toy_hash([8, 12, 16], num_trials=20)
+    print(f"{'n':>4} | {'Avg Evals (Naive)':>18} | {'Avg Evals (Floyd)':>18} | {'Expected':>10}")
+    print("-" * 58)
     for n, r in sorted(results.items()):
-        print(f"{n:>4} | {r['avg_evaluations']:>10.1f} | "
-              f"{r['expected_birthday']:>10.1f} | {r['ratio']:>6.2f}")
+        print(f"{n:>4} | {r['avg_evaluations_naive']:>18.1f} | "
+              f"{r['avg_evaluations_floyd']:>18.1f} | {r['expected_birthday']:>10.1f}")
+
+    print("\n--- Attack Truncated DLP Hash ---")
+    dlp_res = attack_dlp_hash_truncated(16, 5)
+    print(f"n = 16 bits | Avg Evals: {dlp_res['avg_evaluations']:.1f} | "
+          f"Expected: {dlp_res['expected']:.1f} | Ratio: {dlp_res['ratio']:.2f}")
+    if dlp_res.get('input1'):
+        print(f"Example Collision: H({dlp_res['input1']}) == H({dlp_res['input2']}) "
+              f"== {dlp_res['hash_value']}")
 
     # Practical context
     print("\n--- Practical Hash Context ---")
     ctx = practical_context()
     for name, info in ctx.items():
-        print(f"{name}: collision cost = {info['collision_cost']}, "
-              f"≈ {info['years_at_1ghz']} years at 1 GHash/s")
+        print(f"\n{name} (n={info['output_bits']} bits)")
+        print(f"  Generic birthday cost : {info['collision_cost']} ≈ {info['cost_decimal']} ops")
+        print(f"  At 1 GHash/s          : ≈ {info['years_at_1ghz']} years")
+        print(f"  Security assessment   : {info['interpretation']}")
 
     # Empirical curve
-    print("\n--- Empirical Birthday Curve (n=12, 50 trials) ---")
-    curve = empirical_birthday_curve(12, 50)
-    print(f"Expected: {curve['expected_birthday']:.0f}")
-    print(f"Mean evaluations: {curve['mean']:.1f}")
-    print(f"Median: {curve['median']}")
+    print("\n--- Empirical Birthday Curve ---")
+    curve_data = empirical_birthday_curve([8, 10, 12, 14, 16], 100)
+    for n, info in curve_data.items():
+        print(f"n={n:>2}: Mean = {info['mean']:.1f} | Expected = {info['expected_birthday']:.1f}")
