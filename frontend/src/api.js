@@ -172,61 +172,6 @@ const api = {
     return r.json();
   },
 
-  async pa10HMAC(message, keyHex = '', tagHex = '') {
-    const r = await fetch(`${API_BASE}/api/pa10/hmac`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, key_hex: keyHex, tag_hex: tagHex }),
-    });
-    return r.json();
-  },
-
-  async pa10EufCma() {
-    const r = await fetch(`${API_BASE}/api/pa10/euf_cma`, { method: 'POST' });
-    return r.json();
-  },
-
-  async pa10MacCrhf() {
-    const r = await fetch(`${API_BASE}/api/pa10/mac_crhf`, { method: 'POST' });
-    return r.json();
-  },
-
-  async pa10EthEnc(message, keyEncHex = '', keyMacHex = '') {
-    const r = await fetch(`${API_BASE}/api/pa10/eth_enc`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, key_enc_hex: keyEncHex, key_mac_hex: keyMacHex }),
-    });
-    return r.json();
-  },
-
-  async pa10EthDec(keyEncHex, keyMacHex, nonceHex, ciphertextHex, tagHex, tamperByte = -1) {
-    const r = await fetch(`${API_BASE}/api/pa10/eth_dec`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        key_enc_hex: keyEncHex, key_mac_hex: keyMacHex,
-        nonce_hex: nonceHex, ciphertext_hex: ciphertextHex,
-        tag_hex: tagHex, tamper_byte: tamperByte,
-      }),
-    });
-    return r.json();
-  },
-
-  async pa10Timing() {
-    const r = await fetch(`${API_BASE}/api/pa10/timing`, { method: 'POST' });
-    return r.json();
-  },
-
-  async pa10CcaGame(rounds = 30) {
-    const r = await fetch(`${API_BASE}/api/pa10/cca_game`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rounds }),
-    });
-    return r.json();
-  },
-
   // ── PA#11 Diffie-Hellman ──
   async pa11Exchange(a = null, b = null) {
     const r = await fetch(`${API_BASE}/api/pa11/exchange`, {
