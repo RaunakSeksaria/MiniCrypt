@@ -217,47 +217,47 @@ def reduce_primitive(req: ReduceRequest):
         query_bytes = bytes.fromhex(req.query) if req.query else b'\x00'*16
         
         # Instantiate the TARGET primitive (the one we built via reduction)
-        primitive_target = PrimitiveFactory.get_instance(req.foundation, req.target, seed_bytes)
-        result_bytes = primitive_target.evaluate(query_bytes)
-        output_hex = safe_hex(result_bytes)
-
         steps = []; proofs = []
+        current_state = seed_bytes
+        
         for label, desc in chain:
             proof = PROOF_DB.get(label, {"theorem":"","security":"","pa":""})
             proofs.append({"step":label,"description":desc,**proof})
             
             # Special case for HILL (PA#1) iterations display
-            if label == "OWF→PRG" and req.source == "OWF" and req.target == "PRG":
+            if label == "OWF→PRG":
                 from crypto.pa01_owf_prg import PRG_from_OWF, AES_OWF
                 from crypto.utils import bytes_to_bits
                 prg_impl = PRG_from_OWF(AES_OWF(), 128) if req.foundation == "AES" else PRG_from_OWF(None, 32)
-                res_bytes = prg_impl.generate_bytes(int.from_bytes(seed_bytes, 'big'), 16)
+                res_bytes = prg_impl.generate_bytes(int.from_bytes(current_state, 'big'), 16)
                 all_bits = bytes_to_bits(res_bytes)
-                curr_x = seed_bytes
+                
+                iter_x = current_state
                 for i in range(4):
-                    steps.append({"fn": f"HILL Iteration {i+1}", "input": f"x_{i}: {safe_hex(curr_x)[:8]}...", "output": f"Bit: {all_bits[i]} → Next State"})
-                    # Mock flow for visualization
-                    curr_x = (int.from_bytes(curr_x, 'big') + 1).to_bytes(16, 'big')
-                steps.append({"fn": "...", "input": "Iterations 5-128", "output": "Truncated for brevity"})
+                    steps.append({"fn": f"HILL (PA#1) Iteration {i+1}", "input": f"x_{i}: {safe_hex(iter_x)[:8]}...", "output": f"Bit: {all_bits[i]} → Next"})
+                    iter_x = (int.from_bytes(iter_x, 'big') + 1).to_bytes(16, 'big') # visualization mock
+                
+                steps.append({"fn": "...", "input": "Iterations 5-128", "output": f"Full PRG Out: {res_bytes.hex()[:8]}..."})
+                current_state = res_bytes # Update state for next reduction step (e.g. GGM)
+                
             elif label == "PRG→PRF":
-                # GGM Tree Trace: Show first 4 levels of tree walking
+                # GGM Tree Trace: Show tree walking using CURRENT_STATE as Root Key
                 from crypto.pa02_prf_ggm import GGM_PRF
                 from crypto.utils import bytes_to_bits
                 ggm = GGM_PRF()
                 x_bits = bytes_to_bits(query_bytes)
-                current = seed_bytes
+                
+                node_val = current_state
                 for i in range(4):
                     bit = x_bits[i]
-                    g0 = ggm.prg.G0(current)
-                    g1 = ggm.prg.G1(current)
+                    g0 = ggm.prg.G0(node_val)
+                    g1 = ggm.prg.G1(node_val)
                     chosen = g0 if bit == 0 else g1
-                    steps.append({
-                        "fn": f"GGM Tree Depth {i+1}",
-                        "input": f"Node: {safe_hex(current)[:8]}... (Bit {bit})",
-                        "output": f"→ {safe_hex(chosen)[:8]}..."
-                    })
-                    current = chosen
+                    steps.append({"fn": f"GGM (PA#2) Depth {i+1}", "input": f"Node: {safe_hex(node_val)[:8]}... (Bit {bit})", "output": f"→ {safe_hex(chosen)[:8]}..."})
+                    node_val = chosen
+                
                 steps.append({"fn": "...", "input": "Depths 5-128", "output": "Truncated for brevity"})
+                current_state = node_val
             else:
                 # DYNAMIC: Actually call the intermediate primitive to show its output!
                 mid_target = label.split("→")[-1]
@@ -270,6 +270,8 @@ def reduce_primitive(req: ReduceRequest):
                     print(f"DEBUG: Reduction step {label} failed: {e}\n{traceback.format_exc()}")
                     steps.append({"fn": desc, "input": safe_hex(query_bytes)[:8]+"...", "output": "→"})
 
+        # Final result is the state after all steps
+        output_hex = safe_hex(current_state)
         steps.append({"fn": f"Final {req.target} output", "input": safe_hex(query_bytes), "output": output_hex})
         return {"steps":steps,"proofs":proofs,"output":output_hex,"chain":[l for l,_ in chain], "source": req.source, "target": req.target}
     except Exception as e:

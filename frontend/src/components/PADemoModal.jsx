@@ -359,22 +359,33 @@ const PADemoModal = ({ pa, onClose, api }) => {
               <h3 style={{ margin: 0, marginBottom: '12px' }}>Distinguishing Game (PRF Security)</h3>
               <div style={{ padding: '12px', background: 'rgba(var(--accent-rgb), 0.05)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>🎯 Goal: Is it PRF or Random?</div>
-                <div style={{ fontSize: '11px', color: 'var(--text2)', lineHeight: '1.4', marginBottom: '12px' }}>
-                  The adversary tries to distinguish between your <strong>GGM PRF</strong> and a <strong>True Random Function</strong>. If the success rate is close to 50%, the PRF is secure.
-                </div>
                 
                 <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                   <div style={{ flex: 1, background: 'var(--bg2)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Trials</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700 }}>{result.game.trials}</div>
-                  </div>
-                  <div style={{ flex: 1, background: 'var(--bg2)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Advantage</div>
+                    <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Current Advantage</div>
                     <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>{(Math.abs(result.game.advantage) * 100).toFixed(1)}%</div>
                   </div>
                 </div>
 
-                <div style={{ fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic' }}>
+                {result.game.samples && result.game.samples.map((s, idx) => (
+                  <div key={idx} style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px', marginBottom: '8px', fontSize: '10px', border: '1px solid var(--border)' }}>
+                    <div style={{ color: 'var(--text3)', marginBottom: '4px', textTransform: 'uppercase', fontSize: '8px' }}>Query Sample #{idx + 1}</div>
+                    <code style={{ color: 'var(--text2)', display: 'block', marginBottom: '8px', wordBreak: 'break-all' }}>{s.x}</code>
+                    
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <div>
+                        <div style={{ color: 'var(--accent3)', fontSize: '8px', textTransform: 'uppercase' }}>PRF(x)</div>
+                        <code style={{ fontSize: '10px', color: 'var(--accent3)', wordBreak: 'break-all' }}>{s.prf}</code>
+                      </div>
+                      <div>
+                        <div style={{ color: 'var(--text3)', fontSize: '8px', textTransform: 'uppercase' }}>Random(x)</div>
+                        <code style={{ fontSize: '10px', color: 'var(--text3)', wordBreak: 'break-all' }}>{s.rand}</code>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic', marginTop: '12px' }}>
                   {result.game.advantage < 0.1 ? 
                     "✅ Success! The adversary has no significant advantage. The PRF is indistinguishable from random." : 
                     "⚠️ Noticeable bias detected in this trial."}

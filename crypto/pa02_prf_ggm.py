@@ -311,19 +311,28 @@ def distinguishing_game(prf: PRF, num_queries: int = 100) -> dict:
     for _ in range(num_queries):
         random_outputs.append(random_bytes(16))
 
-    # Simple statistical comparison: count the number of 1 bits in each set
+    # Calculate aggregate stats
     prf_ones = sum(sum(bytes_to_bits(y)) for y in prf_outputs)
     rand_ones = sum(sum(bytes_to_bits(y)) for y in random_outputs)
-
     total_bits = num_queries * 128
     prf_ratio = prf_ones / total_bits
     rand_ratio = rand_ones / total_bits
+
+    # Pick 2 actual samples from the batch we just ran
+    samples = []
+    for i in [0, num_queries // 2]: # First one and middle one
+        samples.append({
+            'x': to_hex(int_to_bytes(i, 16)),
+            'prf': to_hex(prf_outputs[i]),
+            'rand': to_hex(random_outputs[i])
+        })
 
     return {
         'trials': num_queries,
         'prf_ones_ratio': prf_ratio,
         'random_ones_ratio': rand_ratio,
         'advantage': abs(prf_ratio - rand_ratio),
+        'samples': samples,
         'indistinguishable': abs(prf_ratio - rand_ratio) < 0.05,
         'conclusion': ('PRF is indistinguishable from random'
                        if abs(prf_ratio - rand_ratio) < 0.05
