@@ -55,8 +55,8 @@ def rsa_keygen(bits: int = 512, e: int = 65537) -> RSAKeyPair:
     half_bits = bits // 2
 
     while True:
-        p = gen_prime(half_bits)
-        q = gen_prime(half_bits)
+        p, _ = gen_prime(half_bits)
+        q, _ = gen_prime(half_bits)
 
         if p == q:
             continue

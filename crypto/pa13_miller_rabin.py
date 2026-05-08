@@ -312,7 +312,7 @@ if __name__ == '__main__':
     # 2. Generate some primes
     print("\n--- Prime Generation ---")
     for bits in [64, 128, 256]:
-        p = gen_prime(bits)
+        p, _ = gen_prime(bits)
         print(f"{bits}-bit prime: {p}")
 
     # 3. Safe prime

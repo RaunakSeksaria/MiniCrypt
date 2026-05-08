@@ -122,8 +122,8 @@ class FactoringOWF:
     def verify_hardness(self, bits: int = 32) -> dict:
         """Show that factoring a small product takes effort."""
         from crypto.pa13_miller_rabin import gen_prime
-        p = gen_prime(bits)
-        q = gen_prime(bits)
+        p, _ = gen_prime(bits)
+        q, _ = gen_prime(bits)
         n = p * q
 
         start = time.time()
