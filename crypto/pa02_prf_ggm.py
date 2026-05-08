@@ -249,7 +249,7 @@ def prf_to_prg(prf: PRF, seed: bytes) -> bytes:
     Maps 16 bytes → 32 bytes (length-doubling).
     """
     zero_block = b'\x00' * 16
-    one_block = b'\x00' * 15 + b'\x01'
+    one_block = b'\xff' * 16
     left = prf.F(seed, zero_block)
     right = prf.F(seed, one_block)
     return left + right
