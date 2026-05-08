@@ -171,7 +171,7 @@ def timing_attack_demo() -> dict:
 # Length-Extension Attack Demo
 # ---------------------------------------------------------------------------
 
-def length_extension_attack(crhf, naive_tag: bytes, message: bytes, suffix: bytes) -> bytes:
+def length_extension_attack(crhf, naive_tag: bytes, key_len: int, message: bytes, suffix: bytes) -> bytes:
     """
     Real Merkle-Damgård length-extension attack.
 
@@ -183,12 +183,38 @@ def length_extension_attack(crhf, naive_tag: bytes, message: bytes, suffix: byte
     and hash just `suffix`. The result equals H(k‖m‖pad(k‖m)‖suffix).
     """
     from crypto.pa07_merkle_damgard import MerkleDamgard
-    forged_md = MerkleDamgard(
+    
+    # The total message the server will hash is: k ‖ m ‖ pad(k‖m) ‖ suffix
+    # The server will apply MD padding to this entire string.
+    # The attacker knows the length of k, m, and the padding.
+    
+    md = MerkleDamgard(
         compress=crhf.dlp.compress_bytes,
         iv=naive_tag,          # <- attacker injects the leaked state
         block_size=crhf.block_size,
     )
-    return forged_md.hash(suffix)
+    
+    # Reconstruct what the server will hash
+    # To find the exact padding the server will append to the end,
+    # we need the length of the extended message including the key.
+    
+    padded_km = md.pad(b'\x00' * key_len + message)
+    extended_message_with_key = padded_km + suffix
+    
+    # Get the padding that the server WILL add to the extended message
+    final_padded = md.pad(extended_message_with_key)
+    
+    # The blocks to hash starting from naive_tag are ONLY the suffix + new padding
+    suffix_and_new_pad = final_padded[len(padded_km):]
+    
+    blocks = [suffix_and_new_pad[i:i + md.block_size] 
+              for i in range(0, len(suffix_and_new_pad), md.block_size)]
+    
+    cv = naive_tag
+    for block in blocks:
+        cv = md.compress(cv, block)
+        
+    return cv
 
 
 def length_extension_demo(hmac_obj: HMAC = None, suffix: bytes = None) -> dict:
@@ -217,7 +243,7 @@ def length_extension_demo(hmac_obj: HMAC = None, suffix: bytes = None) -> dict:
     forged_message = message + pad_suffix + suffix      # what attacker claims
 
     # Forged tag — attacker computes this WITHOUT k
-    forged_tag = length_extension_attack(hmac_obj.crhf, naive_tag, message, suffix)
+    forged_tag = length_extension_attack(hmac_obj.crhf, naive_tag, len(key), message, suffix)
 
     # Verify: server recomputes H(k ‖ forged_message) and checks == forged_tag
     server_check = hmac_obj.crhf.hash(key + forged_message)
@@ -225,8 +251,8 @@ def length_extension_demo(hmac_obj: HMAC = None, suffix: bytes = None) -> dict:
 
     # HMAC is not vulnerable
     hmac_tag = hmac_obj.mac(key, message)
-    # Attacker tries same trick with HMAC
-    hmac_forged_attempt = length_extension_attack(hmac_obj.crhf, bytes.fromhex(to_hex(hmac_tag)), message, suffix)
+    # Attacker tries same trick with HMAC (assuming key length is known)
+    hmac_forged_attempt = length_extension_attack(hmac_obj.crhf, bytes.fromhex(to_hex(hmac_tag)), len(key), message, suffix)
     hmac_forgery_valid = hmac_obj.verify(key, forged_message, hmac_forged_attempt)
 
     return {

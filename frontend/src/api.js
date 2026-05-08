@@ -30,11 +30,101 @@ const api = {
     return r.json();
   },
 
+  async pa5EufInit() {
+    const r = await fetch(`${API_BASE}/api/pa5/euf_init`);
+    return r.json();
+  },
+
+  async pa5EufVerify(sessionId, messageHex, tagHex) {
+    const r = await fetch(`${API_BASE}/api/pa5/euf_verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, message_hex: messageHex, tag_hex: tagHex }),
+    });
+    return r.json();
+  },
+
+  async pa5EufCheat(sessionId) {
+    const r = await fetch(`${API_BASE}/api/pa5/euf_cheat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+    return r.json();
+  },
+
+  async pa5LengthExtension(suffix) {
+    const r = await fetch(`${API_BASE}/api/pa5/length_extension`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suffix }),
+    });
+    return r.json();
+  },
+
+  async pa6MalleabilityInit(message) {
+    const r = await fetch(`${API_BASE}/api/pa6/malleability_init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    return r.json();
+  },
+
+  async pa6MalleabilityFlip(payload) {
+    const r = await fetch(`${API_BASE}/api/pa6/malleability_flip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return r.json();
+  },
+
   async pa8Hash(message) {
     const r = await fetch(`${API_BASE}/api/pa8/hash`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message })
+    });
+    return r.json();
+  },
+
+  async pa17MalleabilityInit(message) {
+    const r = await fetch(`${API_BASE}/api/pa17/malleability_init`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: parseInt(message) || 42 }),
+    });
+    return r.json();
+  },
+
+  async pa17MalleabilityFlip(payload) {
+    const r = await fetch(`${API_BASE}/api/pa17/malleability_flip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return r.json();
+  },
+  async pa19SecureAnd(a, b) {
+    const r = await fetch(`${API_BASE}/api/pa19/secure_and`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ a, b }),
+    });
+    return r.json();
+  },
+
+  async pa19TruthTable() {
+    const r = await fetch(`${API_BASE}/api/pa19/truth_table`, { method: 'POST' });
+    return r.json();
+  },
+
+  async pa20Evaluate(alice_val, bob_val, mode = 'comparator', bits = 4) {
+    const r = await fetch(`${API_BASE}/api/pa20/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alice_val, bob_val, bits, mode }),
     });
     return r.json();
   },
@@ -227,6 +317,34 @@ const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rounds, broken }),
+    });
+    return r.json();
+  },
+
+  // ── PA#4 Modes Visual Animator ──
+  async pa4Animate(mode, message, keyHex = '', ivHex = '') {
+    const r = await fetch(`${API_BASE}/api/pa4/animate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, message, key_hex: keyHex, iv_hex: ivHex }),
+    });
+    return r.json();
+  },
+
+  async pa4Flip(mode, keyHex, ivHex, ciphertextHex, flipBlock) {
+    const r = await fetch(`${API_BASE}/api/pa4/flip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, key_hex: keyHex, iv_hex: ivHex, ciphertext_hex: ciphertextHex, flip_block: flipBlock }),
+    });
+    return r.json();
+  },
+
+  async pa4IvReuse(message1, message2, keyHex = '', ivHex = '') {
+    const r = await fetch(`${API_BASE}/api/pa4/iv_reuse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message1, message2, key_hex: keyHex, iv_hex: ivHex }),
     });
     return r.json();
   },
