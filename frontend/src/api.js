@@ -28,7 +28,31 @@ const api = {
       body: JSON.stringify({ pa, params })
     });
     return r.json();
-  }
+  },
+
+  async pa8Hash(message) {
+    const r = await fetch(`${API_BASE}/api/pa8/hash`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    return r.json();
+  },
+
+  async pa8CollisionStart() {
+    const r = await fetch(`${API_BASE}/api/pa8/collision/start`, { method: 'POST' });
+    return r.json();
+  },
+
+  async pa8CollisionStatus(huntId) {
+    const r = await fetch(`${API_BASE}/api/pa8/collision/status/${huntId}`);
+    return r.json();
+  },
+
+  async pa8CollisionStop(huntId) {
+    const r = await fetch(`${API_BASE}/api/pa8/collision/stop/${huntId}`, { method: 'POST' });
+    return r.json();
+  },
 };
 
 export default api;

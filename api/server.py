@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
-import json, traceback
+import json, traceback, threading, uuid, time
 
 app = FastAPI(title="Minicrypt Clique Explorer API") # Reload trigger v2
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -514,6 +514,129 @@ def run_demo(req: DemoRequest):
             return {"error":f"PA#{req.pa} not found"}
     except Exception as e:
         raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
+
+
+# ── PA#8 dedicated endpoints ──
+
+# Shared state for collision hunts  {hunt_id -> dict}
+_pa8_hunts: dict = {}
+_pa8_crhf_cache = None   # lazily initialised once
+
+def _get_pa8_crhf():
+    global _pa8_crhf_cache
+    if _pa8_crhf_cache is None:
+        from crypto.pa08_dlp_crhf import DLP_CRHF
+        _pa8_crhf_cache = DLP_CRHF(bits=32)  # small group, fast
+    return _pa8_crhf_cache
+
+
+class PA8HashRequest(BaseModel):
+    message: str
+
+
+@app.post("/api/pa8/hash")
+def pa8_live_hash(req: PA8HashRequest):
+    """Hash a message and return the group element as hex (live, on every keystroke)."""
+    try:
+        from crypto.utils import to_hex
+        crhf = _get_pa8_crhf()
+        msg = req.message.encode()
+        h = crhf.hash(msg)
+        full_hex = to_hex(h)
+        h_int = int.from_bytes(h, 'big')
+        truncated = h_int & 0xFFFF
+        return {
+            "message": req.message,
+            "hash_hex": full_hex,
+            "truncated_16bit": truncated,
+            "truncated_hex": f"{truncated:04x}",
+            "p": crhf.dlp.p,
+            "q": crhf.dlp.q,
+            "g": crhf.dlp.g,
+            "h_pub": crhf.dlp.h,
+            "digest_bytes": crhf.digest_size,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
+@app.post("/api/pa8/collision/start")
+def pa8_collision_start():
+    """Launch a background birthday-attack thread (16-bit truncated output). Returns hunt_id."""
+    hunt_id = str(uuid.uuid4())
+    state = {
+        "hunt_id": hunt_id,
+        "status": "running",
+        "evaluations": 0,
+        "birthday_bound": 256,   # 2^(16/2)
+        "output_bits": 16,
+        "collision": None,
+        "started_at": time.time(),
+    }
+    _pa8_hunts[hunt_id] = state
+
+    def _hunt(state):
+        try:
+            crhf = _get_pa8_crhf()
+            seen = {}     # truncated_hash -> message bytes
+            MAX_EVALS = 2 ** 18  # safety cap
+            mask = (1 << 16) - 1
+            # Use a per-hunt salt so each run finds a DIFFERENT collision pair
+            salt = hunt_id[:8]
+            i = 0
+            while state["status"] == "running" and i < MAX_EVALS:
+                msg = f"{salt}:{i}".encode()
+                h_int = int.from_bytes(crhf.hash(msg), 'big') & mask
+                i += 1
+                state["evaluations"] = i
+                if h_int in seen and seen[h_int] != msg:
+                    state["collision"] = {
+                        "msg1": seen[h_int].decode(),
+                        "msg2": msg.decode(),
+                        "hash_16bit": f"{h_int:04x}",
+                        "hash_decimal": h_int,
+                    }
+                    state["status"] = "found"
+                    return
+                seen[h_int] = msg
+            if state["status"] == "running":
+                state["status"] = "exhausted"
+        except Exception as exc:
+            state["status"] = "error"
+            state["error"] = str(exc)
+
+    t = threading.Thread(target=_hunt, args=(state,), daemon=True)
+    t.start()
+    return {"hunt_id": hunt_id, "birthday_bound": 256, "output_bits": 16}
+
+
+@app.get("/api/pa8/collision/status/{hunt_id}")
+def pa8_collision_status(hunt_id: str):
+    """Poll the state of a running collision hunt."""
+    state = _pa8_hunts.get(hunt_id)
+    if state is None:
+        raise HTTPException(404, "Hunt not found")
+    return {
+        "hunt_id": hunt_id,
+        "status": state["status"],
+        "evaluations": state["evaluations"],
+        "birthday_bound": state["birthday_bound"],
+        "output_bits": state["output_bits"],
+        "progress_pct": min(100.0, state["evaluations"] / state["birthday_bound"] * 100),
+        "collision": state["collision"],
+    }
+
+
+@app.post("/api/pa8/collision/stop/{hunt_id}")
+def pa8_collision_stop(hunt_id: str):
+    """Abort a running collision hunt."""
+    state = _pa8_hunts.get(hunt_id)
+    if state is None:
+        raise HTTPException(404, "Hunt not found")
+    if state["status"] == "running":
+        state["status"] = "stopped"
+    return {"status": state["status"]}
+
 
 # ── Routing table ──
 @app.get("/api/reductions")
