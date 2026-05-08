@@ -210,6 +210,34 @@ const api = {
     });
     return r.json();
   },
+
+  // ── PA#4 Modes Visual Animator ──
+  async pa4Animate(mode, message, keyHex = '', ivHex = '') {
+    const r = await fetch(`${API_BASE}/api/pa4/animate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, message, key_hex: keyHex, iv_hex: ivHex }),
+    });
+    return r.json();
+  },
+
+  async pa4Flip(mode, keyHex, ivHex, ciphertextHex, flipBlock) {
+    const r = await fetch(`${API_BASE}/api/pa4/flip`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, key_hex: keyHex, iv_hex: ivHex, ciphertext_hex: ciphertextHex, flip_block: flipBlock }),
+    });
+    return r.json();
+  },
+
+  async pa4IvReuse(message1, message2, keyHex = '', ivHex = '') {
+    const r = await fetch(`${API_BASE}/api/pa4/iv_reuse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message1, message2, key_hex: keyHex, iv_hex: ivHex }),
+    });
+    return r.json();
+  },
 };
 
 export default api;

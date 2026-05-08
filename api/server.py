@@ -1377,6 +1377,248 @@ def pa3_simulate(req: PA3SimRequest):
         return result
 
 
+# ── PA#4 Visual Animation endpoints ──
+
+class PA4AnimateRequest(BaseModel):
+    mode: str = "CBC"          # CBC | OFB | CTR
+    message: str = "Block 0 here!!!!Block 1 here!!!!Block 2 here!!!!"
+    key_hex: str = ""          # leave empty to auto-generate
+    iv_hex: str = ""           # leave empty to auto-generate
+
+
+@app.post("/api/pa4/animate")
+def pa4_animate(req: PA4AnimateRequest):
+    """
+    Return a block-by-block encryption trace for the given mode.
+    Each entry in 'blocks' contains:
+      plaintext_hex, iv_or_counter_hex, keystream_hex,
+      xor_intermediate_hex (CBC only), ciphertext_hex
+    """
+    try:
+        from crypto.pa04_modes import (
+            cbc_encrypt, ofb_encrypt, ctr_encrypt,
+            ofb_keystream, split_blocks as _split
+        )
+        from crypto.aes import aes_encrypt_block, aes_decrypt_block, BLOCK_SIZE
+        from crypto.utils import (
+            random_bytes, pad_pkcs7, xor_bytes, to_hex,
+            int_to_bytes, bytes_to_int, split_blocks
+        )
+
+        mode = req.mode.upper()
+        if mode not in ("CBC", "OFB", "CTR"):
+            raise HTTPException(400, "mode must be CBC, OFB, or CTR")
+
+        key = bytes.fromhex(req.key_hex) if req.key_hex else random_bytes(BLOCK_SIZE)
+        key = (key + b'\x00' * BLOCK_SIZE)[:BLOCK_SIZE]
+
+        msg = req.message.encode()[:48]          # cap at 3 blocks for demo
+        # Pad to exactly 3 blocks (48 bytes)
+        if len(msg) < 48:
+            msg = msg + b' ' * (48 - len(msg))
+        padded = pad_pkcs7(msg, BLOCK_SIZE)
+        pt_blocks = split_blocks(padded, BLOCK_SIZE)[:3]
+
+        if mode == "CBC":
+            iv = bytes.fromhex(req.iv_hex) if req.iv_hex else random_bytes(BLOCK_SIZE)
+            iv = (iv + b'\x00' * BLOCK_SIZE)[:BLOCK_SIZE]
+            trace = []
+            prev = iv
+            ciphertext_blocks = []
+            for i, pt in enumerate(pt_blocks):
+                xored = xor_bytes(prev, pt)
+                ct = aes_encrypt_block(xored, key)
+                trace.append({
+                    "index": i,
+                    "plaintext_hex": to_hex(pt),
+                    "prev_ct_hex": to_hex(prev),   # IV for block 0, prev CT otherwise
+                    "xor_hex": to_hex(xored),
+                    "ciphertext_hex": to_hex(ct),
+                })
+                ciphertext_blocks.append(ct)
+                prev = ct
+            return {
+                "mode": "CBC", "key_hex": to_hex(key), "iv_hex": to_hex(iv),
+                "blocks": trace,
+                "full_ciphertext_hex": to_hex(b''.join(ciphertext_blocks)),
+            }
+
+        elif mode == "OFB":
+            iv = bytes.fromhex(req.iv_hex) if req.iv_hex else random_bytes(BLOCK_SIZE)
+            iv = (iv + b'\x00' * BLOCK_SIZE)[:BLOCK_SIZE]
+            trace = []
+            state = iv
+            ciphertext_blocks = []
+            for i, pt in enumerate(pt_blocks):
+                state = aes_encrypt_block(state, key)   # keystream block
+                ct = xor_bytes(state, pt)
+                trace.append({
+                    "index": i,
+                    "plaintext_hex": to_hex(pt),
+                    "keystream_hex": to_hex(state),
+                    "ciphertext_hex": to_hex(ct),
+                })
+                ciphertext_blocks.append(ct)
+            return {
+                "mode": "OFB", "key_hex": to_hex(key), "iv_hex": to_hex(iv),
+                "blocks": trace,
+                "full_ciphertext_hex": to_hex(b''.join(ciphertext_blocks)),
+            }
+
+        else:  # CTR
+            nonce = bytes.fromhex(req.iv_hex) if req.iv_hex else random_bytes(BLOCK_SIZE)
+            nonce = (nonce + b'\x00' * BLOCK_SIZE)[:BLOCK_SIZE]
+            nonce_int = bytes_to_int(nonce)
+            trace = []
+            ciphertext_blocks = []
+            for i, pt in enumerate(pt_blocks):
+                counter = int_to_bytes((nonce_int + i) % (1 << 128), BLOCK_SIZE)
+                keystream = aes_encrypt_block(counter, key)
+                ct = xor_bytes(keystream, pt)
+                trace.append({
+                    "index": i,
+                    "plaintext_hex": to_hex(pt),
+                    "counter_hex": to_hex(counter),
+                    "keystream_hex": to_hex(keystream),
+                    "ciphertext_hex": to_hex(ct),
+                })
+                ciphertext_blocks.append(ct)
+            return {
+                "mode": "CTR", "key_hex": to_hex(key), "nonce_hex": to_hex(nonce),
+                "blocks": trace,
+                "full_ciphertext_hex": to_hex(b''.join(ciphertext_blocks)),
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
+class PA4FlipRequest(BaseModel):
+    mode: str
+    key_hex: str
+    iv_hex: str            # IV for CBC/OFB, nonce for CTR
+    ciphertext_hex: str    # full 3-block ciphertext
+    flip_block: int = 1    # which ciphertext block to flip (0-indexed)
+
+
+@app.post("/api/pa4/flip")
+def pa4_flip(req: PA4FlipRequest):
+    """
+    Flip bit 0 of the chosen ciphertext block and re-decrypt.
+    Returns which plaintext blocks changed — demonstrating error propagation.
+    """
+    try:
+        from crypto.pa04_modes import cbc_decrypt, ofb_decrypt, ctr_decrypt
+        from crypto.aes import BLOCK_SIZE
+        from crypto.utils import to_hex, split_blocks
+
+        mode = req.mode.upper()
+        key = bytes.fromhex(req.key_hex)
+        iv = bytes.fromhex(req.iv_hex)
+        ct = bytes.fromhex(req.ciphertext_hex)
+
+        # Original decryption
+        if mode == "CBC":
+            original_pt = cbc_decrypt(key, iv, ct)
+        elif mode == "OFB":
+            original_pt = ofb_decrypt(key, iv, ct)
+        elif mode == "CTR":
+            original_pt = ctr_decrypt(key, iv, ct)
+        else:
+            raise HTTPException(400, "bad mode")
+
+        # Flip first byte of chosen block
+        ct_mod = bytearray(ct)
+        flip_idx = req.flip_block * BLOCK_SIZE
+        if flip_idx < len(ct_mod):
+            ct_mod[flip_idx] ^= 0x01
+        ct_mod = bytes(ct_mod)
+
+        try:
+            if mode == "CBC":
+                modified_pt = cbc_decrypt(key, iv, ct_mod)
+            elif mode == "OFB":
+                modified_pt = ofb_decrypt(key, iv, ct_mod)
+            else:
+                modified_pt = ctr_decrypt(key, iv, ct_mod)
+        except Exception:
+            modified_pt = original_pt  # padding error etc — treat as fully corrupted
+
+        orig_blocks = split_blocks(original_pt.ljust(3 * BLOCK_SIZE), BLOCK_SIZE)[:3]
+        mod_blocks = split_blocks(modified_pt.ljust(3 * BLOCK_SIZE), BLOCK_SIZE)[:3]
+
+        corrupted = [i for i in range(3) if orig_blocks[i] != mod_blocks[i]]
+
+        return {
+            "mode": mode,
+            "flipped_ct_block": req.flip_block,
+            "corrupted_pt_blocks": corrupted,
+            "original_pt_blocks": [to_hex(b) for b in orig_blocks],
+            "modified_pt_blocks": [to_hex(b) for b in mod_blocks],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
+class PA4IvReuseRequest(BaseModel):
+    message1: str = "Block0 same here!Block1 diff AAAA"
+    message2: str = "Block0 same here!Block1 diff BBBB"
+    key_hex: str = ""
+    iv_hex: str = ""
+
+
+@app.post("/api/pa4/iv_reuse")
+def pa4_iv_reuse(req: PA4IvReuseRequest):
+    """
+    CBC IV-reuse demo: encrypt two messages with the same IV.
+    Returns per-block ciphertext comparison; matching blocks are highlighted.
+    """
+    try:
+        from crypto.pa04_modes import cbc_encrypt
+        from crypto.aes import BLOCK_SIZE
+        from crypto.utils import random_bytes, to_hex, pad_pkcs7, split_blocks
+
+        key = bytes.fromhex(req.key_hex) if req.key_hex else random_bytes(BLOCK_SIZE)
+        key = (key + b'\x00' * BLOCK_SIZE)[:BLOCK_SIZE]
+        iv = bytes.fromhex(req.iv_hex) if req.iv_hex else random_bytes(BLOCK_SIZE)
+        iv = (iv + b'\x00' * BLOCK_SIZE)[:BLOCK_SIZE]
+
+        m1 = req.message1.encode()[:32].ljust(32)
+        m2 = req.message2.encode()[:32].ljust(32)
+
+        ct1 = cbc_encrypt(key, iv, m1)
+        ct2 = cbc_encrypt(key, iv, m2)
+
+        def _blocks(data):
+            return split_blocks(pad_pkcs7(data, BLOCK_SIZE), BLOCK_SIZE)[:3]
+
+        pt1_blocks = _blocks(m1)
+        pt2_blocks = _blocks(m2)
+        ct1_blocks = split_blocks(ct1, BLOCK_SIZE)[:3]
+        ct2_blocks = split_blocks(ct2, BLOCK_SIZE)[:3]
+
+        match = [ct1_blocks[i] == ct2_blocks[i] for i in range(min(len(ct1_blocks), len(ct2_blocks)))]
+
+        return {
+            "iv_hex": to_hex(iv),
+            "key_hex": to_hex(key),
+            "message1_blocks": [to_hex(b) for b in pt1_blocks],
+            "message2_blocks": [to_hex(b) for b in pt2_blocks],
+            "ct1_blocks": [to_hex(b) for b in ct1_blocks],
+            "ct2_blocks": [to_hex(b) for b in ct2_blocks],
+            "block_match": match,
+            "vulnerability": "Same IV + same plaintext block → identical ciphertext block → leaks plaintext equality",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
 # ── Routing table ──
 @app.get("/api/reductions")
 def get_reductions():

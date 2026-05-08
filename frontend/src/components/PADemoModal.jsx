@@ -16,7 +16,7 @@ const PA_DEFINITIONS = {
     ]
   },
   3: { params: [] },  // PA3 has its own interactive renderer
-  4: { params: [{ name: 'message', label: 'Plaintext Message', default: 'Modes of Operation test!' }] },
+  4: { params: [] },  // PA4 has its own visual animator renderer
   5: { params: [{ name: 'message', label: 'Message to Authenticate', default: 'Authenticate me!' }] },
   6: { params: [{ name: 'message', label: 'Plaintext Message', default: 'CCA-secure message!' }] },
   7: { params: [{ name: 'message', label: 'Message to Hash', default: 'Hello Hash!' }] },
@@ -74,6 +74,19 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa3Loading, setPa3Loading]       = useState({});
   const [pa3LenError, setPa3LenError]     = useState(null);
 
+  // PA#4 Modes visual animator state
+  const [pa4Mode, setPa4Mode]           = useState('CBC');
+  const [pa4Msg, setPa4Msg]             = useState('Block 0 plaintext!!Block 1 plaintext!!Block 2 !!');
+  const [pa4Trace, setPa4Trace]         = useState(null);  // animate response
+  const [pa4FlipResult, setPa4FlipResult] = useState(null);
+  const [pa4FlippedBlock, setPa4FlippedBlock] = useState(null);
+  const [pa4IvReuseData, setPa4IvReuseData] = useState(null);
+  const [pa4IvReuseOn, setPa4IvReuseOn] = useState(false);
+  const [pa4IvMsg1, setPa4IvMsg1]       = useState('Same block here!Different block1');
+  const [pa4IvMsg2, setPa4IvMsg2]       = useState('Same block here!Different block2');
+  const [pa4Loading, setPa4Loading]     = useState({});
+  const [pa4AnimStep, setPa4AnimStep]   = useState(0); // for animation stepping
+
   // PA#10 state
   const [pa10LeData, setPa10LeData]       = useState(null);  // length-extension
   const [pa10LeSuffix, setPa10LeSuffix]   = useState('evil suffix');
@@ -125,15 +138,17 @@ const PADemoModal = ({ pa, onClose, api }) => {
     def.params.forEach(p => initialParams[p.name] = p.default);
     setParams(initialParams);
 
-    // Auto-run if no params (but NOT for PA3/PA8/PA9/PA10/PA11 — they have their own special renderers)
-    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11) {
+    // Auto-run if no params (but NOT for PA3/PA4/PA8/PA9/PA10/PA11 — they have their own special renderers)
+    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11) {
       runDemo(initialParams);
     }
 
-    // Reset PA3 / PA8 / PA9 / PA10 / PA11 state when modal switches PA
+    // Reset PA3 / PA4 / PA8 / PA9 / PA10 / PA11 state when modal switches PA
     setPa3SessionId(null); setPa3Challenge(null); setPa3GuessResult(null);
     setPa3Rounds([]); setPa3Stats(null); setPa3SimData(null);
     setPa3OracleLog([]); setPa3Loading({}); setPa3LenError(null);
+    setPa4Trace(null); setPa4FlipResult(null); setPa4FlippedBlock(null);
+    setPa4IvReuseData(null); setPa4IvReuseOn(false); setPa4Loading({}); setPa4AnimStep(0);
     setPa8Hash(null);
     setHuntStatus(null);
     stopHunt();
@@ -541,6 +556,256 @@ const PADemoModal = ({ pa, onClose, api }) => {
         </>)}
 
         {!pa3SessionId && <div style={{textAlign:'center',padding:'30px',color:'var(--text3)',fontSize:'13px',fontStyle:'italic'}}>Select a mode and start a session above to begin.</div>}
+      </div>
+    );
+  };
+
+  // ─────────────────────────────────────────────────────────────────
+  // PA#4 — Modes of Operation Visual Animator
+  // ─────────────────────────────────────────────────────────────────
+  const renderPA4Special = () => {
+    const busyPA4 = (k) => !!pa4Loading[k];
+    const setL = (k, v) => setPa4Loading(p => ({ ...p, [k]: v }));
+
+    const MODES = ['CBC', 'OFB', 'CTR'];
+    const modeColor = { CBC: '#6366f1', OFB: '#10b981', CTR: '#f59e0b' };
+    const ac = modeColor[pa4Mode] || '#6366f1';
+
+    const shortHex = (h = '') => (h.slice(0, 8) + '…' + h.slice(-4));
+
+    const runAnimate = async (mode, msg) => {
+      setL('anim', true);
+      setPa4FlipResult(null); setPa4FlippedBlock(null); setPa4AnimStep(0);
+      const d = await api.pa4Animate(mode || pa4Mode, msg || pa4Msg);
+      setPa4Trace(d);
+      setL('anim', false);
+    };
+
+    // Block diagram for a single mode
+    const BlockDiagram = ({ trace, mode, traceData }) => {
+      if (!trace || !trace.blocks) return null;
+      const blocks = trace.blocks;
+      const flip = pa4FlipResult;
+      const blockW = 110, gap = 60, totalW = blocks.length * (blockW + gap) - gap + 30;
+
+      return (
+        <div style={{ overflowX: 'auto', paddingBottom: '8px' }}>
+          <svg width={totalW} height={290} style={{ display: 'block', minWidth: totalW }}>
+            {blocks.map((blk, i) => {
+              const x = i * (blockW + gap) + 15;
+              const isCorrPt = flip && flip.corrupted_pt_blocks?.includes(i);
+              const isFlipped = pa4FlippedBlock === i;
+
+              // Row Y positions
+              const ptY = 10, arrowY1 = 45, xorY = 55, arrowY2 = 95, blockY = 105, arrowY3 = 155, ctY = 165;
+
+              const blockColor = isCorrPt ? '#ef4444' : (isFlipped ? '#f59e0b' : ac);
+              const ptColor = isCorrPt ? '#fca5a5' : '#a5b4fc';
+
+              return (
+                <g key={i}>
+                  {/* Plaintext block */}
+                  <rect x={x} y={ptY} width={blockW} height={28} rx={6} fill={`${ptColor}22`} stroke={ptColor} strokeWidth={1.5} />
+                  <text x={x + blockW / 2} y={ptY + 11} textAnchor="middle" fontSize={8} fill={ptColor} fontFamily="monospace">M{i}</text>
+                  <text x={x + blockW / 2} y={ptY + 21} textAnchor="middle" fontSize={7} fill={ptColor} fontFamily="monospace">{shortHex(blk.plaintext_hex)}</text>
+
+                  {/* Mode-specific middle elements */}
+                  {mode === 'CBC' && (<>
+                    {/* XOR symbol */}
+                    <circle cx={x + blockW / 2} cy={xorY + 14} r={12} fill="none" stroke={ac} strokeWidth={1.5} />
+                    <text x={x + blockW / 2} y={xorY + 19} textAnchor="middle" fontSize={13} fill={ac}>⊕</text>
+                    {/* IV/prev-CT label */}
+                    <text x={x + blockW / 2} y={xorY + 6} textAnchor="middle" fontSize={7} fill="#94a3b8">{i === 0 ? 'IV' : 'C' + (i - 1)}</text>
+                    {/* Arrow into XOR from top */}
+                    <line x1={x + blockW / 2} y1={ptY + 28} x2={x + blockW / 2} y2={xorY + 2} stroke="#94a3b8" strokeWidth={1} markerEnd="url(#arr)" />
+                    {/* E_k block */}
+                    <rect x={x + 10} y={blockY} width={blockW - 20} height={30} rx={6} fill={`${ac}33`} stroke={ac} strokeWidth={1.5} />
+                    <text x={x + blockW / 2} y={blockY + 19} textAnchor="middle" fontSize={10} fill={ac} fontWeight={700}>E_k</text>
+                    <line x1={x + blockW / 2} y1={xorY + 26} x2={x + blockW / 2} y2={blockY} stroke="#94a3b8" strokeWidth={1} markerEnd="url(#arr)" />
+                  </>)}
+
+                  {(mode === 'OFB' || mode === 'CTR') && (<>
+                    {/* Keystream block */}
+                    <rect x={x + 10} y={blockY - 20} width={blockW - 20} height={26} rx={5} fill={`${ac}22`} stroke={ac} strokeWidth={1.2} />
+                    <text x={x + blockW / 2} y={blockY - 9} textAnchor="middle" fontSize={7.5} fill={ac} fontFamily="monospace">{shortHex(blk.keystream_hex)}</text>
+                    <text x={x + blockW / 2} y={blockY - 1} textAnchor="middle" fontSize={6.5} fill="#94a3b8">keystream</text>
+                    {/* XOR */}
+                    <circle cx={x + blockW / 2} cy={blockY + 22} r={12} fill="none" stroke={ac} strokeWidth={1.5} />
+                    <text x={x + blockW / 2} y={blockY + 27} textAnchor="middle" fontSize={13} fill={ac}>⊕</text>
+                    <line x1={x + blockW / 2} y1={ptY + 28} x2={x + blockW / 2} y2={blockY + 10} stroke="#94a3b8" strokeWidth={1} markerEnd="url(#arr)" />
+                  </>)}
+
+                  {/* Ciphertext block (clickable for flip) */}
+                  <rect
+                    x={x} y={ctY + (mode === 'CBC' ? 10 : 30)} width={blockW} height={28} rx={6}
+                    fill={isFlipped ? '#f59e0b33' : `${blockColor}22`} stroke={blockColor} strokeWidth={isFlipped ? 2.5 : 1.5}
+                    style={{ cursor: 'pointer' }}
+                    onClick={async () => {
+                      if (!traceData) return;
+                      setL('flip', true); setPa4FlippedBlock(i);
+                      const ivKey = traceData.iv_hex || traceData.nonce_hex || '';
+                      const d = await api.pa4Flip(mode, traceData.key_hex, ivKey, traceData.full_ciphertext_hex, i);
+                      setPa4FlipResult(d); setL('flip', false);
+                    }}
+                  />
+                  <text x={x + blockW / 2} y={ctY + (mode === 'CBC' ? 21 : 41)} textAnchor="middle" fontSize={8} fill={blockColor} fontFamily="monospace" style={{ pointerEvents: 'none' }}>C{i} {isFlipped ? '⚡' : ''}</text>
+                  <text x={x + blockW / 2} y={ctY + (mode === 'CBC' ? 31 : 51)} textAnchor="middle" fontSize={7} fill={blockColor} fontFamily="monospace" style={{ pointerEvents: 'none' }}>{shortHex(blk.ciphertext_hex)}</text>
+
+                  {/* Chain arrow between blocks */}
+                  {i < blocks.length - 1 && mode === 'CBC' && (
+                    <line x1={x + blockW} y1={ctY + 24} x2={x + blockW + gap} y2={ctY + 24} stroke={ac} strokeWidth={1.5} markerEnd="url(#arr)" strokeDasharray="4,2" />
+                  )}
+                </g>
+              );
+            })}
+            <defs>
+              <marker id="arr" markerWidth={8} markerHeight={8} refX={4} refY={3} orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill="#94a3b8" />
+              </marker>
+            </defs>
+          </svg>
+        </div>
+      );
+    };
+
+    const ErrorBadge = ({ corrupted }) => {
+      if (!corrupted) return null;
+      const expected = { CBC: [pa4FlippedBlock, pa4FlippedBlock + 1].filter(n => n >= 0 && n < 3), OFB: [pa4FlippedBlock], CTR: [pa4FlippedBlock] };
+      const exp = expected[pa4Mode] || [];
+      return (
+        <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '12px' }}>
+          <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: '4px' }}>⚡ Bit Flip Error Propagation</div>
+          <div style={{ color: 'var(--text2)', lineHeight: 1.5 }}>
+            Flipped C{pa4FlippedBlock} → corrupted plaintext blocks: {corrupted.length > 0 ? corrupted.map(b => `M${b}`).join(', ') : 'None'}
+          </div>
+          <div style={{ marginTop: '6px', fontSize: '11px', color: '#94a3b8' }}>
+            {pa4Mode === 'CBC' ? `CBC: flipped C${pa4FlippedBlock} corrupts M${pa4FlippedBlock} completely + flips 1 bit in M${pa4FlippedBlock + 1}` : `${pa4Mode}: error stays in exactly the same block — only M${pa4FlippedBlock} is affected`}
+          </div>
+          <div style={{ marginTop: '4px', fontSize: '11px', color: corrupted.join(',') === exp.join(',') ? '#22c55e' : '#f59e0b' }}>
+            {corrupted.join(',') === exp.join(',') ? `✅ Matches expected pattern for ${pa4Mode}` : `Expected blocks: ${exp.map(b => `M${b}`).join(', ')}`}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+        {/* ── Mode Tabs ── */}
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {MODES.map(m => (
+            <button key={m} id={`pa4-tab-${m}`} onClick={async () => {
+              setPa4Mode(m); setPa4FlipResult(null); setPa4FlippedBlock(null);
+              setPa4IvReuseData(null); setPa4IvReuseOn(false);
+              setL('anim', true);
+              const d = await api.pa4Animate(m, pa4Msg);
+              setPa4Trace(d); setL('anim', false);
+            }} style={{ flex: 1, padding: '9px 0', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer', transition: 'all 0.18s', border: m === pa4Mode ? `2px solid ${modeColor[m]}` : `1px solid ${modeColor[m]}55`, background: m === pa4Mode ? `linear-gradient(135deg,${modeColor[m]}cc,${modeColor[m]}88)` : 'rgba(0,0,0,0.2)', color: m === pa4Mode ? 'white' : modeColor[m] }}>
+              {m}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Message input + Run ── */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input id="pa4-msg-input" type="text" value={pa4Msg} onChange={e => setPa4Msg(e.target.value)} placeholder="3-block message (48 chars)..." style={{ flex: 1, padding: '9px 12px', background: 'rgba(0,0,0,0.35)', border: `1px solid ${ac}60`, borderRadius: '8px', color: 'var(--text1)', fontSize: '13px', fontFamily: 'monospace', outline: 'none' }} />
+          <button id="pa4-run-btn" disabled={busyPA4('anim')} onClick={() => runAnimate()} style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: busyPA4('anim') ? `${ac}44` : `linear-gradient(135deg,${ac}cc,${ac}88)`, color: 'white', fontWeight: 700, fontSize: '13px', cursor: busyPA4('anim') ? 'not-allowed' : 'pointer' }}>
+            {busyPA4('anim') ? '⏳' : '▶ Animate'}
+          </button>
+        </div>
+
+        {/* Mode info bar */}
+        <div style={{ fontSize: '11px', color: '#94a3b8', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', border: `1px solid ${ac}30` }}>
+          {pa4Mode === 'CBC' && '🔗 CBC: C_i = E_k(C_{i-1} ⊕ M_i) — sequential encryption, parallel decryption. Click any ciphertext block to flip a bit.'}
+          {pa4Mode === 'OFB' && '🔄 OFB: C_i = M_i ⊕ E_k(E_k(…E_k(IV)…)) — pre-computable keystream, enc=dec. Click any ciphertext block to flip a bit.'}
+          {pa4Mode === 'CTR' && '⚡ CTR: C_i = M_i ⊕ E_k(nonce+i) — fully parallel, stream-cipher mode. Click any ciphertext block to flip a bit.'}
+        </div>
+
+        {!pa4Trace && !busyPA4('anim') && (
+          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text3)', fontSize: '13px', fontStyle: 'italic' }}>
+            Press ▶ Animate to start the block diagram.
+          </div>
+        )}
+
+        {busyPA4('anim') && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner" /></div>}
+
+        {pa4Trace && !busyPA4('anim') && (<>
+          {/* ── Block Diagram ── */}
+          <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '12px', padding: '14px', border: `1px solid ${ac}40` }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: ac, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              Block Cipher Mode Diagram — Click a ciphertext block (C0, C1, C2) to flip a bit
+            </div>
+            <BlockDiagram trace={pa4Trace} mode={pa4Mode} traceData={pa4Trace} />
+            {busyPA4('flip') && <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>⏳ Re-decrypting with flipped bit…</div>}
+            <ErrorBadge corrupted={pa4FlipResult?.corrupted_pt_blocks} />
+          </div>
+
+          {/* ── Key / IV info ── */}
+          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px 12px', border: '1px solid var(--border)', fontSize: '10px', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 10px' }}>
+            <span style={{ color: 'var(--text3)' }}>Key</span><code style={{ color: '#a5b4fc', wordBreak: 'break-all' }}>{pa4Trace.key_hex}</code>
+            <span style={{ color: 'var(--text3)' }}>{pa4Trace.nonce_hex ? 'Nonce' : 'IV'}</span><code style={{ color: '#a5b4fc', wordBreak: 'break-all' }}>{pa4Trace.iv_hex || pa4Trace.nonce_hex}</code>
+          </div>
+
+          {/* ── IV Reuse attack (CBC only) ── */}
+          {pa4Mode === 'CBC' && (
+            <div style={{ background: 'linear-gradient(135deg,rgba(239,68,68,0.08),rgba(239,68,68,0.04))', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '12px', padding: '14px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#ef4444', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>⚠️ CBC IV-Reuse Attack</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
+                <input id="pa4-ivruse-m1" type="text" value={pa4IvMsg1} onChange={e => setPa4IvMsg1(e.target.value)} placeholder="Message 1 (first 16 chars shared)" style={{ padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '6px', color: 'var(--text1)', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }} />
+                <input id="pa4-ivruse-m2" type="text" value={pa4IvMsg2} onChange={e => setPa4IvMsg2(e.target.value)} placeholder="Message 2 (same first 16 chars)" style={{ padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '6px', color: 'var(--text1)', fontSize: '12px', fontFamily: 'monospace', outline: 'none' }} />
+              </div>
+              <button id="pa4-ivruse-btn" disabled={busyPA4('ivr')} onClick={async () => {
+                setL('ivr', true);
+                const d = await api.pa4IvReuse(pa4IvMsg1, pa4IvMsg2, pa4Trace?.key_hex || '', pa4Trace?.iv_hex || '');
+                setPa4IvReuseData(d); setPa4IvReuseOn(true); setL('ivr', false);
+              }} style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.6)', background: busyPA4('ivr') ? 'rgba(239,68,68,0.1)' : 'linear-gradient(135deg,#ef4444cc,#ef444488)', color: 'white', fontWeight: 700, fontSize: '13px', cursor: busyPA4('ivr') ? 'not-allowed' : 'pointer' }}>
+                {busyPA4('ivr') ? '⏳ Running…' : '💥 Run IV-Reuse Attack'}
+              </button>
+
+              {pa4IvReuseData && pa4IvReuseOn && (
+                <div style={{ marginTop: '12px' }}>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginBottom: '8px' }}>
+                    Both messages encrypted with the <strong style={{ color: '#fca5a5' }}>same IV = {pa4IvReuseData.iv_hex?.slice(0, 16)}…</strong>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                    {(pa4IvReuseData.ct1_blocks || []).map((ct1, i) => {
+                      const ct2 = (pa4IvReuseData.ct2_blocks || [])[i] || '';
+                      const match = (pa4IvReuseData.block_match || [])[i];
+                      return (
+                        <div key={i} style={{ borderRadius: '8px', padding: '8px', background: match ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.08)', border: `1px solid ${match ? '#ef4444' : '#22c55e'}` }}>
+                          <div style={{ fontSize: '10px', fontWeight: 700, color: match ? '#ef4444' : '#22c55e', marginBottom: '4px' }}>Block {i} {match ? '🔴 MATCH' : '🟢 diff'}</div>
+                          <div style={{ fontSize: '8px', fontFamily: 'monospace', color: '#a5b4fc', wordBreak: 'break-all', marginBottom: '2px' }}>M1: {ct1.slice(0, 10)}…</div>
+                          <div style={{ fontSize: '8px', fontFamily: 'monospace', color: '#a5b4fc', wordBreak: 'break-all' }}>M2: {ct2.slice(0, 10)}…</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: '10px', fontSize: '11px', color: '#fca5a5', lineHeight: 1.5, padding: '8px 10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px' }}>
+                    {pa4IvReuseData.vulnerability}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Comparison table ── */}
+          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text2)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mode Properties</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '6px', fontSize: '10px', textAlign: 'center' }}>
+              {['', 'Para. Enc', 'Para. Dec', 'Error Prop', 'IV Reuse'].map((h, i) => (
+                <div key={i} style={{ fontWeight: 700, color: 'var(--text3)', paddingBottom: '4px', borderBottom: '1px solid var(--border)' }}>{h}</div>
+              ))}
+              {[['CBC', '✗', '✓', '2 blocks', '💀 Fatal'], ['OFB', '✗', '✗', '1 block', '💀 Fatal'], ['CTR', '✓', '✓', '1 block', '💀 Fatal']].map(([m, pe, pd, ep, ir]) => (
+                <React.Fragment key={m}>
+                  <div style={{ fontWeight: 700, color: modeColor[m], padding: '4px' }}>{m}</div>
+                  {[pe, pd].map((v, j) => <div key={j} style={{ color: v === '✓' ? '#22c55e' : '#ef4444', padding: '4px' }}>{v}</div>)}
+                  <div style={{ color: '#f59e0b', padding: '4px' }}>{ep}</div>
+                  <div style={{ color: '#ef4444', padding: '4px', fontSize: '9px' }}>{ir}</div>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        </>)}
       </div>
     );
   };
@@ -1910,6 +2175,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const isPA1 = pa.pa === 1;
   const isPA2 = pa.pa === 2;
   const isPA3 = pa.pa === 3;
+  const isPA4 = pa.pa === 4;
   const isPA8 = pa.pa === 8;
   const isPA9 = pa.pa === 9;
   const isPA10 = pa.pa === 10;
@@ -1969,7 +2235,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPA1 && !isPA3 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && (
+            {!isPA1 && !isPA3 && !isPA4 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && (
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
@@ -1977,9 +2243,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPA1 && !isPA3 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPA1 && !isPA3 && !isPA4 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA3 ? renderPA3Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : (result && renderResult(result))}
+            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>
