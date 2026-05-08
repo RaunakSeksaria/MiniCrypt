@@ -31,8 +31,8 @@ const PA_DEFINITIONS = {
   16: { params: [{ name: 'message_int', label: 'ElGamal Message (Int)', default: '42' }] },
   17: { params: [] },  // PA17 has its own interactive renderer
   18: { params: [{ name: 'm0', label: 'Message 0 (Int)', default: '42' }, { name: 'm1', label: 'Message 1 (Int)', default: '99' }, { name: 'b', label: 'Choice Bit (0 or 1)', default: '0' }] },
-  19: { params: [{ name: 'a', label: 'Alice Input (0 or 1)', default: '1' }, { name: 'b', label: 'Bob Input (0 or 1)', default: '1' }] },
-  20: { params: [{ name: 'alice_val', label: 'Alice Value (0-15)', default: '7' }, { name: 'bob_val', label: 'Bob Value (0-15)', default: '3' }] },
+  19: { params: [] },  // PA19 has its own interactive renderer
+  20: { params: [] },  // PA20 has its own interactive renderer
 };
 
 const PADemoModal = ({ pa, onClose, api }) => {
@@ -146,6 +146,22 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa17CcaRej, setPa17CcaRej] = useState(false);
   const [pa17Loading, setPa17Loading] = useState({});
 
+  // PA19 State
+  const [pa19A, setPa19A] = useState(1);
+  const [pa19B, setPa19B] = useState(1);
+  const [pa19Data, setPa19Data] = useState(null);
+  const [pa19Table, setPa19Table] = useState(null);
+  const [pa19Loading, setPa19Loading] = useState({});
+
+  // PA20 State
+  const [pa20Alice, setPa20Alice] = useState(7);
+  const [pa20Bob, setPa20Bob] = useState(3);
+  const [pa20Data, setPa20Data] = useState(null);
+  const [pa20Loading, setPa20Loading] = useState(false);
+  const [pa20GateIdx, setPa20GateIdx] = useState(-1);
+  const [pa20Expanded, setPa20Expanded] = useState(false);
+  const [pa20Mode, setPa20Mode] = useState('comparator');
+  
   const def = PA_DEFINITIONS[pa.pa] || { params: [] };
   const isPA11 = pa.pa === 11;
 
@@ -173,7 +189,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     setParams(initialParams);
 
     // Auto-run if no params (but NOT for those with special renderers)
-    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 5 && pa.pa !== 6 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11 && pa.pa !== 17) {
+    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 5 && pa.pa !== 6 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11 && pa.pa !== 17 && pa.pa !== 19 && pa.pa !== 20) {
       runDemo(initialParams);
     }
 
@@ -1320,6 +1336,366 @@ const PADemoModal = ({ pa, onClose, api }) => {
               </div>
             </div>
 
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderPA19Special = () => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div style={{ background: 'rgba(99,102,241,0.05)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(99,102,241,0.3)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--accent3)', marginBottom: '12px' }}>Alice (Sender)</div>
+            <div style={{ marginBottom: '8px', fontSize: '13px', color: 'var(--text2)' }}>Input bit <b>a</b>:</div>
+            <select 
+              value={pa19A} 
+              onChange={e => setPa19A(parseInt(e.target.value))}
+              style={{ width: '100%', padding: '8px', background: 'rgba(0,0,0,0.4)', color: 'white', border: '1px solid var(--border)', borderRadius: '6px' }}
+            >
+              <option value={0}>0</option>
+              <option value={1}>1</option>
+            </select>
+          </div>
+          
+          <div style={{ background: 'rgba(34,197,94,0.05)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(34,197,94,0.3)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: '#4ade80', marginBottom: '12px' }}>Bob (Receiver)</div>
+            <div style={{ marginBottom: '8px', fontSize: '13px', color: 'var(--text2)' }}>Input bit <b>b</b>:</div>
+            <select 
+              value={pa19B} 
+              onChange={e => setPa19B(parseInt(e.target.value))}
+              style={{ width: '100%', padding: '8px', background: 'rgba(0,0,0,0.4)', color: 'white', border: '1px solid var(--border)', borderRadius: '6px' }}
+            >
+              <option value={0}>0</option>
+              <option value={1}>1</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <button 
+            className="btn btn-primary" 
+            style={{ flex: 1 }} 
+            disabled={pa19Loading.and}
+            onClick={async () => {
+              setPa19Loading(p => ({ ...p, and: true }));
+              const res = await api.pa19SecureAnd(pa19A, pa19B);
+              setPa19Data(res);
+              setPa19Loading(p => ({ ...p, and: false }));
+            }}
+          >
+            {pa19Loading.and ? '⏳ Computing...' : '▶ Compute Secure AND'}
+          </button>
+          
+          <button 
+            className="btn btn-ghost" 
+            style={{ flex: 1 }} 
+            disabled={pa19Loading.table}
+            onClick={async () => {
+              setPa19Loading(p => ({ ...p, table: true }));
+              const res = await api.pa19TruthTable();
+              setPa19Table(res);
+              setPa19Loading(p => ({ ...p, table: false }));
+            }}
+          >
+            {pa19Loading.table ? '⏳...' : '▦ Run All (Truth Table)'}
+          </button>
+        </div>
+
+        {pa19Data && (
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Step-by-Step OT Transcript</span>
+              <span style={{ color: pa19Data.correct ? '#4ade80' : '#fca5a5' }}>
+                Output: {pa19Data.result} (Expected: {pa19Data.expected})
+              </span>
+            </div>
+            
+            <div className="step">
+              <div className="fn">1. Alice sets up OT sender messages:</div>
+              <div className="vals">
+                m<sub>0</sub> = 0 <br/>
+                m<sub>1</sub> = a = {pa19Data.transcript.alice_ot_messages[1]}
+              </div>
+            </div>
+            <div className="step-arrow">↓</div>
+            
+            <div className="step" style={{ borderLeftColor: '#4ade80' }}>
+              <div className="fn">2. Bob runs OT receiver with choice bit:</div>
+              <div className="vals">b = {pa19Data.transcript.bob_choice}</div>
+            </div>
+            <div className="step-arrow">↓</div>
+            
+            <div className="step" style={{ borderLeftColor: '#4ade80' }}>
+              <div className="fn">3. Bob receives m<sub>b</sub>:</div>
+              <div className="vals">m<sub>{pa19Data.transcript.bob_choice}</sub> = {pa19Data.transcript.bob_received}</div>
+            </div>
+
+            <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent3)', marginBottom: '8px' }}>Privacy Summary:</div>
+              <ul style={{ fontSize: '12px', color: 'var(--text2)', paddingLeft: '20px', margin: 0, lineHeight: 1.6 }}>
+                <li><b>What does Alice learn?</b> Nothing. She acting as the OT sender guarantees she learns nothing about Bob's choice bit <span style={{ fontFamily: 'monospace' }}>b</span>.</li>
+                <li><b>What does Bob learn?</b> Only <span style={{ fontFamily: 'monospace' }}>a ∧ b</span>. Because he is the OT receiver, he only receives <span style={{ fontFamily: 'monospace' }}>m_b</span> and learns absolutely nothing about the other message <span style={{ fontFamily: 'monospace' }}>m_&#123;1-b&#125;</span>.</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {pa19Table && (
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text)', marginBottom: '16px' }}>Truth Table Verification</div>
+            <table style={{ width: '100%', fontSize: '13px', textAlign: 'left', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <th style={{ padding: '8px' }}>a</th>
+                  <th style={{ padding: '8px' }}>b</th>
+                  <th style={{ padding: '8px' }}>AND (Expected)</th>
+                  <th style={{ padding: '8px' }}>XOR (Expected)</th>
+                  <th style={{ padding: '8px' }}>Tests Passed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {['(0, 0)', '(0, 1)', '(1, 0)', '(1, 1)'].map((keyStr) => {
+                  // In python dictionary, the keys might come back as string tuples like "(0, 0)" 
+                  // or if it returns lists like "[0, 0]", we should check the JSON format.
+                  // Since Python tuples (a, b) as dict keys serialize to string "['0', '0']" or similar in FastAPI? 
+                  // FastAPI typically stringifies tuple keys. Let's look at the keys safely.
+                  let kStr = keyStr;
+                  let andRes = pa19Table.and_results[kStr];
+                  // If not found, try to find matching keys
+                  if (!andRes) {
+                    const keys = Object.keys(pa19Table.and_results);
+                    const parsedKey = keyStr.replace(/[\(\)\[\]\s]/g, '').split(',');
+                    const foundKey = keys.find(k => k.includes(parsedKey[0]) && k.includes(parsedKey[1]));
+                    if (foundKey) {
+                      andRes = pa19Table.and_results[foundKey];
+                      kStr = foundKey;
+                    }
+                  }
+                  if (!andRes) return null;
+                  const xorRes = pa19Table.xor_results[kStr];
+                  
+                  const aVal = keyStr[1];
+                  const bVal = keyStr[4];
+
+                  return (
+                    <tr key={keyStr} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '8px', color: 'var(--accent3)' }}>{aVal}</td>
+                      <td style={{ padding: '8px', color: '#4ade80' }}>{bVal}</td>
+                      <td style={{ padding: '8px' }}>{andRes.expected}</td>
+                      <td style={{ padding: '8px' }}>{xorRes.expected}</td>
+                      <td style={{ padding: '8px', color: '#4ade80' }}>{andRes.correct + xorRes.correct} / {andRes.total * 2} ✓</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div style={{ fontSize: '12px', color: 'var(--text3)', marginTop: '12px', fontStyle: 'italic' }}>
+              Evaluated using 1 full cryptographic run per gate per combination. Server logs have 50 runs.
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderPA20Special = () => {
+    
+    const handleCompute = async () => {
+      setPa20Loading(true);
+      setPa20GateIdx(-1);
+      setPa20Data(null);
+      setPa20Expanded(false);
+      
+      const res = await api.pa20Evaluate(pa20Alice, pa20Bob, pa20Mode, 4);
+      setPa20Data(res);
+      setPa20Loading(false);
+      
+      // Animate gates
+      if (res.gate_log && res.gate_log.length > 0) {
+        let i = 0;
+        const interval = setInterval(() => {
+          setPa20GateIdx(i);
+          i++;
+          if (i >= res.gate_log.length) {
+            clearInterval(interval);
+          }
+        }, 100); // 100ms per gate animation
+      } else {
+        setPa20GateIdx(0);
+      }
+    };
+    
+    const isFinished = pa20Data && pa20GateIdx >= pa20Data.gate_log.length - 1;
+    const progressPct = pa20Data ? Math.min(100, Math.round(((pa20GateIdx + 1) / pa20Data.gate_log.length) * 100)) : 0;
+    
+    let plainResult = "";
+    if (isFinished) {
+      if (pa20Mode === 'comparator') {
+        if (pa20Data.alice_val_hidden > pa20Data.bob_val_hidden) plainResult = "Alice is richer 🤑";
+        else if (pa20Data.alice_val_hidden < pa20Data.bob_val_hidden) plainResult = "Bob is richer 🤑";
+        else plainResult = "Wealth is Equal 🤝";
+      } else if (pa20Mode === 'equality') {
+        if (pa20Data.output === 1) plainResult = "Match! 🟢";
+        else plainResult = "No Match 🔴";
+      } else if (pa20Mode === 'adder') {
+        plainResult = `The Sum is ${pa20Data.output}`;
+      }
+    }
+
+    let aliceLabel = "Alice's Wealth (x):";
+    let bobLabel = "Bob's Wealth (y):";
+    let valPrefix = "$";
+    let valSuffix = "M";
+    let btnText = "▶ Who is richer? (Run Secure MPC)";
+
+    if (pa20Mode === 'equality') {
+      aliceLabel = "Alice's Secret Number:";
+      bobLabel = "Bob's Secret Number:";
+      valPrefix = ""; valSuffix = "";
+      btnText = "▶ Do they match? (Run Secure MPC)";
+    } else if (pa20Mode === 'adder') {
+      aliceLabel = "Alice's Value:";
+      bobLabel = "Bob's Value:";
+      valPrefix = ""; valSuffix = "";
+      btnText = "▶ Compute Sum (Run Secure MPC)";
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
+          <button 
+            className={`btn ${pa20Mode === 'comparator' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => { setPa20Mode('comparator'); setPa20Data(null); }}
+            style={{ flex: 1 }}
+          >💰 Millionaire's Problem</button>
+          <button 
+            className={`btn ${pa20Mode === 'equality' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => { setPa20Mode('equality'); setPa20Data(null); }}
+            style={{ flex: 1 }}
+          >🤝 Secure Equality</button>
+          <button 
+            className={`btn ${pa20Mode === 'adder' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => { setPa20Mode('adder'); setPa20Data(null); }}
+            style={{ flex: 1 }}
+          >➕ Secure Adder</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+          {/* Alice Panel */}
+          <div style={{ flex: 1, background: 'rgba(99,102,241,0.05)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(99,102,241,0.3)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--accent3)', marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Alice's Panel</span>
+              <span style={{ fontSize: '12px', background: 'rgba(99,102,241,0.2)', padding: '2px 8px', borderRadius: '10px' }}>Hidden from Bob</span>
+            </div>
+            <div style={{ marginBottom: '8px', fontSize: '13px', color: 'var(--text2)' }}>{aliceLabel} <b>{valPrefix}{pa20Alice}{valSuffix}</b></div>
+            <input 
+              type="range" 
+              min="1" 
+              max="15" 
+              value={pa20Alice} 
+              onChange={e => setPa20Alice(parseInt(e.target.value))}
+              style={{ width: '100%', cursor: 'pointer' }}
+            />
+          </div>
+          
+          {/* Bob Panel */}
+          <div style={{ flex: 1, background: 'rgba(34,197,94,0.05)', padding: '20px', borderRadius: '12px', border: '1px solid rgba(34,197,94,0.3)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ fontSize: '15px', fontWeight: 700, color: '#4ade80', marginBottom: '16px', display: 'flex', justifyContent: 'space-between' }}>
+              <span>Bob's Panel</span>
+              <span style={{ fontSize: '12px', background: 'rgba(34,197,94,0.2)', padding: '2px 8px', borderRadius: '10px' }}>Hidden from Alice</span>
+            </div>
+            <div style={{ marginBottom: '8px', fontSize: '13px', color: 'var(--text2)' }}>{bobLabel} <b>{valPrefix}{pa20Bob}{valSuffix}</b></div>
+            <input 
+              type="range" 
+              min="1" 
+              max="15" 
+              value={pa20Bob} 
+              onChange={e => setPa20Bob(parseInt(e.target.value))}
+              style={{ width: '100%', cursor: 'pointer' }}
+            />
+          </div>
+        </div>
+
+        <button 
+          className="btn btn-primary" 
+          style={{ width: '100%', padding: '16px', fontSize: '16px' }} 
+          disabled={pa20Loading}
+          onClick={handleCompute}
+        >
+          {pa20Loading ? '⏳ Garbling & Evaluating Circuit...' : btnText}
+        </button>
+
+        {pa20Data && (
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+            
+            {/* Progress Bar Area */}
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '13px', color: 'var(--text2)' }}>
+                <span>Evaluating Garbled Circuit Gates (AND/XOR)</span>
+                <span>{Math.max(0, pa20GateIdx + 1)} / {pa20Data.gate_log.length}</span>
+              </div>
+              <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${progressPct}%`, background: 'var(--accent)', transition: 'width 0.1s linear' }}></div>
+              </div>
+            </div>
+
+            {/* Result Area */}
+            {isFinished && (
+              <div style={{ textAlign: 'center', padding: '24px', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>MPC Protocol Complete</div>
+                <div style={{ fontSize: '24px', fontWeight: 800, color: '#fff', marginBottom: '12px' }}>
+                  {plainResult}
+                </div>
+                <div style={{ fontSize: '14px', color: '#4ade80' }}>
+                  <b>Privacy Guaranteed:</b> The actual values $x$ and $y$ were never revealed!
+                </div>
+              </div>
+            )}
+
+            {/* Circuit Trace Accordion */}
+            <div style={{ marginTop: '24px' }}>
+              <button 
+                onClick={() => setPa20Expanded(!pa20Expanded)}
+                style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '8px', color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+              >
+                <span style={{ fontWeight: 600 }}>Circuit Trace (Evaluated Gates)</span>
+                <span>{pa20Expanded ? '▼' : '▶'}</span>
+              </button>
+              
+              {pa20Expanded && (
+                <div style={{ marginTop: '12px', padding: '16px', background: '#0f172a', borderRadius: '8px', maxHeight: '300px', overflowY: 'auto', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '12px', fontFamily: 'monospace' }}>
+                    // Executed {pa20Data.gate_log.length} gates using {pa20Data.ot_calls} Oblivious Transfers
+                    <br/>// Time elapsed: {pa20Data.time_sec.toFixed(3)}s
+                  </div>
+                  <table style={{ width: '100%', fontSize: '12px', fontFamily: 'monospace', textAlign: 'left', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <th style={{ padding: '6px' }}>#</th>
+                        <th style={{ padding: '6px' }}>Gate</th>
+                        <th style={{ padding: '6px' }}>In Wires</th>
+                        <th style={{ padding: '6px' }}>Out Wire</th>
+                        <th style={{ padding: '6px', textAlign: 'right' }}>Eval Val</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pa20Data.gate_log.map((g, idx) => (
+                        <tr key={idx} style={{ opacity: idx <= pa20GateIdx ? 1 : 0.3, transition: 'opacity 0.2s' }}>
+                          <td style={{ padding: '6px', color: 'var(--text3)' }}>{idx}</td>
+                          <td style={{ padding: '6px', color: g.type === 'AND' ? 'var(--accent3)' : '#4ade80' }}>{g.type}</td>
+                          <td style={{ padding: '6px' }}>[{g.inputs.join(', ')}]</td>
+                          <td style={{ padding: '6px' }}>w{g.output}</td>
+                          <td style={{ padding: '6px', textAlign: 'right', fontWeight: 600, color: '#fff' }}>{idx <= pa20GateIdx ? g.value : '?'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+            
           </div>
         )}
       </div>
@@ -2698,6 +3074,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const isPA9 = pa.pa === 9;
   const isPA10 = pa.pa === 10;
   const isPA17 = pa.pa === 17;
+  const isPA19 = pa.pa === 19;
+  const isPA20 = pa.pa === 20;
 
   return (
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -2754,7 +3132,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA17 && (
+            {!isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA17 && !isPA19 && !isPA20 && (
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
@@ -2762,9 +3140,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA17 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPA1 && !isPA3 && !isPA4 && !isPA5 && !isPA6 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA17 && !isPA19 && !isPA20 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA5 ? renderPA5Special() : isPA6 ? renderPA6Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : isPA17 ? renderPA17Special() : (result && renderResult(result))}
+            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA5 ? renderPA5Special() : isPA6 ? renderPA6Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : isPA17 ? renderPA17Special() : isPA19 ? renderPA19Special() : isPA20 ? renderPA20Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>

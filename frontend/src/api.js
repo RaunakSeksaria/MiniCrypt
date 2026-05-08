@@ -106,6 +106,28 @@ const api = {
     });
     return r.json();
   },
+  async pa19SecureAnd(a, b) {
+    const r = await fetch(`${API_BASE}/api/pa19/secure_and`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ a, b }),
+    });
+    return r.json();
+  },
+
+  async pa19TruthTable() {
+    const r = await fetch(`${API_BASE}/api/pa19/truth_table`, { method: 'POST' });
+    return r.json();
+  },
+
+  async pa20Evaluate(alice_val, bob_val, mode = 'comparator', bits = 4) {
+    const r = await fetch(`${API_BASE}/api/pa20/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alice_val, bob_val, bits, mode }),
+    });
+    return r.json();
+  },
 
   async pa8CollisionStart() {
     const r = await fetch(`${API_BASE}/api/pa8/collision/start`, { method: 'POST' });

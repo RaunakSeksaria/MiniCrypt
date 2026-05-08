@@ -1523,6 +1523,80 @@ def pa17_malleability_flip(req: PA17FlipRequest):
     }
 
 
+# ── PA#19 Secure AND Gate ──
+
+class PA19GateRequest(BaseModel):
+    a: int
+    b: int
+
+@app.post("/api/pa19/secure_and")
+def pa19_secure_and(req: PA19GateRequest):
+    from crypto.pa19_secure_and import SecureGates
+    gates = SecureGates(bits=64)
+    res = gates.secure_and(req.a, req.b)
+    return res
+
+@app.post("/api/pa19/truth_table")
+def pa19_truth_table():
+    from crypto.pa19_secure_and import truth_table_test
+    # 1 run per combo is enough for the UI truth table (just to show it works)
+    res = truth_table_test(runs_per_combo=1)
+    
+    # FastAPI's jsonable_encoder converts tuples to lists, which then throws an error 
+    # when used as dict keys. We must stringify the tuple keys manually.
+    formatted_res = {
+        **res,
+        'and_results': {str(k): v for k, v in res['and_results'].items()},
+        'xor_results': {str(k): v for k, v in res['xor_results'].items()}
+    }
+    return formatted_res
+
+# ── PA#20 All 2-Party Secure Computation ──
+
+class PA20EvalRequest(BaseModel):
+    alice_val: int
+    bob_val: int
+    bits: int = 4
+    mode: str = "comparator"
+
+@app.post("/api/pa20/evaluate")
+def pa20_evaluate(req: PA20EvalRequest):
+    from crypto.pa20_mpc import build_comparator, build_equality, build_adder, secure_eval, int_to_bits, bits_to_int
+    from crypto.pa19_secure_and import SecureGates
+    
+    if req.mode == "equality":
+        circ = build_equality(req.bits)
+    elif req.mode == "adder":
+        circ = build_adder(req.bits)
+    else:
+        circ = build_comparator(req.bits)
+        
+    x_bits = int_to_bits(req.alice_val, req.bits)
+    y_bits = int_to_bits(req.bob_val, req.bits)
+    
+    gates = SecureGates(bits=32)
+    result = secure_eval(circ, x_bits, y_bits, gates)
+    
+    if req.mode == "adder":
+        output_val = bits_to_int(result['output'])
+    else:
+        output_val = result['output'][0]
+    
+    return {
+        "alice_val_hidden": req.alice_val,
+        "bob_val_hidden": req.bob_val,
+        "bits": req.bits,
+        "mode": req.mode,
+        "output": output_val,
+        "gate_log": result['gate_log'],
+        "ot_calls": result['ot_calls'],
+        "time_sec": result['time_sec']
+    }
+
+
+
+
+
 # ── PA#4 Visual Animation endpoints ──
 
 class PA4AnimateRequest(BaseModel):
