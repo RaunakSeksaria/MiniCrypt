@@ -27,11 +27,11 @@ const PA_DEFINITIONS = {
   9: { params: [] },  // PA9 has its own input inside renderPA9Special
   10: { params: [] }, // PA10 has its own special renderer
   11: { params: [] },
-  12: { params: [{ name: 'message_int', label: 'Textbook RSA Message (Int)', default: '42' }, { name: 'message_pkcs', label: 'PKCS#1 Message (Text)', default: 'RSA!' }] },
+  12: { params: [] },  // PA12 has its own interactive renderer
   13: { params: [{ name: 'n', label: 'Number to Test Primality', default: '' }] },
-  14: { params: [{ name: 'residues', label: 'Residues (comma separated)', default: '2,3,2' }, { name: 'moduli', label: 'Moduli (comma separated)', default: '3,5,7' }] },
-  15: { params: [{ name: 'message', label: 'Message to Sign', default: 'Sign this!' }] },
-  16: { params: [{ name: 'message_int', label: 'ElGamal Message (Int)', default: '42' }] },
+  14: { params: [] },  // PA14 has its own interactive renderer
+  15: { params: [] },  // PA15 has its own interactive renderer
+  16: { params: [] },  // PA16 has its own interactive renderer
   17: { params: [] },  // PA17 has its own interactive renderer
   18: { params: [] }, // PA18 has its own special renderer
   19: { params: [] },  // PA19 has its own interactive renderer
@@ -153,6 +153,29 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa6CcaRej, setPa6CcaRej] = useState(false);
   const [pa6Loading, setPa6Loading] = useState({});
 
+  // PA12 State
+  const [pa12MsgInt, setPa12MsgInt] = useState('42');
+  const [pa12MsgPkcs, setPa12MsgPkcs] = useState('RSA!');
+  const [pa12Data, setPa12Data] = useState(null);
+  const [pa12Loading, setPa12Loading] = useState(false);
+  const [pa12Tab, setPa12Tab] = useState('textbook');
+
+  // PA14 State
+  const [pa14Residues, setPa14Residues] = useState('2,3,2');
+  const [pa14Moduli, setPa14Moduli] = useState('3,5,7');
+  const [pa14Data, setPa14Data] = useState(null);
+  const [pa14Loading, setPa14Loading] = useState(false);
+
+  // PA15 State
+  const [pa15Msg, setPa15Msg] = useState('Sign this!');
+  const [pa15Data, setPa15Data] = useState(null);
+  const [pa15Loading, setPa15Loading] = useState(false);
+
+  // PA16 State
+  const [pa16MsgInt, setPa16MsgInt] = useState('42');
+  const [pa16Data, setPa16Data] = useState(null);
+  const [pa16Loading, setPa16Loading] = useState(false);
+
   // PA17 State
   const [pa17Msg, setPa17Msg] = useState('42');
   const [pa17Data, setPa17Data] = useState(null);
@@ -204,7 +227,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     def.params.forEach(p => initialParams[p.name] = p.default);
     setParams(initialParams);
 
-    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 5 && pa.pa !== 6 && pa.pa !== 7 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11 && pa.pa !== 13 && pa.pa !== 17 && pa.pa !== 18 && pa.pa !== 19 && pa.pa !== 20) {      runDemo(initialParams);
+    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 5 && pa.pa !== 6 && pa.pa !== 7 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11 && pa.pa !== 12 && pa.pa !== 13 && pa.pa !== 14 && pa.pa !== 15 && pa.pa !== 16 && pa.pa !== 17 && pa.pa !== 18 && pa.pa !== 19 && pa.pa !== 20) {      runDemo(initialParams);
     }
 
     // Reset PA3 / PA4 / PA8 / PA9 / PA10 / PA11 state when modal switches PA
@@ -4032,6 +4055,195 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  const renderPA12Special = () => {
+    const runPA12 = async () => {
+      setPa12Loading(true);
+      try {
+        const data = await api.runDemo(12, { message_int: pa12MsgInt, message_pkcs: pa12MsgPkcs });
+        setPa12Data(data);
+      } catch (e) { setError(e.message); }
+      finally { setPa12Loading(false); }
+    };
+    const tabStyle = (t) => ({ padding: '8px 16px', borderRadius: '8px 8px 0 0', background: pa12Tab === t ? 'var(--accent)' : 'rgba(0,0,0,0.3)', color: pa12Tab === t ? '#000' : 'var(--text2)', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '13px' });
+    const sectionBox = { background: 'rgba(0,0,0,0.25)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '12px' };
+    const monoVal = { fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all', color: 'var(--text2)', maxHeight: '80px', overflowY: 'auto' };
+    const labelSt = { fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '4px' };
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={sectionBox}>
+          <div style={labelSt}>Inputs</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <div><label style={{ fontSize: '12px', color: 'var(--text3)' }}>Plaintext Integer</label><input type="text" value={pa12MsgInt} onChange={e => setPa12MsgInt(e.target.value)} style={{ width: '100%', padding: '6px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px' }} /></div>
+            <div><label style={{ fontSize: '12px', color: 'var(--text3)' }}>PKCS Message</label><input type="text" value={pa12MsgPkcs} onChange={e => setPa12MsgPkcs(e.target.value)} style={{ width: '100%', padding: '6px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px' }} /></div>
+          </div>
+          <button onClick={runPA12} disabled={pa12Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa12Loading ? '⏳ Generating Keys...' : '🔐 Generate RSA Keys & Run'}</button>
+        </div>
+        {pa12Data && (<>
+          <div style={sectionBox}>
+            <div style={labelSt}>RSA Key Pair ({pa12Data.bits}-bit)</div>
+            <div style={monoVal}>n = {pa12Data.n}</div>
+            <div style={{ ...monoVal, marginTop: '4px' }}>e = {pa12Data.e}</div>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
+            <button onClick={() => setPa12Tab('textbook')} style={tabStyle('textbook')}>Textbook RSA</button>
+            <button onClick={() => setPa12Tab('pkcs')} style={tabStyle('pkcs')}>PKCS#1 v1.5</button>
+            <button onClick={() => setPa12Tab('attacks')} style={tabStyle('attacks')}>⚠️ Attacks</button>
+          </div>
+          <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '0 10px 10px 10px', border: '1px solid var(--border)' }}>
+            {pa12Tab === 'textbook' && (<div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+                <div style={sectionBox}><div style={labelSt}>Plaintext m</div><div style={{ fontSize: '28px', textAlign: 'center', color: 'var(--accent)' }}>{pa12Data.textbook.m}</div></div>
+                <div style={{ fontSize: '24px', color: 'var(--text3)' }}>→ c = m<sup>e</sup> mod n →</div>
+                <div style={sectionBox}><div style={labelSt}>Ciphertext c</div><div style={monoVal}>{pa12Data.textbook.c}</div></div>
+              </div>
+              <div style={{ textAlign: 'center', margin: '8px 0', fontSize: '20px', color: 'var(--text3)' }}>↓ m = c<sup>d</sup> mod n ↓</div>
+              <div style={{ ...sectionBox, textAlign: 'center' }}><div style={labelSt}>Decrypted</div><div style={{ fontSize: '28px', color: pa12Data.textbook.match ? '#4ade80' : '#ef4444' }}>{pa12Data.textbook.d} {pa12Data.textbook.match ? '✓' : '✗'}</div></div>
+            </div>)}
+            {pa12Tab === 'pkcs' && (<div>
+              <div style={sectionBox}><div style={labelSt}>PKCS#1 v1.5 Padding: 0x00 ‖ 0x02 ‖ PS ‖ 0x00 ‖ M</div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}><div><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Original</div><div style={{ fontSize: '18px', color: 'var(--accent)' }}>{pa12Data.pkcs.message}</div></div><div><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Decrypted</div><div style={{ fontSize: '18px', color: pa12Data.pkcs.match ? '#4ade80' : '#ef4444' }}>{pa12Data.pkcs.decrypted} {pa12Data.pkcs.match ? '✓' : '✗'}</div></div></div></div>
+            </div>)}
+            {pa12Tab === 'attacks' && (<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ ...sectionBox, borderColor: 'rgba(239,68,68,0.3)' }}><div style={{ ...labelSt, color: '#ef4444' }}>⚠️ Determinism Attack</div><div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{pa12Data.determinism?.vulnerability}</div><div style={monoVal}>c₁ = Enc({pa12Data.determinism?.message}) = {String(pa12Data.determinism?.c1)?.slice(0,40)}...</div><div style={monoVal}>c₂ = Enc({pa12Data.determinism?.message}) = {String(pa12Data.determinism?.c2)?.slice(0,40)}...</div><div style={{ color: pa12Data.determinism?.identical ? '#ef4444' : '#4ade80', fontWeight: 700, marginTop: '6px' }}>Identical: {pa12Data.determinism?.identical ? '✓ YES — Deterministic!' : 'No'}</div></div>
+              <div style={{ ...sectionBox, borderColor: 'rgba(251,191,36,0.3)' }}><div style={{ ...labelSt, color: '#fbbf24' }}>⚠️ Multiplicative Homomorphism</div><div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{pa12Data.homomorphism?.vulnerability}</div><div style={monoVal}>Enc({pa12Data.homomorphism?.m1}) · Enc({pa12Data.homomorphism?.m2}) mod n → Dec = {pa12Data.homomorphism?.c1_c2_decrypted}</div><div style={{ color: pa12Data.homomorphism?.homomorphic ? '#ef4444' : '#4ade80', fontWeight: 700, marginTop: '6px' }}>Homomorphic: {pa12Data.homomorphism?.homomorphic ? '✓ Attack works!' : 'No'}</div></div>
+              <div style={{ ...sectionBox, borderColor: 'rgba(168,85,247,0.3)' }}><div style={{ ...labelSt, color: '#a855f7' }}>⚠️ Bleichenbacher Padding Oracle</div><div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{pa12Data.bleichenbacher?.vulnerability}</div><div style={monoVal}>Valid ciphertext passes oracle: {pa12Data.bleichenbacher?.valid_ciphertext_oracle ? '✓' : '✗'}</div><div style={monoVal}>Random ciphertexts accepted: {pa12Data.bleichenbacher?.random_oracle_accepts}/{pa12Data.bleichenbacher?.random_trials} ({(pa12Data.bleichenbacher?.accept_rate * 100)?.toFixed(1)}%)</div></div>
+            </div>)}
+          </div>
+        </>)}
+      </div>
+    );
+  };
+
+  const renderPA14Special = () => {
+    const runPA14 = async () => {
+      setPa14Loading(true);
+      try {
+        const data = await api.runDemo(14, { residues: pa14Residues, moduli: pa14Moduli });
+        setPa14Data(data);
+      } catch (e) { setError(e.message); }
+      finally { setPa14Loading(false); }
+    };
+    const sectionBox = { background: 'rgba(0,0,0,0.25)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '12px' };
+    const labelSt = { fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '4px' };
+    const monoVal = { fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all', color: 'var(--text2)' };
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={sectionBox}>
+          <div style={labelSt}>Chinese Remainder Theorem Inputs</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <div><label style={{ fontSize: '12px', color: 'var(--text3)' }}>Residues (comma-sep)</label><input type="text" value={pa14Residues} onChange={e => setPa14Residues(e.target.value)} style={{ width: '100%', padding: '6px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px' }} /></div>
+            <div><label style={{ fontSize: '12px', color: 'var(--text3)' }}>Moduli (comma-sep)</label><input type="text" value={pa14Moduli} onChange={e => setPa14Moduli(e.target.value)} style={{ width: '100%', padding: '6px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px' }} /></div>
+          </div>
+          <button onClick={runPA14} disabled={pa14Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa14Loading ? '⏳ Computing...' : '🧮 Solve CRT & Run Håstad'}</button>
+        </div>
+        {pa14Data && (<>
+          <div style={sectionBox}>
+            <div style={labelSt}>CRT Solution</div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+              {pa14Data.crt_result?.residues?.map((r, i) => (
+                <div key={i} style={{ background: 'rgba(var(--accent-rgb),0.1)', padding: '6px 12px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '13px' }}>
+                  x ≡ {r} (mod {pa14Data.crt_result?.moduli?.[i]})
+                </div>
+              ))}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: '20px', color: 'var(--accent)', fontWeight: 700 }}>x = {pa14Data.crt_result?.solution}</div>
+          </div>
+          <div style={{ ...sectionBox, borderColor: 'rgba(239,68,68,0.3)' }}>
+            <div style={{ ...labelSt, color: '#ef4444' }}>⚠️ Håstad Broadcast Attack (e=3)</div>
+            <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>If the same message m is encrypted with e=3 under 3 different RSA public keys, the attacker can use CRT to recover m³ mod N₁N₂N₃, then compute the cube root to recover m.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Key Size</div><div style={{ fontSize: '16px', color: 'var(--text1)' }}>{pa14Data.hastad?.bits}-bit</div></div>
+              <div><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Attack Success</div><div style={{ fontSize: '16px', color: pa14Data.hastad?.success ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa14Data.hastad?.success ? '✓ Recovered m!' : '✗ Failed'}</div></div>
+            </div>
+          </div>
+        </>)}
+      </div>
+    );
+  };
+
+  const renderPA15Special = () => {
+    const runPA15 = async () => {
+      setPa15Loading(true);
+      try {
+        const data = await api.runDemo(15, { message: pa15Msg });
+        setPa15Data(data);
+      } catch (e) { setError(e.message); }
+      finally { setPa15Loading(false); }
+    };
+    const sectionBox = { background: 'rgba(0,0,0,0.25)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '12px' };
+    const labelSt = { fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '4px' };
+    const monoVal = { fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all', color: 'var(--text2)' };
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={sectionBox}>
+          <div style={labelSt}>Message to Sign</div>
+          <input type="text" value={pa15Msg} onChange={e => setPa15Msg(e.target.value)} style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px', marginBottom: '10px' }} />
+          <button onClick={runPA15} disabled={pa15Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa15Loading ? '⏳ Signing...' : '✍️ Sign & Verify'}</button>
+        </div>
+        {pa15Data && (<>
+          <div style={sectionBox}>
+            <div style={labelSt}>RSA Signature: σ = H(m)<sup>d</sup> mod n</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Message</div><div style={{ fontSize: '15px', color: 'var(--accent)' }}>{pa15Data.message}</div></div>
+              <div><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Signature</div><div style={monoVal}>{String(pa15Data.signature)?.slice(0,60)}...</div></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '10px' }}>
+              <div style={{ padding: '8px', background: 'rgba(34,197,94,0.1)', borderRadius: '8px', textAlign: 'center' }}><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Verify(m, σ)</div><div style={{ fontSize: '16px', color: pa15Data.verify ? '#4ade80' : '#ef4444', fontWeight: 700 }}>{pa15Data.verify ? '✓ Valid' : '✗ Invalid'}</div></div>
+              <div style={{ padding: '8px', background: 'rgba(239,68,68,0.1)', borderRadius: '8px', textAlign: 'center' }}><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Verify("wrong", σ)</div><div style={{ fontSize: '16px', color: pa15Data.wrong ? '#4ade80' : '#ef4444', fontWeight: 700 }}>{pa15Data.wrong ? '✓ Rejected!' : '✗ Accepted?!'}</div></div>
+            </div>
+          </div>
+          <div style={{ ...sectionBox, borderColor: 'rgba(239,68,68,0.3)' }}>
+            <div style={{ ...labelSt, color: '#ef4444' }}>⚠️ Signature Homomorphism Attack</div>
+            <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>Textbook RSA signatures are homomorphic: σ(m₁)·σ(m₂) = σ(m₁·m₂). Hash-then-sign prevents this because H(m₁·m₂) ≠ H(m₁)·H(m₂).</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', textAlign: 'center' }}><div style={{ fontSize: '12px', color: '#fca5a5' }}>Raw RSA Attack</div><div style={{ fontSize: '16px', color: pa15Data.attack?.raw_works ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa15Data.attack?.raw_works ? '⚠️ Works!' : '✓ Blocked'}</div></div>
+              <div style={{ padding: '10px', background: 'rgba(34,197,94,0.08)', borderRadius: '8px', textAlign: 'center' }}><div style={{ fontSize: '12px', color: '#86efac' }}>Hash-then-Sign</div><div style={{ fontSize: '16px', color: pa15Data.attack?.hash_works ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa15Data.attack?.hash_works ? '⚠️ Works!' : '✓ Blocked!'}</div></div>
+            </div>
+          </div>
+        </>)}
+      </div>
+    );
+  };
+
+  const renderPA16Special = () => {
+    const runPA16 = async () => {
+      setPa16Loading(true);
+      try {
+        const data = await api.runDemo(16, { message_int: pa16MsgInt });
+        setPa16Data(data);
+      } catch (e) { setError(e.message); }
+      finally { setPa16Loading(false); }
+    };
+    const sectionBox = { background: 'rgba(0,0,0,0.25)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '12px' };
+    const labelSt = { fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '4px' };
+    const monoVal = { fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all', color: 'var(--text2)' };
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        <div style={sectionBox}>
+          <div style={labelSt}>ElGamal Plaintext (Integer)</div>
+          <input type="number" value={pa16MsgInt} onChange={e => setPa16MsgInt(e.target.value)} style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px', marginBottom: '10px' }} />
+          <button onClick={runPA16} disabled={pa16Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa16Loading ? '⏳ Encrypting...' : '🔑 ElGamal Encrypt & Attack'}</button>
+        </div>
+        {pa16Data && (<>
+          <div style={sectionBox}>
+            <div style={labelSt}>ElGamal Parameters</div>
+            <div style={monoVal}>p = {pa16Data.p}, g = {pa16Data.g}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: '12px', alignItems: 'center' }}>
+            <div style={sectionBox}><div style={labelSt}>Plaintext m</div><div style={{ fontSize: '28px', textAlign: 'center', color: 'var(--accent)' }}>{pa16Data.m}</div></div>
+            <div style={{ fontSize: '20px', color: 'var(--text3)', textAlign: 'center' }}>→<br/><span style={{ fontSize: '11px' }}>c₁=gʳ, c₂=m·hʳ</span><br/>→</div>
+            <div style={sectionBox}><div style={labelSt}>Ciphertext (c₁, c₂)</div><div style={monoVal}>c₁ = {pa16Data.c1}<br/>c₂ = {pa16Data.c2}</div></div>
+          </div>
+          <div style={{ ...sectionBox, textAlign: 'center' }}><div style={labelSt}>Decrypted</div><div style={{ fontSize: '28px', color: pa16Data.match ? '#4ade80' : '#ef4444' }}>{pa16Data.decrypted} {pa16Data.match ? '✓' : '✗'}</div></div>
+          <div style={{ ...sectionBox, borderColor: 'rgba(239,68,68,0.3)' }}>
+            <div style={{ ...labelSt, color: '#ef4444' }}>⚠️ Malleability Attack</div>
+            <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>ElGamal is multiplicatively homomorphic: multiplying c₂ by a factor t yields Dec(c₁, t·c₂) = t·m. An attacker can manipulate the plaintext without knowing it.</div>
+            <div style={{ textAlign: 'center', padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px' }}><div style={{ fontSize: '16px', color: pa16Data.malleability ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa16Data.malleability ? '⚠️ Malleability Confirmed!' : '✓ Not Malleable'}</div></div>
+          </div>
+        </>)}
+      </div>
+    );
+  };
+
   const activePAId = Number(pa.pa);
   const isPaDemo1 = activePAId === 1;
   const isPaDemo2 = activePAId === 2;
@@ -4044,7 +4256,11 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const isPaDemo9 = activePAId === 9;
   const isPaDemo10 = activePAId === 10;
   const isPaDemo11 = activePAId === 11;
+  const isPA12 = activePAId === 12;
   const isPaDemo13 = activePAId === 13;
+  const isPA14 = activePAId === 14;
+  const isPA15 = activePAId === 15;
+  const isPA16 = activePAId === 16;
   const isPA17 = activePAId === 17;
   const isPaDemo18 = activePAId === 18;
   const isPA19 = activePAId === 19;
@@ -4062,7 +4278,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
               {def.params
-                .filter(p => !isPaDemo7 && !isPaDemo13 && !isPaDemo2 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20)
+                .filter(p => !isPaDemo7 && !isPaDemo13 && !isPaDemo2 && !isPA4 && !isPA5 && !isPA6 && !isPA12 && !isPA14 && !isPA15 && !isPA16 && !isPA17 && !isPA19 && !isPA20)
                 .map(p => (
                 <div className="field" key={p.name} style={{ marginBottom: 0 }}>
                   <label style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -4106,18 +4322,18 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPaDemo1 && !isPaDemo2 && !isPaDemo3 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPaDemo13 && !isPaDemo18 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20 && (              <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
+            {!isPaDemo1 && !isPaDemo2 && !isPaDemo3 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPA12 && !isPaDemo13 && !isPA14 && !isPA15 && !isPA16 && !isPaDemo18 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20 && (              <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
             )}
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPaDemo1 && !isPaDemo3 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPaDemo13 && !isPaDemo18 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPaDemo1 && !isPaDemo3 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPA12 && !isPaDemo13 && !isPA14 && !isPA15 && !isPA16 && !isPaDemo18 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPaDemo7 ? renderPA7Special() : isPaDemo1 ? renderPA1Special() : isPaDemo2 ? renderPA2Special() : isPaDemo3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA5 ? renderPA5Special() : isPA6 ? renderPA6Special() : isPaDemo8 ? renderPA8Special() : isPaDemo9 ? renderPA9Special() : isPaDemo10 ? renderPA10Special() : isPaDemo11 ? renderPA11Special() : isPaDemo13 ? renderPA13Special() : isPaDemo18 ? renderPA18Special() : isPA17 ? renderPA17Special() : isPA19 ? renderPA19Special() : isPA20 ? renderPA20Special() : (result && renderResult(result))}
+            {isPaDemo7 ? renderPA7Special() : isPaDemo1 ? renderPA1Special() : isPaDemo2 ? renderPA2Special() : isPaDemo3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA5 ? renderPA5Special() : isPA6 ? renderPA6Special() : isPaDemo8 ? renderPA8Special() : isPaDemo9 ? renderPA9Special() : isPaDemo10 ? renderPA10Special() : isPaDemo11 ? renderPA11Special() : isPA12 ? renderPA12Special() : isPaDemo13 ? renderPA13Special() : isPA14 ? renderPA14Special() : isPA15 ? renderPA15Special() : isPA16 ? renderPA16Special() : isPaDemo18 ? renderPA18Special() : isPA17 ? renderPA17Special() : isPA19 ? renderPA19Special() : isPA20 ? renderPA20Special() : (result && renderResult(result))}
 
-            {!isPaDemo1 && !isPaDemo2 && !isPaDemo3 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPaDemo13 && !isPaDemo18 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20 && (
+            {!isPaDemo1 && !isPaDemo2 && !isPaDemo3 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPA12 && !isPaDemo13 && !isPA14 && !isPA15 && !isPA16 && !isPaDemo18 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20 && (
               <button className="run-button" onClick={handleRunDemo} disabled={isLoading} style={{ marginTop: '20px' }}>
                 {isLoading ? 'Running Demo...' : 'Run Interactive Demo'}
               </button>

@@ -40,26 +40,40 @@ def safe_hex(b):
     return str(b)
 
 # ── ROUTING TABLE ──
-REDUCTIONS = {
-    ("OWF","PRG"): [("OWF→PRG","HILL hard-core-bit (PA#1)")],
-    ("OWF","OWP"): [("OWF→OWP","DLP is already a OWP")],
-    ("PRG","PRF"): [("PRG→PRF","GGM tree construction (PA#2)")],
-    ("PRF","PRP"): [("PRF→PRP","Luby-Rackoff 3-round Feistel")],
-    ("PRF","MAC"): [("PRF→MAC","Mac_k(m)=F_k(m) (PA#5)")],
-    ("PRP","MAC"): [("PRP→PRF","PRP/PRF switching lemma"),("PRF→MAC","Mac_k(m)=F_k(m)")],
-    ("PRP","PRF"): [("PRP→PRF","PRP/PRF switching lemma")],
-    ("CRHF","HMAC"): [("CRHF→HMAC","HMAC construction (PA#10)")],
-    ("HMAC","MAC"): [("HMAC→MAC","HMAC is a MAC (direct)")],
-    ("MAC","PRF"): [("MAC→PRF","Secure MAC is a PRF on random inputs")],
-    ("PRG","OWF"): [("PRG→OWF","Any PRG is a OWF (immediate)")],
-    ("PRF","PRG"): [("PRF→PRG","G(s)=F_s(0)||F_s(1) (PA#2)")],
-    ("MAC","CRHF"): [("MAC→CRHF","MAC as compression in Merkle-Damgård (PA#7)")],
-    ("HMAC","CRHF"): [("HMAC→CRHF","Fix key, H'(m)=HMAC_k(m) is CRHF")],
-    ("OWF","PRF"): [("OWF→PRG","HILL (PA#1)"),("PRG→PRF","GGM (PA#2)")],
-    ("OWF","MAC"): [("OWF→PRG","HILL"),("PRG→PRF","GGM"),("PRF→MAC","Direct")],
-    ("PRG","MAC"): [("PRG→PRF","GGM (PA#2)"),("PRF→MAC","Direct (PA#5)")],
-    ("OWF","PRP"): [("OWF→PRG","HILL"),("PRG→PRF","GGM"),("PRF→PRP","Luby-Rackoff")],
+DIRECT_REDUCTIONS = {
+    ("OWF", "PRG"): ("OWF→PRG", "HILL hard-core-bit (PA#1)"),
+    ("OWF", "OWP"): ("OWF→OWP", "DLP is already a OWP"),
+    ("PRG", "PRF"): ("PRG→PRF", "GGM tree construction (PA#2)"),
+    ("PRF", "PRP"): ("PRF→PRP", "Luby-Rackoff 3-round Feistel"),
+    ("PRF", "MAC"): ("PRF→MAC", "Mac_k(m)=F_k(m) (PA#5)"),
+    ("PRP", "PRF"): ("PRP→PRF", "PRP/PRF switching lemma"),
+    ("CRHF", "HMAC"): ("CRHF→HMAC", "HMAC construction (PA#10)"),
+    ("HMAC", "MAC"): ("HMAC→MAC", "HMAC is a MAC (direct)"),
+    ("MAC", "PRF"): ("MAC→PRF", "Secure MAC is a PRF on random inputs"),
+    ("PRG", "OWF"): ("PRG→OWF", "Any PRG is a OWF (immediate)"),
+    ("PRF", "PRG"): ("PRF→PRG", "G(s)=F_s(0)||F_s(1) (PA#2)"),
+    ("MAC", "CRHF"): ("MAC→CRHF", "MAC as compression in Merkle-Damgård (PA#7)"),
+    ("HMAC", "CRHF"): ("HMAC→CRHF", "Fix key, H'(m)=HMAC_k(m) is CRHF"),
 }
+
+def find_shortest_path(start, end):
+    if start == end:
+        return []
+    queue = [[start]]
+    visited = set([start])
+    while queue:
+        path = queue.pop(0)
+        node = path[-1]
+        for (src, dst), desc in DIRECT_REDUCTIONS.items():
+            if src == node:
+                if dst not in visited:
+                    new_path = list(path)
+                    new_path.append(dst)
+                    if dst == end:
+                        return [DIRECT_REDUCTIONS[(new_path[i], new_path[i+1])] for i in range(len(new_path)-1)]
+                    queue.append(new_path)
+                    visited.add(dst)
+    return None
 
 PROOF_DB = {
     "OWF→PRG": {"theorem":"HILL Theorem","security":"If PRG broken with advantage ε, OWF invertible with prob ε/poly(n)","pa":"PA#1"},
@@ -208,7 +222,7 @@ def build_primitive(req: BuildRequest):
 def reduce_primitive(req: ReduceRequest):
     try:
         key_pair = (req.source, req.target)
-        chain = REDUCTIONS.get(key_pair)
+        chain = find_shortest_path(req.source, req.target)
         if chain is None:
             return {"error": f"No direct reduction from {req.source} to {req.target}.",
                     "steps":[],"proofs":[],"output":"N/A"}
@@ -398,7 +412,7 @@ def run_demo(req: DemoRequest):
             game = euf_cma_game(mac, 30, 10)
             return {"message":msg.decode(),"tag":to_hex(tag),"verify":mac.Vrfy(k,msg,tag),"game":game,"prf_mode":prf_mode}
         elif req.pa == 6:
-            from crypto.pa06_cca_enc import CCAEncryption, malleability_attack_demo
+            from crypto.pa06_cca_enc import CCAEncryption, malleability_attack_demo, key_separation_demo
             from crypto.pa02_prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
             prf_mode = 'ggm' if req.foundation == 'DLP' else 'aes'
@@ -407,9 +421,10 @@ def run_demo(req: DemoRequest):
             r,ct,tag = cca.encrypt(ke,km,msg)
             pt = cca.decrypt(ke,km,r,ct,tag)
             attack = malleability_attack_demo()
-            return {"plaintext":msg.decode(),"decrypted":pt.decode(),"match":pt==msg,"tamper_rejected":cca.decrypt(ke,km,r,bytes([ct[0]^1])+ct[1:],tag) is None,"attack":{"cpa_malleable":attack['cpa_only']['malleable'],"cca_rejected":attack['cca_secure']['rejected']},"prf_mode":prf_mode}
+            key_sep = key_separation_demo()
+            return {"plaintext":msg.decode(),"decrypted":pt.decode(),"match":pt==msg,"tamper_rejected":cca.decrypt(ke,km,r,bytes([ct[0]^1])+ct[1:],tag) is None,"attack":{"cpa_malleable":attack['cpa_only']['malleable'],"cca_rejected":attack['cca_secure']['rejected']},"key_separation":key_sep,"prf_mode":prf_mode}
         elif req.pa == 7:
-            from crypto.pa07_merkle_damgard import create_toy_hash
+            from crypto.pa07_merkle_damgard import create_toy_hash, collision_propagation_demo
             msg_str = req.params.get('message', 'Hello Hash!')
             is_hex = req.params.get('is_hex', False)
             output_size = int(req.params.get('output_size', 4))
@@ -423,7 +438,9 @@ def run_demo(req: DemoRequest):
                 msg = b"Invalid Input"
                 
             toy = create_toy_hash(digest_size=output_size)
-            return toy.hash_with_trace(msg)
+            trace = toy.hash_with_trace(msg)
+            trace["collision_propagation"] = collision_propagation_demo()
+            return trace
         elif req.pa == 8:
             from crypto.pa08_dlp_crhf import DLP_CRHF
             from crypto.utils import to_hex
@@ -456,20 +473,21 @@ def run_demo(req: DemoRequest):
             tag = hmac.mac(k, msg)
             return {"message":msg.decode(),"tag":to_hex(tag),"verify":hmac.verify(k,msg,tag),"tamper":not hmac.verify(k,b"wrong",tag)}
         elif req.pa == 11:
-            from crypto.pa11_diffie_hellman import DiffieHellman, mitm_attack
+            from crypto.pa11_diffie_hellman import DiffieHellman, mitm_attack, cdh_hardness_demo
             dh = DiffieHellman(bits=32)
             exch = dh.key_exchange()
             mitm = mitm_attack(dh)
-            return {"exchange":{"p":exch['p'],"g":exch['g'],"A":exch['A'],"B":exch['B'],"K_alice":exch['K_alice'],"K_bob":exch['K_bob'],"match":exch['keys_match']},"mitm":{"eve_has_alice_key":mitm['eve_has_alice_key'],"eve_has_bob_key":mitm['eve_has_bob_key'],"alice_bob_same":mitm['alice_bob_same']}}
+            cdh = cdh_hardness_demo(dh, tiny_bits=20)
+            return {"exchange":{"p":exch['p'],"g":exch['g'],"A":exch['A'],"B":exch['B'],"K_alice":exch['K_alice'],"K_bob":exch['K_bob'],"match":exch['keys_match']},"mitm":{"eve_has_alice_key":mitm['eve_has_alice_key'],"eve_has_bob_key":mitm['eve_has_bob_key'],"alice_bob_same":mitm['alice_bob_same']}, "cdh": cdh}
         elif req.pa == 12:
-            from crypto.pa12_rsa import rsa_keygen, rsa_encrypt, rsa_decrypt, pkcs15_encrypt, pkcs15_decrypt
+            from crypto.pa12_rsa import rsa_keygen, rsa_encrypt, rsa_decrypt, pkcs15_encrypt, pkcs15_decrypt, determinism_attack_demo, multiplicative_homomorphism_demo, bleichenbacher_oracle_demo
             kp = rsa_keygen(256); m = int(req.params.get("message_int", 42))
             c = rsa_encrypt(kp.n, kp.e, m)
             d = rsa_decrypt(kp.d, kp.n, c)
             msg = req.params.get("message_pkcs", "RSA!").encode()
             c2 = pkcs15_encrypt(kp.n, kp.e, msg)
             d2 = pkcs15_decrypt(kp.d, kp.n, c2)
-            return {"textbook":{"m":m,"c":str(c),"d":d,"match":d==m},"pkcs":{"message":msg.decode(),"decrypted":d2.decode(),"match":d2==msg},"n":str(kp.n),"e":kp.e,"bits":kp.bits}
+            return {"textbook":{"m":m,"c":str(c),"d":d,"match":d==m},"pkcs":{"message":msg.decode(),"decrypted":d2.decode(),"match":d2==msg},"n":str(kp.n),"e":kp.e,"bits":kp.bits, "determinism": determinism_attack_demo(256), "homomorphism": multiplicative_homomorphism_demo(256), "bleichenbacher": bleichenbacher_oracle_demo(256)}
         elif req.pa == 13:
             from crypto.pa13_miller_rabin import is_prime, gen_prime, miller_rabin_with_trace, carmichael_demo, benchmark_prime_generation
             task = req.params.get("task", "test")
@@ -522,19 +540,19 @@ def run_demo(req: DemoRequest):
             att = malleability_attack(key, m)
             return {"m":m,"c1":c1,"c2":c2,"decrypted":d,"match":d==m,"malleability":att['attack_works'],"p":key.p,"g":key.g}
         elif req.pa == 17:
-            from crypto.pa17_cca_pkc import CCA_PKC
+            from crypto.pa17_cca_pkc import CCA_PKC, contrast_demo
             cca = CCA_PKC(eg_bits=32, rsa_bits=256)
             m = int(req.params.get("message_int", 42)); ct=cca.encrypt(m)
             pt=cca.decrypt(ct['c1'],ct['c2'],ct['sigma'])
             bad=cca.decrypt(ct['c1'],(ct['c2']*2)%cca.eg_key.p,ct['sigma'])
-            return {"m":m,"decrypted":pt,"match":pt==m,"tamper_rejected":bad is None}
+            return {"m":m,"decrypted":pt,"match":pt==m,"tamper_rejected":bad is None, "contrast": contrast_demo(cca)}
         elif req.pa == 18:
-            from crypto.pa18_ot import run_ot
+            from crypto.pa18_ot import run_ot, receiver_privacy_demo, sender_privacy_demo
             m0 = int(req.params.get("m0", 42))
             m1 = int(req.params.get("m1", 99))
             b = int(req.params.get("b", 0))
             r = run_ot(m0, m1, b, bits=32)
-            return {"m0": m0, "m1": m1, "b": b, "received": r['received'], "correct": r['correct']}
+            return {"m0": m0, "m1": m1, "b": b, "received": r['received'], "correct": r['correct'], "receiver_privacy": receiver_privacy_demo(32), "sender_privacy": sender_privacy_demo(32)}
             
             
         elif req.pa == 19:
