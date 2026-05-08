@@ -171,7 +171,27 @@ def timing_attack_demo() -> dict:
 # Length-Extension Attack Demo
 # ---------------------------------------------------------------------------
 
-def length_extension_demo(hmac_obj: HMAC = None) -> dict:
+def length_extension_attack(crhf, naive_tag: bytes, message: bytes, suffix: bytes) -> bytes:
+    """
+    Real Merkle-Damgård length-extension attack.
+
+    Given: t = H(k ‖ m) = naive_tag  (attacker sees this)
+    Goal:  forge H(k ‖ m ‖ pad(k‖m) ‖ suffix)  WITHOUT knowing k.
+
+    Trick: naive_tag IS the final chaining value of H(k‖m).
+    We create a new MerkleDamgard instance with IV = naive_tag
+    and hash just `suffix`. The result equals H(k‖m‖pad(k‖m)‖suffix).
+    """
+    from crypto.pa07_merkle_damgard import MerkleDamgard
+    forged_md = MerkleDamgard(
+        compress=crhf.dlp.compress_bytes,
+        iv=naive_tag,          # <- attacker injects the leaked state
+        block_size=crhf.block_size,
+    )
+    return forged_md.hash(suffix)
+
+
+def length_extension_demo(hmac_obj: HMAC = None, suffix: bytes = None) -> dict:
     """
     Demonstrate length-extension attack on naive H(k‖m) vs HMAC.
 
@@ -180,32 +200,53 @@ def length_extension_demo(hmac_obj: HMAC = None) -> dict:
     """
     if hmac_obj is None:
         hmac_obj = HMAC(bits=32)
+    if suffix is None:
+        suffix = b"evil suffix"
 
     key = random_bytes(hmac_obj.block_size)
     message = b"original message"
-    suffix = b"appended data"
 
-    # Naive H(k‖m)
+    # Naive H(k‖m) — the attacker sees (message, tag)
     naive_tag = hmac_obj.crhf.hash(key + message)
 
-    # The length-extension attack: given H(k‖m), compute H(k‖m‖pad‖suffix)
-    # by continuing the hash from the internal state (= naive_tag)
-    padded_input = hmac_obj.crhf.md.pad(key + message)
-    extended_input = padded_input + suffix
-    extended_tag = hmac_obj.crhf.hash(extended_input[len(key):])  # Attacker doesn't know key
+    # MD padding that was applied to (k ‖ m)
+    padded_km = hmac_obj.crhf.md.pad(key + message)
+    # The full extended message (attacker constructs this without k)
+    # = original_message ‖ padding_of_(k‖m)[len(key):] ‖ suffix
+    pad_suffix = padded_km[len(key) + len(message):]   # padding bytes only
+    forged_message = message + pad_suffix + suffix      # what attacker claims
+
+    # Forged tag — attacker computes this WITHOUT k
+    forged_tag = length_extension_attack(hmac_obj.crhf, naive_tag, message, suffix)
+
+    # Verify: server recomputes H(k ‖ forged_message) and checks == forged_tag
+    server_check = hmac_obj.crhf.hash(key + forged_message)
+    forgery_valid = (server_check == forged_tag)
 
     # HMAC is not vulnerable
     hmac_tag = hmac_obj.mac(key, message)
+    # Attacker tries same trick with HMAC
+    hmac_forged_attempt = length_extension_attack(hmac_obj.crhf, bytes.fromhex(to_hex(hmac_tag)), message, suffix)
+    hmac_forgery_valid = hmac_obj.verify(key, forged_message, hmac_forged_attempt)
 
     return {
+        'key_hex': to_hex(key),
+        'message': message.decode(),
+        'suffix': suffix.decode(errors='replace'),
+        'forged_message': forged_message.decode(errors='replace'),
+        'pad_suffix_hex': to_hex(pad_suffix),
         'naive_tag': to_hex(naive_tag),
-        'message': message,
-        'suffix': suffix,
-        'naive_vulnerable': True,
+        'forged_tag': to_hex(forged_tag),
+        'forgery_valid': forgery_valid,
+        'naive_vulnerable': forgery_valid,
         'hmac_tag': to_hex(hmac_tag),
-        'hmac_secure': True,
-        'explanation': 'Naive H(k‖m) leaks internal state → attacker can extend. '
-                       'HMAC uses double hashing to prevent this.',
+        'hmac_forgery_valid': hmac_forgery_valid,
+        'hmac_secure': not hmac_forgery_valid,
+        'explanation': (
+            'Naive H(k‖m): the tag IS the final chaining value — attacker sets it as '
+            'IV and continues hashing suffix → valid forgery. '
+            'HMAC: outer hash wraps the inner result, so the chaining value is never exposed.'
+        ),
     }
 
 
@@ -326,6 +367,7 @@ def mac_to_crhf_demo(hmac_obj: HMAC = None) -> dict:
 # ---------------------------------------------------------------------------
 
 _default_hmac = None
+_default_eth = None
 
 def get_hmac(bits: int = 32) -> HMAC:
     global _default_hmac
@@ -334,10 +376,26 @@ def get_hmac(bits: int = 32) -> HMAC:
     return _default_hmac
 
 def HMAC_tag(key: bytes, message: bytes) -> bytes:
+    """Compute HMAC_k(m) -> tag bytes."""
     return get_hmac().mac(key, message)
 
 def HMAC_Verify(key: bytes, message: bytes, tag: bytes) -> bool:
+    """Verify HMAC tag using constant-time comparison."""
     return get_hmac().verify(key, message, tag)
+
+def EtH_Enc(key_enc: bytes, key_mac: bytes, plaintext: bytes) -> tuple:
+    """Encrypt-then-HMAC: returns (r, ciphertext, tag)."""
+    global _default_eth
+    if _default_eth is None:
+        _default_eth = EncryptThenHMAC(hmac=get_hmac())
+    return _default_eth.encrypt(key_enc, key_mac, plaintext)
+
+def EtH_Dec(key_enc: bytes, key_mac: bytes, r: bytes, ciphertext: bytes, tag: bytes):
+    """Verify-then-decrypt. Returns plaintext bytes or None (⊥) on failure."""
+    global _default_eth
+    if _default_eth is None:
+        _default_eth = EncryptThenHMAC(hmac=get_hmac())
+    return _default_eth.decrypt(key_enc, key_mac, r, ciphertext, tag)
 
 
 # ---------------------------------------------------------------------------
