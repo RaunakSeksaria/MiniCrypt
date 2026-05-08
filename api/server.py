@@ -417,10 +417,22 @@ def run_demo(req: DemoRequest):
             h = crhf.hash(msg)
             return {"message":msg.decode(),"hash":to_hex(h),"p":crhf.dlp.p,"g":crhf.dlp.g,"h_pub":crhf.dlp.h}
         elif req.pa == 9:
-            from crypto.pa09_birthday import attack_toy_hash, practical_context
-            results = attack_toy_hash([8,10,12], num_trials=5)
+            from crypto.pa09_birthday import attack_toy_hash, practical_context, make_toy_hash, birthday_attack_naive
+            n_bits = int(req.params.get("n_bits", 12))
+            hash_fn = make_toy_hash(n_bits)
+            res = birthday_attack_naive(hash_fn, n_bits)
             ctx = practical_context()
-            return {"attacks":{str(k):v for k,v in results.items()},"context":ctx}
+            return {
+                "n_bits": n_bits,
+                "found": res.get("found", False),
+                "evaluations": res.get("evaluations", 0),
+                "expected": res.get("expected", 2 ** (n_bits / 2)),
+                "ratio": round(res.get("ratio", 0), 3),
+                "input1": res["input1"].hex() if res.get("found") else None,
+                "input2": res["input2"].hex() if res.get("found") else None,
+                "hash_value": res.get("hash_value"),
+                "context": ctx,
+            }
         elif req.pa == 10:
             from crypto.pa10_hmac import HMAC
             from crypto.utils import random_bytes, to_hex
@@ -514,6 +526,113 @@ def run_demo(req: DemoRequest):
             return {"error":f"PA#{req.pa} not found"}
     except Exception as e:
         raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
+
+
+# ── PA#9 dedicated birthday-attack endpoints ──
+
+_pa9_hunts: dict = {}
+
+
+class PA9StartRequest(BaseModel):
+    n_bits: int = 12
+
+
+@app.post("/api/pa9/birthday/start")
+def pa9_birthday_start(req: PA9StartRequest):
+    """Launch a background birthday-attack thread on the toy hash. Returns hunt_id."""
+    n_bits = max(4, min(20, req.n_bits))  # clamp to sane range
+    hunt_id = str(uuid.uuid4())
+    birthday_bound = 2 ** (n_bits / 2)
+    state = {
+        "hunt_id": hunt_id,
+        "status": "running",
+        "evaluations": 0,
+        "n_bits": n_bits,
+        "birthday_bound": birthday_bound,
+        "collision": None,
+        "started_at": time.time(),
+        # Snapshot history for the probability curve: list of (k, prob) sampled
+        "curve_points": [],
+    }
+    _pa9_hunts[hunt_id] = state
+
+    def _hunt(state):
+        from crypto.pa09_birthday import make_toy_hash
+        import math as _math
+        try:
+            n = state["n_bits"]
+            hash_fn = make_toy_hash(n)
+            seen = {}
+            MAX_EVALS = int(10 * (2 ** (n / 2))) + 2
+            curve_sample_every = max(1, MAX_EVALS // 200)  # ~200 curve points max
+            i = 0
+            while state["status"] == "running" and i < MAX_EVALS:
+                x = __import__('os').urandom(8)
+                h = hash_fn(x)
+                i += 1
+                state["evaluations"] = i
+                # Record theoretical probability curve points
+                if i % curve_sample_every == 0:
+                    k = i
+                    prob = 1.0 - _math.exp(-k * (k - 1) / (2 ** n))
+                    state["curve_points"].append({"k": k, "prob": round(prob, 6)})
+                if h in seen and seen[h] != x:
+                    state["collision"] = {
+                        "input1": seen[h].hex(),
+                        "input2": x.hex(),
+                        "hash_value": h,
+                        "hash_hex": f"{h:0{(n + 3) // 4}x}",
+                    }
+                    state["status"] = "found"
+                    return
+                seen[h] = x
+            if state["status"] == "running":
+                state["status"] = "exhausted"
+        except Exception as exc:
+            state["status"] = "error"
+            state["error"] = str(exc)
+
+    t = threading.Thread(target=_hunt, args=(state,), daemon=True)
+    t.start()
+    return {
+        "hunt_id": hunt_id,
+        "n_bits": n_bits,
+        "birthday_bound": birthday_bound,
+    }
+
+
+@app.get("/api/pa9/birthday/status/{hunt_id}")
+def pa9_birthday_status(hunt_id: str):
+    """Poll current state of a PA9 birthday hunt."""
+    state = _pa9_hunts.get(hunt_id)
+    if state is None:
+        raise HTTPException(404, "Hunt not found")
+    n = state["n_bits"]
+    k = state["evaluations"]
+    import math as _math
+    empirical_prob = 1.0 - _math.exp(-k * (k - 1) / (2 ** n)) if k > 1 else 0.0
+    return {
+        "hunt_id": hunt_id,
+        "status": state["status"],
+        "evaluations": k,
+        "n_bits": n,
+        "birthday_bound": state["birthday_bound"],
+        "progress_pct": min(100.0, k / state["birthday_bound"] * 100),
+        "empirical_prob": round(empirical_prob, 6),
+        "collision": state["collision"],
+        "curve_points": state["curve_points"],
+    }
+
+
+@app.post("/api/pa9/birthday/stop/{hunt_id}")
+def pa9_birthday_stop(hunt_id: str):
+    """Abort a running PA9 birthday hunt."""
+    state = _pa9_hunts.get(hunt_id)
+    if state is None:
+        raise HTTPException(404, "Hunt not found")
+    if state["status"] == "running":
+        state["status"] = "stopped"
+    return {"status": state["status"]}
 
 
 # ── PA#8 dedicated endpoints ──

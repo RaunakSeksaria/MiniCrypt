@@ -21,7 +21,7 @@ const PA_DEFINITIONS = {
   6: { params: [{ name: 'message', label: 'Plaintext Message', default: 'CCA-secure message!' }] },
   7: { params: [{ name: 'message', label: 'Message to Hash', default: 'Hello Hash!' }] },
   8: { params: [] },  // PA8 has its own input inside renderPA8Special
-  9: { params: [] },
+  9: { params: [] },  // PA9 has its own input inside renderPA9Special
   10: { params: [{ name: 'message', label: 'Message to HMAC', default: 'HMAC test message' }] },
   11: { params: [] },
   12: { params: [{ name: 'message_int', label: 'Textbook RSA Message (Int)', default: '42' }, { name: 'message_pkcs', label: 'PKCS#1 Message (Text)', default: 'RSA!' }] },
@@ -52,6 +52,13 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [huntRunning, setHuntRunning] = useState(false);
   const pollRef = useRef(null);
 
+  // PA#9 birthday attack state
+  const [pa9NBits, setPa9NBits] = useState(12);
+  const [pa9HuntId, setPa9HuntId] = useState(null);
+  const [pa9Status, setPa9Status] = useState(null);
+  const [pa9Running, setPa9Running] = useState(false);
+  const pa9PollRef = useRef(null);
+
   const def = PA_DEFINITIONS[pa.pa] || { params: [] };
 
   // Stop polling helper — defined before useEffect so cleanup can reference it
@@ -63,23 +70,33 @@ const PADemoModal = ({ pa, onClose, api }) => {
     setHuntRunning(false);
   }, []);
 
+  const stopPa9Hunt = useCallback(() => {
+    if (pa9PollRef.current) {
+      clearInterval(pa9PollRef.current);
+      pa9PollRef.current = null;
+    }
+    setPa9Running(false);
+  }, []);
+
   useEffect(() => {
     // Set initial params
     const initialParams = {};
     def.params.forEach(p => initialParams[p.name] = p.default);
     setParams(initialParams);
 
-    // Auto-run if no params (but NOT for PA8 — it has its own special renderer)
-    if (def.params.length === 0 && pa.pa !== 8) {
+    // Auto-run if no params (but NOT for PA8/PA9 — they have their own special renderers)
+    if (def.params.length === 0 && pa.pa !== 8 && pa.pa !== 9) {
       runDemo(initialParams);
     }
 
-    // Reset PA8 state when modal switches PA
+    // Reset PA8 / PA9 state when modal switches PA
     setPa8Hash(null);
     setHuntStatus(null);
     stopHunt();
+    setPa9Status(null);
+    stopPa9Hunt();
 
-    return () => stopHunt();
+    return () => { stopHunt(); stopPa9Hunt(); };
   }, [pa]);
 
   // PA8: auto-hash the default message when the modal opens
@@ -524,6 +541,304 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  // ─────────────────────────────────────────────────────────────────
+  // PA#9 — Birthday Attack demo
+  // ─────────────────────────────────────────────────────────────────
+  const renderPA9Special = () => {
+    const collision = pa9Status?.collision;
+    const evals     = pa9Status?.evaluations ?? 0;
+    const status    = pa9Status?.status;
+    const bound     = pa9Status?.birthday_bound ?? Math.pow(2, pa9NBits / 2);
+    const empiricalProb = pa9Status?.empirical_prob ?? 0;
+    const curvePoints   = pa9Status?.curve_points ?? [];
+    const nBits = pa9NBits;
+
+    // Theoretical curve: 1 - e^(-k*(k-1)/2^n)
+    // Build a smooth theoretical reference line (100 pts from 0 to 5*bound)
+    const maxK = Math.max(evals + 5, bound * 4);
+    const theoryPts = Array.from({ length: 120 }, (_, i) => {
+      const k = Math.round((i / 119) * maxK);
+      return { k, prob: 1 - Math.exp(-k * (k - 1) / Math.pow(2, nBits)) };
+    });
+
+    // SVG chart dimensions
+    const W = 340, H = 160, PAD = { t: 10, r: 16, b: 32, l: 42 };
+    const cW = W - PAD.l - PAD.r;
+    const cH = H - PAD.t - PAD.b;
+    const xScale = k => (k / maxK) * cW;
+    const yScale = p => cH - p * cH;
+
+    // Build SVG path from theory points
+    const theoryPath = theoryPts
+      .map((pt, i) => `${i === 0 ? 'M' : 'L'}${xScale(pt.k).toFixed(1)},${yScale(pt.prob).toFixed(1)}`)
+      .join(' ');
+
+    // Empirical curve: build from curvePoints
+    const empirPath = curvePoints.length > 1
+      ? curvePoints
+          .map((pt, i) => `${i === 0 ? 'M' : 'L'}${xScale(pt.k).toFixed(1)},${yScale(pt.prob).toFixed(1)}`)
+          .join(' ')
+      : '';
+
+    // Birthday bound x-position
+    const boundX = xScale(bound);
+
+    // Collision marker
+    const collisionX = collision ? xScale(evals) : null;
+    const collisionY = collision ? yScale(empiricalProb) : null;
+
+    const nOptions = [8, 10, 12, 14, 16];
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+        {/* ── n-bit slider ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(168,85,247,0.08) 100%)',
+          border: '1px solid rgba(99,102,241,0.3)',
+          borderRadius: '12px',
+          padding: '18px',
+        }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase' }}>🎛️ Output Bit-Length n</div>
+
+          {/* Segmented pill selector */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {nOptions.map(n => (
+              <button
+                key={n}
+                id={`pa9-n-btn-${n}`}
+                onClick={() => { setPa9NBits(n); setPa9Status(null); stopPa9Hunt(); }}
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  borderRadius: '8px',
+                  border: n === nBits ? '2px solid #818cf8' : '1px solid rgba(99,102,241,0.25)',
+                  background: n === nBits
+                    ? 'linear-gradient(135deg, rgba(99,102,241,0.3) 0%, rgba(168,85,247,0.3) 100%)'
+                    : 'rgba(0,0,0,0.2)',
+                  color: n === nBits ? '#c4b5fd' : 'var(--text2)',
+                  fontWeight: n === nBits ? 700 : 400,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'all 0.18s',
+                }}
+              >
+                {n}-bit
+              </button>
+            ))}
+          </div>
+
+          <div style={{ marginTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', fontSize: '11px' }}>
+            <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '6px', padding: '8px 10px', border: '1px solid rgba(99,102,241,0.15)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--text3)', marginBottom: '2px' }}>Output space</div>
+              <div style={{ fontFamily: 'monospace', color: '#a5b4fc', fontWeight: 700 }}>2<sup>{nBits}</sup> = {Math.pow(2, nBits).toLocaleString()}</div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '6px', padding: '8px 10px', border: '1px solid rgba(99,102,241,0.15)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--text3)', marginBottom: '2px' }}>Birthday bound</div>
+              <div style={{ fontFamily: 'monospace', color: '#f59e0b', fontWeight: 700 }}>2<sup>{nBits}/2</sup> ≈ {Math.round(Math.pow(2, nBits / 2))}</div>
+            </div>
+            <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '6px', padding: '8px 10px', border: '1px solid rgba(99,102,241,0.15)', textAlign: 'center' }}>
+              <div style={{ color: 'var(--text3)', marginBottom: '2px' }}>Evaluated</div>
+              <div style={{ fontFamily: 'monospace', color: '#34d399', fontWeight: 700 }}>{evals.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Attack controls ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(245,158,11,0.07) 0%, rgba(239,68,68,0.07) 100%)',
+          border: '1px solid rgba(245,158,11,0.3)',
+          borderRadius: '12px',
+          padding: '18px',
+        }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>🎯 Birthday Attack</div>
+
+          <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+            <button
+              id="pa9-run-btn"
+              disabled={pa9Running}
+              style={{
+                flex: 1, padding: '10px', borderRadius: '8px', fontWeight: 700, fontSize: '13px',
+                cursor: pa9Running ? 'not-allowed' : 'pointer',
+                background: pa9Running
+                  ? 'rgba(245,158,11,0.15)'
+                  : 'linear-gradient(135deg, #f59e0b, #ef4444)',
+                border: 'none',
+                color: pa9Running ? '#f59e0b' : 'white',
+                transition: 'all 0.2s',
+              }}
+              onClick={async () => {
+                setPa9Status(null);
+                setPa9Running(true);
+                const { hunt_id } = await api.pa9BirthdayStart(nBits);
+                setPa9HuntId(hunt_id);
+                if (pa9PollRef.current) clearInterval(pa9PollRef.current);
+                pa9PollRef.current = setInterval(async () => {
+                  const s = await api.pa9BirthdayStatus(hunt_id);
+                  setPa9Status(s);
+                  if (s.status !== 'running') {
+                    clearInterval(pa9PollRef.current);
+                    pa9PollRef.current = null;
+                    setPa9Running(false);
+                  }
+                }, 250);
+              }}
+            >
+              {pa9Running ? '⚡ Attacking…' : collision ? '🔄 Run Again' : '▶ Run Attack'}
+            </button>
+
+            {pa9Running && (
+              <button
+                id="pa9-stop-btn"
+                style={{
+                  padding: '10px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                  background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444',
+                }}
+                onClick={async () => {
+                  if (pa9HuntId) await api.pa9BirthdayStop(pa9HuntId);
+                  stopPa9Hunt();
+                }}
+              >
+                ■ Stop
+              </button>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          {pa9Status && (
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text3)', marginBottom: '6px' }}>
+                <span>Hashes computed: <strong style={{ color: 'var(--text1)' }}>{evals.toLocaleString()}</strong></span>
+                <span>P(collision): <strong style={{ color: '#34d399' }}>{(empiricalProb * 100).toFixed(1)}%</strong></span>
+              </div>
+              <div style={{ height: '10px', background: 'rgba(0,0,0,0.3)', borderRadius: '5px', overflow: 'hidden', position: 'relative' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${Math.min(100, evals / (bound * 4) * 100)}%`,
+                  background: status === 'found'
+                    ? 'linear-gradient(90deg, #22c55e, #16a34a)'
+                    : 'linear-gradient(90deg, #f59e0b, #ef4444)',
+                  transition: 'width 0.25s ease',
+                  borderRadius: '5px',
+                }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Live probability chart ── */}
+        {pa9Status && (
+          <div style={{
+            background: 'rgba(0,0,0,0.25)',
+            border: '1px solid var(--border)',
+            borderRadius: '12px',
+            padding: '14px',
+          }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text2)', marginBottom: '10px', textTransform: 'uppercase' }}>📈 Collision Probability vs Hashes Computed</div>
+            <svg
+              id="pa9-probability-chart"
+              width={W}
+              height={H}
+              style={{ display: 'block', maxWidth: '100%', overflow: 'visible' }}
+              viewBox={`0 0 ${W} ${H}`}
+            >
+              <g transform={`translate(${PAD.l},${PAD.t})`}>
+                {/* Y grid lines */}
+                {[0, 0.25, 0.5, 0.75, 1.0].map(p => (
+                  <g key={p}>
+                    <line x1={0} y1={yScale(p)} x2={cW} y2={yScale(p)} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+                    <text x={-6} y={yScale(p) + 4} textAnchor="end" fontSize={9} fill="rgba(255,255,255,0.35)">{(p * 100).toFixed(0)}%</text>
+                  </g>
+                ))}
+
+                {/* X axis label */}
+                <text x={cW / 2} y={cH + 28} textAnchor="middle" fontSize={9} fill="rgba(255,255,255,0.35)">k (hashes computed)</text>
+
+                {/* Birthday bound marker */}
+                <line x1={boundX} y1={0} x2={boundX} y2={cH} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4,3" opacity={0.7} />
+                <text x={boundX + 3} y={12} fontSize={9} fill="#f59e0b" opacity={0.9}>2^({nBits}/2)={Math.round(bound)}</text>
+
+                {/* Theoretical curve */}
+                <path d={theoryPath} fill="none" stroke="#818cf8" strokeWidth={1.5} opacity={0.7} />
+
+                {/* Empirical curve (from server curve_points) */}
+                {empirPath && (
+                  <path d={empirPath} fill="none" stroke="#34d399" strokeWidth={2} opacity={0.9} />
+                )}
+
+                {/* Live empirical dot */}
+                {evals > 0 && (
+                  <circle
+                    cx={xScale(evals)}
+                    cy={yScale(empiricalProb)}
+                    r={4}
+                    fill="#34d399"
+                    stroke="white"
+                    strokeWidth={1}
+                  />
+                )}
+
+                {/* Collision marker */}
+                {collisionX !== null && (
+                  <>
+                    <line x1={collisionX} y1={0} x2={collisionX} y2={cH} stroke="#22c55e" strokeWidth={2} strokeDasharray="3,2" />
+                    <circle cx={collisionX} cy={collisionY} r={6} fill="#22c55e" stroke="white" strokeWidth={1.5} />
+                  </>
+                )}
+
+                {/* Axes */}
+                <line x1={0} y1={0} x2={0} y2={cH} stroke="rgba(255,255,255,0.2)" />
+                <line x1={0} y1={cH} x2={cW} y2={cH} stroke="rgba(255,255,255,0.2)" />
+              </g>
+            </svg>
+
+            {/* Legend */}
+            <div style={{ display: 'flex', gap: '16px', marginTop: '8px', fontSize: '10px', flexWrap: 'wrap' }}>
+              <span><span style={{ display: 'inline-block', width: 20, height: 2, background: '#818cf8', verticalAlign: 'middle', marginRight: 4 }} />Theory: 1−e<sup>−k(k−1)/2<sup>n</sup></sup></span>
+              <span><span style={{ display: 'inline-block', width: 20, height: 2, background: '#34d399', verticalAlign: 'middle', marginRight: 4 }} />Empirical P(collision)</span>
+              <span><span style={{ display: 'inline-block', width: 14, height: 2, background: '#f59e0b', verticalAlign: 'middle', marginRight: 4, borderTop: '1px dashed #f59e0b' }} />Birthday bound 2<sup>n/2</sup></span>
+            </div>
+          </div>
+        )}
+
+        {/* ── Collision found card ── */}
+        {collision && (
+          <div
+            id="pa9-collision-result"
+            style={{
+              background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(16,185,129,0.12) 100%)',
+              border: '2px solid #22c55e',
+              borderRadius: '10px',
+              padding: '16px',
+              animation: 'fadeIn 0.4s ease',
+            }}
+          >
+            <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '10px', fontSize: '14px' }}>💥 Collision Found in {evals.toLocaleString()} evaluations! (expected ≈ {Math.round(bound)})</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: '12px' }}>
+              <span style={{ color: 'var(--text3)' }}>Input 1</span>
+              <code style={{ color: '#86efac', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px', wordBreak: 'break-all' }}>0x{collision.input1}</code>
+              <span style={{ color: 'var(--text3)' }}>Input 2</span>
+              <code style={{ color: '#86efac', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px', wordBreak: 'break-all' }}>0x{collision.input2}</code>
+              <span style={{ color: 'var(--text3)' }}>Shared hash ({nBits}-bit)</span>
+              <code style={{ color: '#fbbf24', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>0x{collision.hash_hex} = {collision.hash_value}</code>
+            </div>
+            <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text3)', borderTop: '1px solid rgba(34,197,94,0.2)', paddingTop: '10px', lineHeight: 1.5 }}>
+              <strong style={{ color: 'var(--text2)' }}>Birthday paradox:</strong> With only {nBits} output bits (2<sup>{nBits}</sup> = {Math.pow(2,nBits).toLocaleString()} possible values),
+              a collision appears after ≈ 2<sup>{nBits}/2</sup> = {Math.round(bound)} hashes — far fewer than the full output space.
+              Ratio empirical/expected: <strong style={{ color: '#34d399' }}>{(evals / bound).toFixed(2)}×</strong>.
+            </div>
+          </div>
+        )}
+
+        {status === 'exhausted' && !collision && (
+          <div style={{ color: '#f87171', fontSize: '12px', padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.2)' }}>
+            Safety cap reached without collision. Try again.
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderPA2Special = () => {
     if (!result) return null;
     return (
@@ -639,6 +954,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const isPA1 = pa.pa === 1;
   const isPA2 = pa.pa === 2;
   const isPA8 = pa.pa === 8;
+  const isPA9 = pa.pa === 9;
 
   return (
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -695,7 +1011,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPA1 && !isPA8 && (
+            {!isPA1 && !isPA8 && !isPA9 && (
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
@@ -703,9 +1019,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPA1 && !isPA8 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPA1 && !isPA8 && !isPA9 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA8 ? renderPA8Special() : (result && renderResult(result))}
+            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>

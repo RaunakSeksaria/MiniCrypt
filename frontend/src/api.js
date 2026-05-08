@@ -53,6 +53,25 @@ const api = {
     const r = await fetch(`${API_BASE}/api/pa8/collision/stop/${huntId}`, { method: 'POST' });
     return r.json();
   },
+
+  async pa9BirthdayStart(nBits) {
+    const r = await fetch(`${API_BASE}/api/pa9/birthday/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ n_bits: nBits }),
+    });
+    return r.json();
+  },
+
+  async pa9BirthdayStatus(huntId) {
+    const r = await fetch(`${API_BASE}/api/pa9/birthday/status/${huntId}`);
+    return r.json();
+  },
+
+  async pa9BirthdayStop(huntId) {
+    const r = await fetch(`${API_BASE}/api/pa9/birthday/stop/${huntId}`, { method: 'POST' });
+    return r.json();
+  },
 };
 
 export default api;
