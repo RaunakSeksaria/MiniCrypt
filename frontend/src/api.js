@@ -164,6 +164,26 @@ const api = {
     });
     return r.json();
   },
+
+  // ── PA#18 Oblivious Transfer ──
+  async pa18Play(b, m0, m1) {
+    const r = await fetch(`${API_BASE}/api/pa18/ot/play`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ b, m0, m1 }),
+    });
+    return r.json();
+  },
+
+  async pa18Correctness() {
+    const r = await fetch(`${API_BASE}/api/pa18/ot/correctness`, { method: 'POST' });
+    return r.json();
+  },
+
+  async pa18Privacy() {
+    const r = await fetch(`${API_BASE}/api/pa18/ot/privacy`, { method: 'POST' });
+    return r.json();
+  },
 };
 
 export default api;

@@ -1173,6 +1173,98 @@ def pa11_cdh(req: PA11CdhRequest):
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
+# ── PA#18 Oblivious Transfer dedicated endpoints ──
+
+class PA18PlayRequest(BaseModel):
+    b: int = 0      # Bob's choice bit (0 or 1)
+    m0: int = 42    # Alice's message 0
+    m1: int = 99    # Alice's message 1
+
+@app.post("/api/pa18/ot/play")
+def pa18_ot_play(req: PA18PlayRequest):
+    """Run full OT protocol and return step-by-step trace + cheat attempt result."""
+    try:
+        from crypto.pa18_ot import OTProtocol
+        from crypto.pa16_elgamal import elgamal_decrypt
+        if req.b not in (0, 1):
+            raise HTTPException(400, "Choice bit b must be 0 or 1")
+
+        ot = OTProtocol(bits=32)
+
+        # Step 1: Receiver generates keys
+        step1 = ot.receiver_step1(req.b)
+        pk0, pk1, state = step1['pk0'], step1['pk1'], step1['state']
+
+        # Step 2: Sender encrypts both messages
+        step2 = ot.sender_step(pk0, pk1, req.m0, req.m1)
+        C0, C1 = step2['C0'], step2['C1']
+
+        # Step 3: Receiver decrypts chosen ciphertext
+        mb = ot.receiver_step2(state, C0, C1)
+        expected = req.m0 if req.b == 0 else req.m1
+
+        # Cheat attempt: brute-force sk_{1-b} from 1..SEARCH_LIMIT
+        C_other = C1 if req.b == 0 else C0
+        c1_o, c2_o = C_other
+        other_msg = req.m1 if req.b == 0 else req.m0
+        SEARCH_LIMIT = 5000
+        found_sk, found_msg = None, None
+        for sk_guess in range(1, SEARCH_LIMIT + 1):
+            m_guess = elgamal_decrypt(sk_guess, ot.p, c1_o, c2_o)
+            if m_guess == other_msg:
+                found_sk = sk_guess
+                found_msg = m_guess
+                break
+
+        return {
+            'b': req.b,
+            'm0': req.m0,
+            'm1': req.m1,
+            'mb': mb,
+            'correct': mb == expected,
+            'p': ot.p,
+            'g': ot.g,
+            'q': ot.q,
+            'pk0_h': pk0['h'],
+            'pk1_h': pk1['h'],
+            'sk_b': state['sk_b'],
+            'C0': list(C0),
+            'C1': list(C1),
+            'cheat': {
+                'searched': SEARCH_LIMIT,
+                'found_sk': found_sk,
+                'found_msg': found_msg,
+                'failed': found_sk is None,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
+@app.post("/api/pa18/ot/correctness")
+def pa18_correctness():
+    """Run 100 OT trials with random b, m0, m1 and verify correctness."""
+    try:
+        from crypto.pa18_ot import correctness_test
+        return correctness_test(bits=32, trials=100)
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
+@app.post("/api/pa18/ot/privacy")
+def pa18_privacy():
+    """Run receiver-privacy and sender-privacy demos."""
+    try:
+        from crypto.pa18_ot import receiver_privacy_demo, sender_privacy_demo
+        rp = receiver_privacy_demo(bits=32, trials=100)
+        sp = sender_privacy_demo(bits=32)
+        return {'receiver': rp, 'sender': sp}
+    except Exception as e:
+        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+
+
 # ── Routing table ──
 @app.get("/api/reductions")
 def get_reductions():

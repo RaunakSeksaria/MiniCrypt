@@ -30,7 +30,7 @@ const PA_DEFINITIONS = {
   15: { params: [{ name: 'message', label: 'Message to Sign', default: 'Sign this!' }] },
   16: { params: [{ name: 'message_int', label: 'ElGamal Message (Int)', default: '42' }] },
   17: { params: [{ name: 'message_int', label: 'CCA-PKC Message (Int)', default: '42' }] },
-  18: { params: [{ name: 'm0', label: 'Message 0 (Int)', default: '42' }, { name: 'm1', label: 'Message 1 (Int)', default: '99' }, { name: 'b', label: 'Choice Bit (0 or 1)', default: '0' }] },
+  18: { params: [] }, // PA18 has its own special renderer
   19: { params: [{ name: 'a', label: 'Alice Input (0 or 1)', default: '1' }, { name: 'b', label: 'Bob Input (0 or 1)', default: '1' }] },
   20: { params: [{ name: 'alice_val', label: 'Alice Value (0-15)', default: '7' }, { name: 'bob_val', label: 'Bob Value (0-15)', default: '3' }] },
 };
@@ -84,8 +84,20 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa11CdhBits,     setPa11CdhBits]     = useState(20);
   const [pa11Loading,     setPa11Loading]     = useState({});
 
+  // PA#18 OT state
+  const [pa18M0,              setPa18M0]              = useState(42);
+  const [pa18M1,              setPa18M1]              = useState(99);
+  const [pa18Step,            setPa18Step]            = useState(0);   // 0=idle 1=keys 2=ciphers 3=done
+  const [pa18PlayData,        setPa18PlayData]        = useState(null);
+  const [pa18Loading,         setPa18Loading]         = useState(false);
+  const [pa18Log,             setPa18Log]             = useState([]);
+  const [pa18CorrectnessData, setPa18CorrectnessData] = useState(null);
+  const [pa18PrivacyData,     setPa18PrivacyData]     = useState(null);
+  const [pa18CtlLoading,      setPa18CtlLoading]      = useState({});  // {correctness, privacy}
+
   const def = PA_DEFINITIONS[pa.pa] || { params: [] };
   const isPA11 = pa.pa === 11;
+  const isPA18 = pa.pa === 18;
 
   // Stop polling helper — defined before useEffect so cleanup can reference it
   const stopHunt = useCallback(() => {
@@ -110,8 +122,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
     def.params.forEach(p => initialParams[p.name] = p.default);
     setParams(initialParams);
 
-    // Auto-run if no params (but NOT for PA8/PA9/PA10/PA11 — they have their own special renderers)
-    if (def.params.length === 0 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11) {
+    // Auto-run if no params (but NOT for PA8/PA9/PA10/PA11/PA18 — they have their own special renderers)
+    if (def.params.length === 0 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11 && pa.pa !== 18) {
       runDemo(initialParams);
     }
 
@@ -125,6 +137,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
     setPa10EthData(null); setPa10DecData(null); setPa10TimingData(null); setPa10CcaData(null);
     setPa11Data(null); setPa11MitmData(null); setPa11CdhData(null);
     setPa11EveEnabled(false); setPa11Animating(false); setPa11AliceExp(''); setPa11BobExp('');
+    setPa18Step(0); setPa18PlayData(null); setPa18Log([]);
+    setPa18CorrectnessData(null); setPa18PrivacyData(null); setPa18CtlLoading({});
 
     return () => { stopHunt(); stopPa9Hunt(); };
   }, [pa]);
@@ -1728,6 +1742,366 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  const renderPA18Special = () => {
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+    const b = pa18PlayData?.b;
+    const done = pa18Step === 3;
+
+    const shortNum = (n) => n == null ? '?' : String(n).slice(-8);
+
+    const runOT = async (choice) => {
+      setPa18Loading(true);
+      setPa18Step(0);
+      setPa18PlayData(null);
+      setPa18Log([{ icon: '🔑', text: `Bob selects b=${choice} — generating key pairs…`, color: '#a5b4fc' }]);
+      try {
+        const data = await api.pa18Play(choice, Number(pa18M0), Number(pa18M1));
+        // Step 1 — keys ready
+        await sleep(500);
+        setPa18Step(1);
+        setPa18Log([
+          { icon: '🔑', text: `Bob selects b=${choice} — generating key pairs…`, color: '#a5b4fc' },
+          { icon: '✓', text: `pk_${choice}   = g^sk (honest) →  …${shortNum(choice === 0 ? data.pk0_h : data.pk1_h)}`, color: '#34d399' },
+          { icon: '✓', text: `pk_${1-choice} = random element  →  …${shortNum(choice === 0 ? data.pk1_h : data.pk0_h)}  (no trapdoor)`, color: '#fbbf24' },
+          { icon: '📤', text: `(pk₀, pk₁) sent to Alice`, color: '#a5b4fc' },
+        ]);
+        // Step 2 — ciphertexts
+        await sleep(600);
+        setPa18Step(2);
+        setPa18Log(prev => [...prev,
+          { icon: '🔒', text: `Alice encrypts: C₀ = ElGamal(pk₀, m₀)  →  […${shortNum(data.C0[0])}, …${shortNum(data.C0[1])}]`, color: '#c4b5fd' },
+          { icon: '🔒', text: `Alice encrypts: C₁ = ElGamal(pk₁, m₁)  →  […${shortNum(data.C1[0])}, …${shortNum(data.C1[1])}]`, color: '#c4b5fd' },
+          { icon: '📥', text: `(C₀, C₁) received by Bob`, color: '#a5b4fc' },
+        ]);
+        // Step 3 — decrypt
+        await sleep(600);
+        setPa18Step(3);
+        setPa18PlayData(data);
+        setPa18Log(prev => [...prev,
+          { icon: '🔓', text: `Bob decrypts C_${choice} using sk_${choice}…`, color: '#a5b4fc' },
+          { icon: '✨', text: `m_${choice} = ${data.mb}  ← revealed!`, color: '#34d399' },
+          { icon: '🔒', text: `m_${1-choice} = ??  ← no sk_${1-choice}, cannot decrypt`, color: '#f87171' },
+        ]);
+      } catch (err) {
+        setPa18Log(prev => [...prev, { icon: '❌', text: `Error: ${err.message}`, color: '#f87171' }]);
+      }
+      setPa18Loading(false);
+    };
+
+    const panelBase = {
+      borderRadius: '14px', padding: '18px', flex: 1,
+      display: 'flex', flexDirection: 'column', gap: '12px',
+    };
+
+    const stepDot = (n) => {
+      const active = pa18Step >= n;
+      return (
+        <div style={{
+          width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+          background: active ? 'var(--accent)' : 'rgba(255,255,255,0.08)',
+          border: `2px solid ${active ? 'var(--accent)' : 'rgba(255,255,255,0.15)'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '11px', fontWeight: 700, color: active ? '#fff' : 'rgba(255,255,255,0.3)',
+          transition: 'all 0.4s',
+        }}>{n}</div>
+      );
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+        {/* ── Message inputs + two-panel layout ── */}
+        <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+
+          {/* Alice panel */}
+          <div style={{
+            ...panelBase,
+            background: 'linear-gradient(135deg, rgba(168,85,247,0.10) 0%, rgba(99,102,241,0.10) 100%)',
+            border: '1px solid rgba(168,85,247,0.35)',
+            opacity: done ? 1 : 0.75,
+            minWidth: 180,
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#c4b5fd', letterSpacing: '0.06em' }}>
+              👩 ALICE &nbsp;<span style={{ fontWeight: 400, opacity: 0.6, fontSize: '10px' }}>Sender</span>
+            </div>
+
+            {[['m₀', pa18M0, setPa18M0], ['m₁', pa18M1, setPa18M1]].map(([label, val, setter]) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', color: '#c4b5fd', minWidth: 24 }}>{label}</span>
+                <input
+                  type="number" value={val}
+                  onChange={e => setter(Number(e.target.value))}
+                  disabled={pa18Loading}
+                  style={{
+                    flex: 1, padding: '6px 10px', borderRadius: '6px', fontSize: '13px',
+                    background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(168,85,247,0.35)',
+                    color: 'var(--text1)', outline: 'none',
+                  }}
+                />
+                <span style={{ fontSize: '16px' }}>{done ? '🔒' : '❓'}</span>
+              </div>
+            ))}
+
+            {done && (
+              <div style={{ marginTop: '6px', fontSize: '11px', color: 'var(--text3)', lineHeight: 1.5 }}>
+                Alice sees only <strong>(pk₀, pk₁)</strong> — cannot tell which key Bob generated honestly.
+              </div>
+            )}
+          </div>
+
+          {/* Bob panel */}
+          <div style={{
+            ...panelBase,
+            background: 'linear-gradient(135deg, rgba(34,197,94,0.10) 0%, rgba(16,185,129,0.10) 100%)',
+            border: '1px solid rgba(34,197,94,0.35)',
+            minWidth: 180,
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: 700, color: '#86efac', letterSpacing: '0.06em' }}>
+              🧑 BOB &nbsp;<span style={{ fontWeight: 400, opacity: 0.6, fontSize: '10px' }}>Receiver</span>
+            </div>
+
+            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '4px' }}>Choose which message to receive:</div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {[0, 1].map(choice => (
+                <button key={choice}
+                  id={`pa18-choose-${choice}-btn`}
+                  disabled={pa18Loading}
+                  onClick={() => runOT(choice)}
+                  style={{
+                    flex: 1, padding: '10px 0', borderRadius: '8px', fontWeight: 700, fontSize: '14px',
+                    cursor: pa18Loading ? 'not-allowed' : 'pointer',
+                    background: done && b === choice
+                      ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+                      : 'rgba(34,197,94,0.12)',
+                    border: `2px solid ${done && b === choice ? '#22c55e' : 'rgba(34,197,94,0.3)'}`,
+                    color: done && b === choice ? '#fff' : '#86efac',
+                    transition: 'all 0.25s',
+                  }}
+                >
+                  {pa18Loading && b === choice ? '⏳' : `m${choice === 0 ? '₀' : '₁'}`}
+                </button>
+              ))}
+            </div>
+
+            {/* Result reveal */}
+            {done && (
+              <div style={{ marginTop: '4px' }}>
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(16,185,129,0.15) 100%)',
+                  border: '2px solid #22c55e', borderRadius: '10px', padding: '12px',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: '11px', color: '#86efac', marginBottom: '4px' }}>m_{b} revealed ✨</div>
+                  <div style={{ fontSize: '28px', fontWeight: 900, color: '#22c55e', fontFamily: 'monospace' }}>
+                    {pa18PlayData?.mb}
+                  </div>
+                </div>
+                <div style={{
+                  marginTop: '8px',
+                  background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+                  borderRadius: '8px', padding: '10px', textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: '10px', color: '#f87171', marginBottom: '2px' }}>m_{1-b} hidden</div>
+                  <div style={{ fontSize: '22px', fontWeight: 900, color: '#f87171', letterSpacing: '4px' }}>? ?</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Protocol steps indicator ── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0',
+          background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '12px 16px',
+          border: '1px solid var(--border)',
+        }}>
+          {[
+            [1, 'Receiver Step 1', 'Bob generates keys'],
+            [2, 'Sender Step', 'Alice encrypts'],
+            [3, 'Receiver Step 2', 'Bob decrypts'],
+          ].map(([n, title, sub], i) => (
+            <React.Fragment key={n}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                {stepDot(n)}
+                <div>
+                  <div style={{ fontSize: '11px', fontWeight: 600, color: pa18Step >= n ? 'var(--text1)' : 'var(--text3)' }}>{title}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)' }}>{sub}</div>
+                </div>
+              </div>
+              {i < 2 && <div style={{ width: 24, height: 2, background: pa18Step > n ? 'var(--accent)' : 'rgba(255,255,255,0.1)', flexShrink: 0, transition: 'background 0.4s' }} />}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* ── Protocol Log ── */}
+        {pa18Log.length > 0 && (
+          <div style={{
+            background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(99,102,241,0.25)',
+            borderRadius: '10px', padding: '14px',
+          }}>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+              📋 Protocol Log
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {pa18Log.map((entry, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', fontSize: '12px' }}>
+                  <span style={{ flexShrink: 0 }}>{entry.icon}</span>
+                  <span style={{ fontFamily: 'monospace', color: entry.color, lineHeight: 1.5 }}>{entry.text}</span>
+                </div>
+              ))}
+              {pa18Loading && (
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '12px', color: 'var(--text3)' }}>
+                  <div className="spinner" style={{ width: 14, height: 14, flexShrink: 0 }} />
+                  <span>Running…</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Cheat Attempt (only after step 3) ── */}
+        {done && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(245,158,11,0.07) 0%, rgba(239,68,68,0.07) 100%)',
+            border: '1px solid rgba(245,158,11,0.35)', borderRadius: '12px', padding: '16px',
+          }}>
+            <div style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
+              🕵️ Cheat Attempt — Try Decrypting m_&#123;1-b&#125;
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '12px' }}>
+              Bob tries brute-forcing <code style={{ color: '#fbbf24' }}>sk_&#123;1-b&#125;</code> by trying 5 000 consecutive guesses and decrypting C<sub>&#123;1-b&#125;</sub>. Since sk_&#123;1-b&#125; was chosen uniformly from a ~2³¹ group, the odds of a hit are ≈ 0.00025 %.
+            </div>
+            {pa18PlayData?.cheat && (
+              <div style={{
+                borderRadius: '8px', padding: '12px',
+                background: pa18PlayData.cheat.failed ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.12)',
+                border: `1px solid ${pa18PlayData.cheat.failed ? '#22c55e' : '#ef4444'}`,
+              }}>
+                <div style={{ fontWeight: 700, fontSize: '13px', color: pa18PlayData.cheat.failed ? '#22c55e' : '#ef4444', marginBottom: '8px' }}>
+                  {pa18PlayData.cheat.failed ? `✓ Cheat failed — m_${1-b} stays hidden` : `✗ Lucky hit (sk guess found within ${pa18PlayData.cheat.searched})`}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: '11px' }}>
+                  <span style={{ color: 'var(--text3)' }}>Searched</span>
+                  <span style={{ fontFamily: 'monospace', color: 'var(--text2)' }}>{pa18PlayData.cheat.searched.toLocaleString()} candidate keys</span>
+                  <span style={{ color: 'var(--text3)' }}>Result</span>
+                  <span style={{ fontFamily: 'monospace', color: pa18PlayData.cheat.failed ? '#22c55e' : '#f87171' }}>
+                    {pa18PlayData.cheat.failed ? `m_${1-b} = ??  (DLP protects sk_${1-b})` : `Found sk = ${pa18PlayData.cheat.found_sk} → m = ${pa18PlayData.cheat.found_msg}`}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Correctness + Privacy tests ── */}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            id="pa18-correctness-btn"
+            disabled={pa18CtlLoading.correctness}
+            onClick={async () => {
+              setPa18CtlLoading(p => ({ ...p, correctness: true }));
+              try { setPa18CorrectnessData(await api.pa18Correctness()); } catch (_) {}
+              setPa18CtlLoading(p => ({ ...p, correctness: false }));
+            }}
+            style={{
+              flex: 1, padding: '9px', borderRadius: '8px', fontWeight: 700, fontSize: '12px',
+              cursor: pa18CtlLoading.correctness ? 'not-allowed' : 'pointer',
+              background: pa18CorrectnessData ? 'rgba(34,197,94,0.12)' : 'rgba(99,102,241,0.12)',
+              border: `1px solid ${pa18CorrectnessData ? '#22c55e' : 'rgba(99,102,241,0.4)'}`,
+              color: pa18CorrectnessData ? '#86efac' : '#a5b4fc',
+            }}
+          >
+            {pa18CtlLoading.correctness ? '⏳ Running…' : '🧪 100-Trial Correctness'}
+          </button>
+          <button
+            id="pa18-privacy-btn"
+            disabled={pa18CtlLoading.privacy}
+            onClick={async () => {
+              setPa18CtlLoading(p => ({ ...p, privacy: true }));
+              try { setPa18PrivacyData(await api.pa18Privacy()); } catch (_) {}
+              setPa18CtlLoading(p => ({ ...p, privacy: false }));
+            }}
+            style={{
+              flex: 1, padding: '9px', borderRadius: '8px', fontWeight: 700, fontSize: '12px',
+              cursor: pa18CtlLoading.privacy ? 'not-allowed' : 'pointer',
+              background: pa18PrivacyData ? 'rgba(245,158,11,0.12)' : 'rgba(99,102,241,0.12)',
+              border: `1px solid ${pa18PrivacyData ? '#f59e0b' : 'rgba(99,102,241,0.4)'}`,
+              color: pa18PrivacyData ? '#fbbf24' : '#a5b4fc',
+            }}
+          >
+            {pa18CtlLoading.privacy ? '⏳ Running…' : '🔍 Privacy Analysis'}
+          </button>
+        </div>
+
+        {/* Correctness result */}
+        {pa18CorrectnessData && (
+          <div style={{
+            background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)',
+            borderRadius: '10px', padding: '14px',
+          }}>
+            <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '8px', fontSize: '13px' }}>
+              🧪 Correctness: {pa18CorrectnessData.correct}/{pa18CorrectnessData.trials} trials passed
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ flex: 1, height: 8, background: 'rgba(0,0,0,0.3)', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', borderRadius: 4, transition: 'width 0.5s ease',
+                  width: `${(pa18CorrectnessData.correct / pa18CorrectnessData.trials) * 100}%`,
+                  background: pa18CorrectnessData.all_correct ? 'linear-gradient(90deg, #22c55e, #16a34a)' : 'linear-gradient(90deg, #f59e0b, #ef4444)',
+                }} />
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#22c55e', minWidth: 40 }}>
+                {(pa18CorrectnessData.rate * 100).toFixed(0)}%
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '8px' }}>
+              {pa18CorrectnessData.all_correct ? '✓ All 100 trials: receiver always recovers m_b correctly.' : '⚠ Some failures — check group parameters.'}
+            </div>
+          </div>
+        )}
+
+        {/* Privacy result */}
+        {pa18PrivacyData && (
+          <div style={{
+            background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)',
+            borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px',
+          }}>
+            <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '13px' }}>🔍 Privacy Analysis</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              {/* Receiver privacy */}
+              <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#fbbf24', marginBottom: '6px' }}>Receiver Privacy</div>
+                <div style={{ fontSize: '11px', color: 'var(--text2)', lineHeight: 1.6 }}>
+                  Sender guessed b correctly <strong>{pa18PrivacyData.receiver.sender_correct_guesses}</strong>/{pa18PrivacyData.receiver.trials} times<br />
+                  Advantage: <strong style={{ color: pa18PrivacyData.receiver.private ? '#22c55e' : '#ef4444' }}>
+                    {(pa18PrivacyData.receiver.sender_advantage * 100).toFixed(1)}%
+                  </strong><br />
+                  <span style={{ color: pa18PrivacyData.receiver.private ? '#22c55e' : '#ef4444' }}>
+                    {pa18PrivacyData.receiver.private ? '✓ Private (≈ random guess)' : '✗ Not private!'}
+                  </span>
+                </div>
+              </div>
+              {/* Sender privacy */}
+              <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px' }}>
+                <div style={{ fontSize: '11px', fontWeight: 700, color: '#fbbf24', marginBottom: '6px' }}>Sender Privacy</div>
+                <div style={{ fontSize: '11px', color: 'var(--text2)', lineHeight: 1.6 }}>
+                  Brute-forced {pa18PrivacyData.sender.brute_force_searched.toLocaleString()} keys<br />
+                  Found m_{`{1-b}`}: <strong style={{ color: pa18PrivacyData.sender.private ? '#22c55e' : '#ef4444' }}>
+                    {pa18PrivacyData.sender.brute_force_m1 == null ? 'No' : `Yes (${pa18PrivacyData.sender.brute_force_m1})`}
+                  </strong><br />
+                  <span style={{ color: pa18PrivacyData.sender.private ? '#22c55e' : '#ef4444' }}>
+                    {pa18PrivacyData.sender.private ? '✓ DLP protects sk_{1-b}' : '✗ Key found (tiny params)'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const isPA1 = pa.pa === 1;
   const isPA2 = pa.pa === 2;
   const isPA8 = pa.pa === 8;
@@ -1789,7 +2163,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPA1 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && (
+            {!isPA1 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA18 && (
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
@@ -1797,9 +2171,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPA1 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPA1 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA18 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : (result && renderResult(result))}
+            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : isPA18 ? renderPA18Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>
