@@ -66,6 +66,68 @@ def miller_rabin(n: int, k: int = 40) -> bool:
     return True
 
 
+def miller_rabin_with_trace(n: int, k: int = 40) -> dict:
+    """
+    Miller-Rabin primality test with a detailed trace for visualization.
+    """
+    if n < 2:
+        return {"n": n, "is_prime": False, "reason": "n < 2", "rounds": []}
+    if n == 2 or n == 3:
+        return {"n": n, "is_prime": True, "reason": "n is 2 or 3", "rounds": []}
+    if n % 2 == 0:
+        return {"n": n, "is_prime": False, "reason": "n is even", "rounds": []}
+
+    s, d = 0, n - 1
+    while d % 2 == 0:
+        s += 1
+        d //= 2
+
+    rounds_trace = []
+    is_prime_result = True
+    
+    for i in range(k):
+        a = random_int(2, n - 2)
+        x = mod_exp(a, d, n)
+        
+        round_data = {
+            "round": i + 1,
+            "witness": a,
+            "initial_x": x,
+            "intermediate_steps": [],
+            "verdict": "potential prime (x=1 or x=n-1)"
+        }
+
+        if x == 1 or x == n - 1:
+            rounds_trace.append(round_data)
+            continue
+
+        composite = True
+        for r in range(s - 1):
+            x = mod_exp(x, 2, n)
+            round_data["intermediate_steps"].append(x)
+            if x == n - 1:
+                composite = False
+                round_data["verdict"] = f"potential prime (found n-1 at step {r+1})"
+                break
+
+        if composite:
+            round_data["verdict"] = "DEFINITELY COMPOSITE"
+            rounds_trace.append(round_data)
+            is_prime_result = False
+            break
+            
+        rounds_trace.append(round_data)
+
+    return {
+        "n": n,
+        "is_prime": is_prime_result,
+        "s": s,
+        "d": d,
+        "rounds": rounds_trace,
+        "time_ms": 0 # to be filled by caller
+    }
+
+
 def is_prime(n: int, k: int = 40) -> bool:
     """
     Check if n is (probably) prime. Convenience wrapper around miller_rabin.
@@ -100,26 +162,17 @@ def fermat_test(n: int, k: int = 20) -> bool:
 # Prime Generation
 # ---------------------------------------------------------------------------
 
-def gen_prime(bits: int, k: int = 40) -> int:
+def gen_prime(bits: int, k: int = 40) -> tuple:
     """
-    Generate a random probable prime of the specified bit length.
-
-    Args:
-        bits: Desired bit length of the prime.
-        k: Number of Miller-Rabin rounds.
-
-    Returns:
-        A probable prime integer of the given bit length.
+    Generate a random probable prime and return (prime, attempts).
     """
+    attempts = 0
     while True:
-        # Generate random odd number with the correct bit length
+        attempts += 1
         candidate = random_bits(bits)
-        candidate |= 1  # Make sure it's odd
-
+        candidate |= 1
         if miller_rabin(candidate, k):
-            # Sanity check with extra rounds
-            if miller_rabin(candidate, min(k, 20)):
-                return candidate
+            return candidate, attempts
 
 
 def gen_safe_prime(bits: int, k: int = 40) -> tuple:
@@ -135,7 +188,7 @@ def gen_safe_prime(bits: int, k: int = 40) -> tuple:
     """
     while True:
         # Generate candidate q
-        q = gen_prime(bits - 1, k)
+        q, _ = gen_prime(bits - 1, k)
         p = 2 * q + 1
         if miller_rabin(p, k):
             return p, q
@@ -170,18 +223,37 @@ def carmichael_demo():
 
     results = {
         'n': n,
+        'is_prime': False,
         'factorization': '3 × 11 × 17',
-        'fermat_results': [],
-        'miller_rabin_results': [],
+        'fermat_samples': [],
+        'miller_rabin_witness': None
     }
 
-    # Run Fermat test 10 times
-    for _ in range(10):
-        results['fermat_results'].append(fermat_test(n, k=20))
+    # Samples for Fermat test
+    for _ in range(5):
+        a = random_int(2, n - 2)
+        res = mod_exp(a, n - 1, n)
+        results['fermat_samples'].append({"a": a, "result": res})
 
-    # Run Miller-Rabin test 10 times
-    for _ in range(10):
-        results['miller_rabin_results'].append(miller_rabin(n, k=5))
+    # Find a Miller-Rabin witness that catches it
+    s, d = 0, n - 1
+    while d % 2 == 0:
+        s += 1
+        d //= 2
+    
+    for _ in range(100):
+        a = random_int(2, n - 2)
+        x = mod_exp(a, d, n)
+        if x != 1 and x != n - 1:
+            # Found a witness! Show the squaring steps
+            steps = []
+            curr = x
+            for _ in range(s - 1):
+                next_x = mod_exp(curr, 2, n)
+                steps.append(next_x)
+                curr = next_x
+            results['miller_rabin_witness'] = {"a": a, "initial_x": x, "steps": steps}
+            break
 
     return results
 
@@ -198,8 +270,9 @@ def benchmark_prime_generation(bit_sizes=None):
     for bits in bit_sizes:
         candidates_tested = 0
         start = time.time()
-        trials = 5
-
+        # Scale trials down for larger primes to keep it responsive
+        trials = 5 if bits < 512 else (2 if bits < 1024 else 1)
+        
         for _ in range(trials):
             count = 0
             while True:
@@ -240,6 +313,25 @@ if __name__ == '__main__':
     print("\n--- Prime Generation ---")
     for bits in [64, 128, 256]:
         p = gen_prime(bits)
+        print(f"{bits}-bit prime: {p}")
+
+    # 3. Safe prime
+    print("\n--- Safe Prime Generation ---")
+    p, q = gen_safe_prime(64)
+    print(f"Safe prime p = {p}")
+    print(f"Sophie Germain prime q = {q}")
+    print(f"p = 2q + 1? {p == 2 * q + 1}")
+    g = find_generator(p, q)
+    print(f"Generator g = {g}")
+    print(f"g^q mod p = {mod_exp(g, q, p)} (should be 1)")
+
+    # 4. Benchmark
+    print("\n--- Benchmark ---")
+    results = benchmark_prime_generation([64, 128, 256])
+    for bits, r in results.items():
+        print(f"{bits}-bit: avg {r['avg_candidates']:.1f} candidates, "
+              f"{r['avg_time_sec']:.4f}s, "
+              f"theoretical ~{r['theoretical_candidates']:.0f}")
         print(f"{bits}-bit prime: {p}")
 
     # 3. Safe prime

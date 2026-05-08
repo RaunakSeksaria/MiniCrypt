@@ -313,10 +313,8 @@ def run_demo(req: DemoRequest):
             if task == "inversion":
                 # Only run expensive brute-force demo when requested
                 response["inversion"] = demonstrate_prg_inversion_v2(prg)
-            
             return response
         elif req.pa == 2:
-            from crypto.pa02_prf_ggm import GGM_PRF
             from crypto.utils import to_hex, bytes_to_bits
             key_hex = req.params.get("key", "2b7e151628aed2a6abf7158809cf4f3c")
             query_hex = req.params.get("query", "00000000000000000000000000000001")
@@ -369,13 +367,15 @@ def run_demo(req: DemoRequest):
             }
         elif req.pa == 3:
             from crypto.pa03_cpa_enc import CPAEncryption, ind_cpa_game
+            from crypto.pa02_prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
-            enc = CPAEncryption(); k = random_bytes(16)
+            prf_mode = 'ggm' if req.foundation == 'DLP' else 'aes'
+            enc = CPAEncryption(prf=PRF(mode=prf_mode)); k = random_bytes(16)
             msg = req.params.get("message","Hello CPA!").encode()
             r, ct = enc.encrypt(k, msg)
             pt = enc.decrypt(k, r, ct)
             game = ind_cpa_game(enc, 50)
-            return {"plaintext":msg.decode(),"nonce":to_hex(r),"ciphertext":to_hex(ct),"decrypted":pt.decode(),"match":pt==msg,"game":game}
+            return {"plaintext":msg.decode(),"nonce":to_hex(r),"ciphertext":to_hex(ct),"decrypted":pt.decode(),"match":pt==msg,"game":game,"prf_mode":prf_mode}
         elif req.pa == 4:
             from crypto.pa04_modes import encrypt, decrypt
             from crypto.utils import random_bytes, to_hex
@@ -389,28 +389,41 @@ def run_demo(req: DemoRequest):
             return results
         elif req.pa == 5:
             from crypto.pa05_mac import MAC, euf_cma_game
+            from crypto.pa02_prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
-            mac = MAC(mode='cbc'); k = random_bytes(16)
+            prf_mode = 'ggm' if req.foundation == 'DLP' else 'aes'
+            mac = MAC(mode='cbc', prf=PRF(mode=prf_mode)); k = random_bytes(16)
             msg = b"Authenticate me!"
             tag = mac.Mac(k, msg)
             game = euf_cma_game(mac, 30, 10)
-            return {"message":msg.decode(),"tag":to_hex(tag),"verify":mac.Vrfy(k,msg,tag),"game":game}
+            return {"message":msg.decode(),"tag":to_hex(tag),"verify":mac.Vrfy(k,msg,tag),"game":game,"prf_mode":prf_mode}
         elif req.pa == 6:
             from crypto.pa06_cca_enc import CCAEncryption, malleability_attack_demo
+            from crypto.pa02_prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
-            cca = CCAEncryption(); ke=random_bytes(16); km=random_bytes(16)
+            prf_mode = 'ggm' if req.foundation == 'DLP' else 'aes'
+            cca = CCAEncryption(prf=PRF(mode=prf_mode)); ke=random_bytes(16); km=random_bytes(16)
             msg = b"CCA-secure message!"
             r,ct,tag = cca.encrypt(ke,km,msg)
             pt = cca.decrypt(ke,km,r,ct,tag)
             attack = malleability_attack_demo()
-            return {"plaintext":msg.decode(),"decrypted":pt.decode(),"match":pt==msg,"tamper_rejected":cca.decrypt(ke,km,r,bytes([ct[0]^1])+ct[1:],tag) is None,"attack":{"cpa_malleable":attack['cpa_only']['malleable'],"cca_rejected":attack['cca_secure']['rejected']}}
+            return {"plaintext":msg.decode(),"decrypted":pt.decode(),"match":pt==msg,"tamper_rejected":cca.decrypt(ke,km,r,bytes([ct[0]^1])+ct[1:],tag) is None,"attack":{"cpa_malleable":attack['cpa_only']['malleable'],"cca_rejected":attack['cca_secure']['rejected']},"prf_mode":prf_mode}
         elif req.pa == 7:
             from crypto.pa07_merkle_damgard import create_toy_hash
-            from crypto.utils import to_hex
-            toy = create_toy_hash()
-            msg = req.params.get("message","Hello Hash!").encode()
-            trace = toy.hash_with_trace(msg)
-            return trace
+            msg_str = req.params.get('message', 'Hello Hash!')
+            is_hex = req.params.get('is_hex', False)
+            output_size = int(req.params.get('output_size', 4))
+            
+            try:
+                if is_hex:
+                    msg = bytes.fromhex(msg_str.replace(' ', ''))
+                else:
+                    msg = msg_str.encode()
+            except:
+                msg = b"Invalid Input"
+                
+            toy = create_toy_hash(digest_size=output_size)
+            return toy.hash_with_trace(msg)
         elif req.pa == 8:
             from crypto.pa08_dlp_crhf import DLP_CRHF
             from crypto.utils import to_hex
@@ -458,11 +471,33 @@ def run_demo(req: DemoRequest):
             d2 = pkcs15_decrypt(kp.d, kp.n, c2)
             return {"textbook":{"m":m,"c":str(c),"d":d,"match":d==m},"pkcs":{"message":msg.decode(),"decrypted":d2.decode(),"match":d2==msg},"n":str(kp.n),"e":kp.e,"bits":kp.bits}
         elif req.pa == 13:
-            from crypto.pa13_miller_rabin import is_prime, gen_prime
-            n = int(req.params.get("n", 1009))
-            p = gen_prime(64)
-            tests = {str(n): is_prime(n) for n in [2,3,17,561,1009,65537,n]}
-            return {"input_test":f"{n} is prime? {is_prime(n)}","generated_prime":str(p),"bits":p.bit_length(),"tests":tests}
+            from crypto.pa13_miller_rabin import is_prime, gen_prime, miller_rabin_with_trace, carmichael_demo, benchmark_prime_generation
+            task = req.params.get("task", "test")
+            rounds = int(req.params.get("rounds", 10))
+            
+            if task == "test":
+                n = int(req.params.get("n", 1009))
+                start = time.time()
+                trace = miller_rabin_with_trace(n, k=rounds)
+                trace["time_ms"] = (time.time() - start) * 1000
+                return trace
+            elif task == "generate":
+                bits = int(req.params.get("bits", 64))
+                p, attempts = gen_prime(bits, k=rounds)
+                trace = miller_rabin_with_trace(p, k=rounds)
+                return {"prime": str(p), "bits": p.bit_length(), "attempts": attempts, "rounds": trace["rounds"]}
+            elif task == "carmichael":
+                return carmichael_demo()
+            elif task == "benchmark":
+                return benchmark_prime_generation([64, 128, 256, 512, 1024, 2048])
+            elif task == "examples":
+                # Known 512-bit prime (Mersenne prime M521 snippet or a standard one)
+                p512 = (2**521) - 1 # M521 is prime
+                # Known composite that looks tricky
+                comp = 561
+                return {"p512": str(p512), "composite": "12345678901234567891"}
+            else:
+                return {"error": "Unknown task"}
         elif req.pa == 14:
             from crypto.pa14_crt import crt, hastad_attack_demo
             res_str = req.params.get("residues", "2,3,2")

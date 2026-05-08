@@ -19,13 +19,16 @@ const PA_DEFINITIONS = {
   4: { params: [{ name: 'message', label: 'Plaintext Message', default: 'Modes of Operation test!' }] },
   5: { params: [{ name: 'message', label: 'Message to Authenticate', default: 'Authenticate me!' }] },
   6: { params: [{ name: 'message', label: 'Plaintext Message', default: 'CCA-secure message!' }] },
-  7: { params: [{ name: 'message', label: 'Message to Hash', default: 'Hello Hash!' }] },
+  7: { params: [
+    { name: 'message', label: 'Message to Hash', default: 'Hello Hash!' },
+    { name: 'output_size', label: 'Output Digest Size (bytes)', type: 'range', min: 1, max: 16, default: 4 }
+  ] },
   8: { params: [] },  // PA8 has its own input inside renderPA8Special
   9: { params: [] },  // PA9 has its own input inside renderPA9Special
   10: { params: [] }, // PA10 has its own special renderer
   11: { params: [] },
   12: { params: [{ name: 'message_int', label: 'Textbook RSA Message (Int)', default: '42' }, { name: 'message_pkcs', label: 'PKCS#1 Message (Text)', default: 'RSA!' }] },
-  13: { params: [{ name: 'n', label: 'Number to Test Primality', default: '1009' }] },
+  13: { params: [{ name: 'n', label: 'Number to Test Primality', default: '' }] },
   14: { params: [{ name: 'residues', label: 'Residues (comma separated)', default: '2,3,2' }, { name: 'moduli', label: 'Moduli (comma separated)', default: '3,5,7' }] },
   15: { params: [{ name: 'message', label: 'Message to Sign', default: 'Sign this!' }] },
   16: { params: [{ name: 'message_int', label: 'ElGamal Message (Int)', default: '42' }] },
@@ -75,6 +78,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
   // PA#11 state
   const [pa11Data,        setPa11Data]        = useState(null);   // exchange result
+
+  // PA#2 state
+  const [pa2Tab, setPa2Tab] = useState('forward');
   const [pa11MitmData,    setPa11MitmData]    = useState(null);   // MITM result
   const [pa11CdhData,     setPa11CdhData]     = useState(null);   // CDH result
   const [pa11AliceExp,    setPa11AliceExp]    = useState('');     // custom 'a'
@@ -96,8 +102,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa18CtlLoading,      setPa18CtlLoading]      = useState({});  // {correctness, privacy}
 
   const def = PA_DEFINITIONS[pa.pa] || { params: [] };
-  const isPA11 = pa.pa === 11;
-  const isPA18 = pa.pa === 18;
+
 
   // Stop polling helper — defined before useEffect so cleanup can reference it
   const stopHunt = useCallback(() => {
@@ -149,6 +154,17 @@ const PADemoModal = ({ pa, onClose, api }) => {
     if (pa.pa !== 8) return;
     setParams(p => ({ ...p, message: PA8_DEFAULT_MSG }));
     api.pa8Hash(PA8_DEFAULT_MSG).then(data => setPa8Hash(data)).catch(() => {});
+  }, [pa]);
+
+  useEffect(() => {
+    if (pa.pa === 1 || pa.pa === 2 || pa.pa === 7) {
+      const initialParams = {};
+      (PA_DEFINITIONS[pa.pa]?.params || []).forEach(p => {
+        initialParams[p.name] = p.default;
+      });
+      setParams(p => ({ ...p, ...initialParams }));
+      runDemo(initialParams);
+    }
   }, [pa]);
 
   const runDemo = async (currentParams = params, task = null) => {
@@ -364,6 +380,280 @@ const PADemoModal = ({ pa, onClose, api }) => {
               )}
             </div>
           )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderPA7Special = () => {
+    if (isLoading && (!result || !result.steps)) {
+      return <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner"></div><p style={{ marginTop: '12px', color: 'var(--text3)' }}>Building MD-Chain...</p></div>;
+    }
+    if (!result || !result.steps) return null;
+
+    return (
+      <div className="pa7-special animate-fade-in">
+        <div style={{ marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text3)' }}>
+              INTERACTIVE MESSAGE INPUT (Avalanche Effect)
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text3)' }}>Output:</span>
+                <input 
+                  type="range" min="1" max="16" step="1"
+                  value={params.output_size || 4}
+                  style={{ width: '80px', height: '4px' }}
+                  onChange={(e) => {
+                    const next = { ...params, output_size: parseInt(e.target.value) };
+                    setParams(next);
+                    runDemo(next);
+                  }}
+                />
+                <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 700, minWidth: '45px' }}>{params.output_size || 4} bytes</span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  className={`btn btn-sm ${!params.is_hex ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '10px', padding: '4px 8px' }}
+                  onClick={() => {
+                    if (!params.is_hex) return; // Already text
+                    let currentHex = (params.message || '48656c6c6f204861736821').replace(/[^0-9a-fA-F]/g, '');
+                    let textStr = '';
+                    try {
+                      for (let i = 0; i < currentHex.length; i += 2) {
+                        textStr += String.fromCharCode(parseInt(currentHex.substr(i, 2), 16));
+                      }
+                    } catch (e) { textStr = 'Invalid Hex'; }
+                    const next = { ...params, is_hex: false, message: textStr };
+                    setParams(next);
+                    runDemo(next);
+                  }}
+                >
+                  Text
+                </button>
+                <button 
+                  className={`btn btn-sm ${params.is_hex ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ fontSize: '10px', padding: '4px 8px' }}
+                  onClick={() => {
+                    if (params.is_hex) return; // Already hex
+                    let currentText = params.message || 'Hello Hash!';
+                    let hexStr = '';
+                    for (let i = 0; i < currentText.length; i++) {
+                      hexStr += currentText.charCodeAt(i).toString(16).padStart(2, '0');
+                    }
+                    const next = { ...params, is_hex: true, message: hexStr };
+                    setParams(next);
+                    runDemo(next);
+                  }}
+                >
+                  Hex
+                </button>
+              </div>
+            </div>
+          </div>
+          <textarea
+            className="input-field"
+            style={{ 
+              width: '100%', 
+              height: '80px', 
+              fontFamily: 'monospace', 
+              fontSize: '14px', 
+              resize: 'none',
+              padding: '12px',
+              borderRadius: '8px',
+              background: 'var(--bg2)',
+              color: 'var(--text1)',
+              border: '1px solid var(--border)'
+            }}
+            value={params.message ?? (params.is_hex ? '48656c6c6f204861736821' : 'Hello Hash!')}
+            onChange={(e) => {
+              const next = { ...params, message: e.target.value };
+              setParams(next);
+              runDemo(next);
+            }}
+            placeholder={params.is_hex ? "Enter hex (e.g. 48656c6c6f...)" : "Type your message here..."}
+          />
+          <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '6px', fontStyle: 'italic' }}>
+            💡 Tip: You can also edit the hex directly inside the "Message Data" blocks below!
+          </div>
+        </div>
+
+        <div className="md-chain-container" style={{ 
+          display: 'flex', 
+          overflowX: 'auto', 
+          padding: '20px 0', 
+          gap: '40px',
+          scrollBehavior: 'smooth'
+        }}>
+          {/* Initial IV */}
+          <div className="chain-step iv-step" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '100px' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '8px' }}>IV (z₀)</div>
+            <div style={{ 
+              padding: '10px', 
+              background: 'var(--bg2)', 
+              border: '2px solid var(--border)', 
+              borderRadius: '8px',
+              fontFamily: 'monospace',
+              fontSize: '12px'
+            }}>
+              {result.steps[0]?.cv_in || '00000000'}
+            </div>
+            <div style={{ height: '40px', width: '2px', background: 'var(--accent)', marginTop: '8px' }}></div>
+          </div>
+
+          {result.steps.map((step, idx) => (
+            <div key={idx} className="chain-step animate-slide-in" style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: 'center', 
+              minWidth: '200px', 
+              position: 'relative',
+              animationDelay: `${idx * 0.1}s`
+            }}>
+              {/* Chaining Arrow */}
+              <div style={{ 
+                position: 'absolute', 
+                left: '-35px', 
+                top: '115px', 
+                fontSize: '24px', 
+                color: 'var(--accent)',
+                animation: 'bounceRight 2s infinite'
+              }}>
+                ➜
+              </div>
+              
+              <div style={{ 
+                fontSize: '11px', 
+                color: step.label.includes('Data') ? 'var(--accent3)' : 'var(--accent)', 
+                marginBottom: '10px',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                {step.label}
+              </div>
+
+              <div style={{ 
+                width: '100%',
+                padding: '16px', 
+                background: step.label.includes('Padding') || step.label.includes('Length') ? 'rgba(var(--accent-rgb), 0.08)' : 'rgba(var(--accent3-rgb), 0.08)', 
+                border: `2px solid ${step.label.includes('Padding') || step.label.includes('Length') ? 'var(--accent)' : 'var(--accent3)'}`, 
+                borderRadius: '12px',
+                textAlign: 'center',
+                boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                position: 'relative',
+                cursor: step.label.includes('Data') ? 'text' : 'default',
+                transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => step.label.includes('Data') && (e.currentTarget.style.transform = 'scale(1.02)')}
+              onMouseLeave={(e) => step.label.includes('Data') && (e.currentTarget.style.transform = 'scale(1.0)')}
+              >
+                <div style={{ fontSize: '9px', opacity: 0.7, marginBottom: '6px', textTransform: 'uppercase' }}>Block M{idx + 1}</div>
+                <code 
+                  contentEditable={step.label.includes('Data')}
+                  suppressContentEditableWarning
+                  onBlur={(e) => {
+                    if (!step.label.includes('Data')) return;
+                    const newBlockHex = e.target.innerText.replace(/[^0-9a-fA-F]/g, '').padEnd(16, '0').substring(0, 16);
+                    
+                    // Reconstruct full message hex from steps
+                    const allDataBlocks = result.steps
+                      .filter(s => s.label.includes('Data'))
+                      .map((s, i) => i === idx ? newBlockHex : s.block);
+                    
+                    const fullHex = allDataBlocks.join('');
+                    const next = { ...params, message: fullHex, is_hex: true };
+                    setParams(next);
+                    runDemo(next);
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && e.preventDefault() || e.key === 'Enter' && e.target.blur()}
+                  style={{ 
+                    fontSize: '13px', 
+                    wordBreak: 'break-all', 
+                    color: 'var(--text1)', 
+                    outline: 'none',
+                    padding: '2px 4px',
+                    borderRadius: '4px',
+                    background: step.label.includes('Data') ? 'rgba(0,0,0,0.2)' : 'transparent'
+                  }}>
+                  {step.block}
+                </code>
+              </div>
+
+              {/* Compression Function Circle */}
+              <div style={{ 
+                width: '40px', 
+                height: '40px', 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, var(--accent) 0%, var(--accent3) 100%)', 
+                color: 'white',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '16px 0',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                boxShadow: '0 0 15px rgba(var(--accent-rgb), 0.5)',
+                zIndex: 2
+              }}>
+                f
+              </div>
+
+              <div style={{ 
+                padding: '12px 16px', 
+                background: 'rgba(0,0,0,0.4)', 
+                border: '1px solid var(--accent)', 
+                borderRadius: '10px',
+                fontFamily: 'monospace',
+                fontSize: '13px',
+                color: 'var(--accent)',
+                fontWeight: 700,
+                boxShadow: 'inset 0 0 10px rgba(var(--accent-rgb), 0.2)'
+              }}>
+                {step.cv_out}
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '6px', fontWeight: 600 }}>CV z{idx + 1} (Hex)</div>
+            </div>
+          ))}
+          
+          <div className="chain-step final-step" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '150px', marginLeft: '20px' }}>
+            <div style={{ position: 'absolute', left: '-35px', top: '115px', fontSize: '24px', color: 'var(--accent2)' }}>➜</div>
+            <div style={{ fontSize: '11px', color: 'var(--accent2)', marginBottom: '10px', fontWeight: 800, letterSpacing: '0.1em' }}>OUTPUT</div>
+            <div style={{ 
+              padding: '16px 24px', 
+              background: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)', 
+              color: 'white',
+              borderRadius: '12px',
+              fontFamily: 'monospace',
+              fontSize: '16px',
+              fontWeight: 800,
+              boxShadow: '0 0 30px rgba(236, 72, 153, 0.4)',
+              border: '2px solid rgba(255,255,255,0.2)',
+              animation: 'pulse 2s infinite'
+            }}>
+              {result.digest}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ 
+          marginTop: '24px', 
+          padding: '16px', 
+          background: 'rgba(var(--accent-rgb), 0.1)', 
+          borderRadius: '12px',
+          border: '1px solid var(--border)',
+          fontSize: '13px',
+          lineHeight: '1.6'
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: '8px', color: 'var(--accent)' }}>Merkle-Damgård Construction:</div>
+          This visualizer shows how arbitrary length messages are hashed.
+          <ul style={{ paddingLeft: '20px', margin: '8px 0' }}>
+            <li><strong>Padding:</strong> <code>0x80</code> followed by zeros.</li>
+            <li><strong>Strengthening:</strong> The last block contains the 64-bit message length.</li>
+            <li><strong>Chain:</strong> Each block <code>Mᵢ</code> is XORed with the previous <code>zᵢ₋₁</code> (Toy compression).</li>
+          </ul>
         </div>
       </div>
     );
@@ -884,64 +1174,129 @@ const PADemoModal = ({ pa, onClose, api }) => {
   };
 
   const renderPA2Special = () => {
-    if (!result) return null;
     return (
-      <div className="pa2-special">
-        {result.tree && (
-          <GGMVisualizer 
-            tree={result.tree} 
-            queryBits={result.query_bits} 
-            output={result.output} 
-          />
-        )}
-
-        <div style={{ marginTop: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-          <button
-            className="btn btn-secondary"
-            style={{ background: showStats ? 'var(--accent3)' : 'rgba(var(--accent-rgb), 0.1)', border: '1px solid var(--accent3)', color: showStats ? 'white' : 'var(--accent3)' }}
-            onClick={() => {
-              if (!showStats) {
-                runDemo(params, 'randomness');
-                setShowStats(true);
-                setShowInversion(false);
-              } else {
-                setShowStats(false);
-              }
+      <div className="pa2-special animate-fade-in" style={{ marginTop: '-10px' }}>
+        {/* Tab Navigation */}
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+          <button 
+            className="btn"
+            style={{ 
+              background: pa2Tab === 'forward' ? 'linear-gradient(135deg, var(--accent), var(--accent2))' : 'transparent',
+              color: pa2Tab === 'forward' ? 'white' : 'var(--text2)',
+              border: pa2Tab === 'forward' ? 'none' : '1px solid var(--border)',
+              padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
             }}
+            onClick={() => setPa2Tab('forward')}
           >
-            🧪 Randomness Tests
+            🌲 Tab 1: Forward (GGM Tree)
           </button>
-          <button
-            className="btn btn-secondary"
-            style={{ background: showInversion ? 'var(--accent)' : 'rgba(var(--accent-rgb), 0.1)', border: '1px solid var(--accent)', color: showInversion ? 'white' : 'var(--accent)' }}
-            onClick={() => {
-              if (!showInversion) {
-                runDemo(params, 'game');
-                setShowInversion(true);
-                setShowStats(false);
-              } else {
-                setShowInversion(false);
-              }
+          <button 
+            className="btn"
+            style={{ 
+              background: pa2Tab === 'backward' ? 'linear-gradient(135deg, var(--accent), var(--accent2))' : 'transparent',
+              color: pa2Tab === 'backward' ? 'white' : 'var(--text2)',
+              border: pa2Tab === 'backward' ? 'none' : '1px solid var(--border)',
+              padding: '8px 16px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
             }}
+            onClick={() => setPa2Tab('backward')}
           >
-            🎮 Security Game
+            ⏪ Tab 2: Backward (PRG from PRF)
           </button>
         </div>
 
-        <div style={{ marginTop: '20px' }}>
-          {showStats && result && result.stats && (
-            <div className="result-section animate-fade-in" style={{ marginBottom: '20px' }}>
-              <h3 style={{ margin: 0, marginBottom: '12px' }}>PRF as PRG Randomness</h3>
-              <div className="stats-container">
-                <div className="ratio-bar-container" style={{ marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                    <span>Bit Ratio (Ones/Total)</span>
-                    <span style={{ fontWeight: 600 }}>{result.ratio ? (result.ratio * 100).toFixed(1) : '...'}%</span>
-                  </div>
-                  <div style={{ height: '8px', background: 'var(--bg2)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
-                    <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '2px', background: 'var(--accent)', zIndex: 1, opacity: 0.5 }}></div>
-                    <div style={{ height: '100%', width: `${(result.ratio || 0.5) * 100}%`, background: 'var(--accent3)', transition: 'width 0.3s ease' }}></div>
-                  </div>
+        {/* Tab 1 Content */}
+        {pa2Tab === 'forward' && (
+          <div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Hex Key (k)</label>
+                <input type="text" value={params.key || ''} onChange={(e) => { 
+                  const next = {...params, key: e.target.value}; setParams(next); runDemo(next); 
+                }} />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>Query (x) - Binary</label>
+                <input type="text" value={params.query || ''} onChange={(e) => { 
+                  const next = {...params, query: e.target.value}; setParams(next); runDemo(next); 
+                }} />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between' }}>Tree Depth (n) <span>{params.depth || 4} bits</span></label>
+                <input type="range" min="2" max="8" value={params.depth || 4} onChange={(e) => { 
+                  const next = {...params, depth: parseInt(e.target.value)}; setParams(next); runDemo(next); 
+                }} />
+              </div>
+            </div>
+
+            {result && result.tree && (
+              <GGMVisualizer 
+                tree={result.tree} 
+                queryBits={result.query_bits} 
+                output={result.output} 
+              />
+            )}
+
+            <div style={{ marginTop: '20px' }}>
+              <button
+                className="btn btn-secondary"
+                style={{ width: '100%', background: showInversion ? 'var(--accent)' : 'rgba(var(--accent-rgb), 0.1)', border: '1px solid var(--accent)', color: showInversion ? 'white' : 'var(--accent)' }}
+                onClick={() => {
+                  if (!showInversion) {
+                    runDemo(params, 'game');
+                    setShowInversion(true);
+                  } else {
+                    setShowInversion(false);
+                  }
+                }}
+              >
+                🎮 PRF Distinguishing Game Demo
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2 Content */}
+        {pa2Tab === 'backward' && (
+          <div className="result-section animate-fade-in">
+            <h3 style={{ margin: 0, marginBottom: '12px' }}>Backward PRG Construction G(s) = Fs(0ⁿ) || Fs(1ⁿ)</h3>
+            <div style={{ marginBottom: '16px', fontSize: '11px', color: 'var(--text2)' }}>
+              Uses the seed (s) to generate pseudorandom output via the underlying PRF.
+            </div>
+
+            <div className="field" style={{ marginBottom: '16px' }}>
+              <label>Seed (s) - Hex</label>
+              <input type="text" value={params.key || ''} onChange={(e) => { 
+                setParams({...params, key: e.target.value}); 
+                setResult(prev => prev ? { ...prev, stats: null, ratio: null } : null);
+              }} />
+            </div>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button
+                className="btn btn-primary"
+                onClick={() => runDemo(params, 'randomness')}
+              >
+                🧪 Run NIST Tests
+              </button>
+            </div>
+
+            <div style={{ marginTop: '20px' }}>
+              {(!result?.stats && isLoading) && (
+                <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>
+              )}
+              {result?.stats && (
+                <div className="animate-fade-in">
+                  <div className="stats-container">
+                    <div className="ratio-bar-container" style={{ marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
+                        <span>Bit Ratio (Ones/Total)</span>
+                        <span style={{ fontWeight: 600 }}>{result.ratio ? (result.ratio * 100).toFixed(1) : '...'}%</span>
+                      </div>
+                      <div style={{ height: '8px', background: 'var(--bg2)', borderRadius: '4px', overflow: 'hidden', position: 'relative' }}>
+                        <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: '2px', background: 'var(--accent)', zIndex: 1, opacity: 0.5 }}></div>
+                        <div style={{ height: '100%', width: `${(result.ratio || 0.5) * 100}%`, background: 'var(--accent3)', transition: 'width 0.3s ease' }}></div>
+                      </div>
+                    </div>
                 </div>
 
                 <div className="test-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
@@ -959,49 +1314,50 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+        )}
 
-          {showInversion && result && result.game && (
-            <div className="result-section animate-fade-in">
-              <h3 style={{ margin: 0, marginBottom: '12px' }}>Distinguishing Game (PRF Security)</h3>
-              <div style={{ padding: '12px', background: 'rgba(var(--accent-rgb), 0.05)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>🎯 Goal: Is it PRF or Random?</div>
-                
-                <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
-                  <div style={{ flex: 1, background: 'var(--bg2)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Current Advantage</div>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>{(Math.abs(result.game.advantage) * 100).toFixed(1)}%</div>
-                  </div>
-                </div>
-
-                {result.game.samples && result.game.samples.map((s, idx) => (
-                  <div key={idx} style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px', marginBottom: '8px', fontSize: '10px', border: '1px solid var(--border)' }}>
-                    <div style={{ color: 'var(--text3)', marginBottom: '4px', textTransform: 'uppercase', fontSize: '8px' }}>Query Sample #{idx + 1}</div>
-                    <code style={{ color: 'var(--text2)', display: 'block', marginBottom: '8px', wordBreak: 'break-all' }}>{s.x}</code>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      <div>
-                        <div style={{ color: 'var(--accent3)', fontSize: '8px', textTransform: 'uppercase' }}>PRF(x)</div>
-                        <code style={{ fontSize: '10px', color: 'var(--accent3)', wordBreak: 'break-all' }}>{s.prf}</code>
-                      </div>
-                      <div>
-                        <div style={{ color: 'var(--text3)', fontSize: '8px', textTransform: 'uppercase' }}>Random(x)</div>
-                        <code style={{ fontSize: '10px', color: 'var(--text3)', wordBreak: 'break-all' }}>{s.rand}</code>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <div style={{ fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic', marginTop: '12px' }}>
-                  {result.game.advantage < 0.1 ? 
-                    "✅ Success! The adversary has no significant advantage. The PRF is indistinguishable from random." : 
-                    "⚠️ Noticeable bias detected in this trial."}
+        {pa2Tab === 'forward' && showInversion && result && result.game && (
+          <div className="result-section animate-fade-in" style={{ marginTop: '20px' }}>
+            <h3 style={{ margin: 0, marginBottom: '12px' }}>Distinguishing Game (PRF Security)</h3>
+            <div style={{ padding: '12px', background: 'rgba(var(--accent-rgb), 0.05)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>🎯 Goal: Is it PRF or Random?</div>
+              
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
+                <div style={{ flex: 1, background: 'var(--bg2)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)' }}>Current Advantage</div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--accent)' }}>{(Math.abs(result.game.advantage) * 100).toFixed(1)}%</div>
                 </div>
               </div>
+
+              {result.game.samples && result.game.samples.map((s, idx) => (
+                <div key={idx} style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px', marginBottom: '8px', fontSize: '10px', border: '1px solid var(--border)' }}>
+                  <div style={{ color: 'var(--text3)', marginBottom: '4px', textTransform: 'uppercase', fontSize: '8px' }}>Query Sample #{idx + 1}</div>
+                  <code style={{ color: 'var(--text2)', display: 'block', marginBottom: '8px', wordBreak: 'break-all' }}>{s.x}</code>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div>
+                      <div style={{ color: 'var(--accent3)', fontSize: '8px', textTransform: 'uppercase' }}>PRF(x)</div>
+                      <code style={{ fontSize: '10px', color: 'var(--accent3)', wordBreak: 'break-all' }}>{s.prf}</code>
+                    </div>
+                    <div>
+                      <div style={{ color: 'var(--text3)', fontSize: '8px', textTransform: 'uppercase' }}>Random(x)</div>
+                      <code style={{ fontSize: '10px', color: 'var(--text3)', wordBreak: 'break-all' }}>{s.rand}</code>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic', marginTop: '12px' }}>
+                {result.game.advantage < 0.1 ? 
+                  "✅ Success! The adversary has no significant advantage. The PRF is indistinguishable from random." : 
+                  "⚠️ Noticeable bias detected in this trial."}
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -2102,11 +2458,247 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
-  const isPA1 = pa.pa === 1;
-  const isPA2 = pa.pa === 2;
-  const isPA8 = pa.pa === 8;
-  const isPA9 = pa.pa === 9;
-  const isPA10 = pa.pa === 10;
+  const renderPA13Special = () => {
+    const isPrime = result?.is_prime;
+    const rounds = result?.rounds || [];
+    
+    return (
+      <div className="pa13-special animate-fade-in">
+        {/* Controls */}
+        <div style={{ marginBottom: '20px', background: 'var(--bg2)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="field">
+              <label>Number to Test (n)</label>
+              <input 
+                type="text" 
+                value={params.n || ''} 
+                onChange={(e) => { setParams({ ...params, n: e.target.value }); setResult(null); }}
+                className="input-field"
+                placeholder="Enter a large integer..."
+              />
+            </div>
+            <div className="field">
+              <label style={{ display: 'flex', justifyContent: 'space-between' }}>
+                Rounds (k) <span>{params.rounds || 10}</span>
+              </label>
+              <input 
+                type="range" min="1" max="40" 
+                value={params.rounds || 10}
+                onChange={(e) => { setParams({ ...params, rounds: parseInt(e.target.value) }); setResult(null); }}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button className="btn btn-primary" onClick={() => { setResult(null); runDemo({ ...params, task: params.n === '561' ? 'carmichael' : 'test' }); }}>
+                🧪 Run Miller-Rabin
+              </button>
+              <button className="btn btn-secondary" onClick={() => { setResult(null); runDemo({ ...params, task: 'generate', bits: 64 }); }}>
+                🎲 Gen 64-bit Prime
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button className="btn btn-secondary" style={{ fontSize: '11px' }} onClick={() => { setParams({ ...params, n: '561' }); setResult(null); }}>
+                🛡️ Load 561 (Carmichael)
+              </button>
+              <button className="btn btn-secondary" style={{ fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis' }} onClick={() => { setParams({ ...params, n: '50454031626014583076315936191179085094450305445103984158485369931027336053089', task: 'test' }); setResult(null); }}>
+                🧩 Load Known Composite
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <button className="btn btn-secondary" style={{ fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis' }} onClick={() => { setParams({ ...params, n: '99143722431692432695197203697643226071348800903354283165788708015992029220483', task: 'test' }); setResult(null); }}>
+                💎 Load 256-bit Prime
+              </button>
+              <button className="btn btn-secondary" style={{ fontSize: '11px' }} onClick={() => { setResult(null); runDemo({ ...params, task: 'benchmark' }); }}>
+                📊 Performance Benchmark
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="animate-fade-in" style={{ textAlign: 'center', padding: '30px', background: 'var(--bg2)', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '20px' }}>
+            <div className="spinner" style={{ margin: '0 auto' }}></div>
+            <div style={{ fontSize: '12px', marginTop: '12px', color: 'var(--text2)', fontWeight: 600 }}>Processing Cryptographic Operations...</div>
+          </div>
+        )}
+
+        {/* Results for Generation */}
+        {result && result.prime && (
+          <div className="result-card animate-slide-in" style={{
+            background: 'rgba(34,197,94,0.08)',
+            border: '1px solid #22c55e',
+            borderRadius: '12px', padding: '16px', marginBottom: '20px'
+          }}>
+            <div style={{ fontSize: '10px', color: '#22c55e', fontWeight: 800 }}>GENERATED {result.bits}-BIT PRIME</div>
+            <code style={{ fontSize: '11px', display: 'block', wordBreak: 'break-all', margin: '8px 0', maxHeight: '60px', overflowY: 'auto' }}>
+              {result.prime}
+            </code>
+            <div style={{ fontSize: '12px', opacity: 0.8 }}>
+              Successfully found after <strong>{result.attempts}</strong> random candidates tested!
+            </div>
+          </div>
+        )}
+
+        {/* Results */}
+        {result && result.n && (
+          <div className="result-card animate-slide-in" style={{
+            background: isPrime ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+            border: `1px solid ${isPrime ? '#22c55e' : '#ef4444'}`,
+            borderRadius: '12px', padding: '20px', marginBottom: '20px', textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '11px', color: isPrime ? '#22c55e' : '#ef4444', textTransform: 'uppercase', fontWeight: 800, letterSpacing: '0.1em' }}>
+              Primality Result for n = {result.n}
+            </div>
+            <div style={{ fontSize: '32px', fontWeight: 900, color: isPrime ? '#22c55e' : '#ef4444', margin: '8px 0' }}>
+              {isPrime ? 'PROBABLY PRIME' : 'DEFINITELY COMPOSITE'}
+            </div>
+            <div style={{ fontSize: '12px', opacity: 0.8 }}>
+              {isPrime 
+                ? `Confidence: >${(100 * (1 - Math.pow(4, -(params.rounds || 10)))).toFixed(12)}%` 
+                : 'Reason: Found a witness of compositeness'}
+            </div>
+            <div style={{ fontSize: '11px', marginTop: '8px', opacity: 0.6 }}>Time: {result.time_ms?.toFixed(2)}ms</div>
+          </div>
+        )}
+
+        {/* Witness Trace Table */}
+        {rounds.length > 0 && (
+          <div className="trace-section animate-fade-in">
+            <h3 style={{ fontSize: '14px', marginBottom: '12px' }}>Witness Trace (aᵈ mod n)</h3>
+            <div style={{ overflowX: 'auto', background: 'var(--bg2)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead style={{ background: 'rgba(255,255,255,0.05)', textAlign: 'left' }}>
+                  <tr>
+                    <th style={{ padding: '10px' }}>#</th>
+                    <th style={{ padding: '10px' }}>Witness (a)</th>
+                    <th style={{ padding: '10px' }}>aᵈ mod n</th>
+                    <th style={{ padding: '10px' }}>Verdict</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rounds.map((r, i) => (
+                    <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                      <td style={{ padding: '10px', color: 'var(--text3)' }}>{r.round}</td>
+                      <td style={{ padding: '10px', fontFamily: 'monospace' }}>{r.witness}</td>
+                      <td style={{ padding: '10px', fontFamily: 'monospace' }}>{r.initial_x}</td>
+                      <td style={{ 
+                        padding: '10px', 
+                        color: r.verdict.includes('COMPOSITE') ? '#ef4444' : '#22c55e',
+                        fontWeight: 600,
+                        fontSize: '11px'
+                      }}>
+                        {r.verdict}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Carmichael Results */}
+        {result && result.fermat_samples && (
+          <div className="carmichael-section animate-slide-in" style={{ padding: '20px', background: 'var(--bg2)', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '15px', color: '#f59e0b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🛡️ The Carmichael Paradox (n = 561)
+            </h3>
+            <p style={{ fontSize: '12px', margin: '8px 0', opacity: 0.8, lineHeight: '1.5' }}>
+              561 is composite (3×11×17), but it passes the Fermat test for <strong>all</strong> bases 'a' coprime to n. 
+              This makes it a "pseudoprime" that fools simpler tests.
+            </p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '16px' }}>
+              <div style={{ padding: '12px', background: 'rgba(239,68,68,0.05)', border: '1px solid #ef4444', borderRadius: '10px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: '#ef4444', marginBottom: '8px' }}>NAIVE FERMAT TEST (FOOLED)</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  {result.fermat_samples.map((s, i) => (
+                    <div key={i} style={{ fontSize: '11px', fontFamily: 'monospace' }}>
+                      {s.a}⁵⁶⁰ mod 561 = <span style={{ color: '#ef4444', fontWeight: 700 }}>{s.result}</span>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: '10px', marginTop: '4px', fontStyle: 'italic', opacity: 0.7 }}>Result: Looks Prime!</div>
+                </div>
+              </div>
+              
+              <div style={{ padding: '12px', background: 'rgba(34,197,94,0.05)', border: '1px solid #22c55e', borderRadius: '10px' }}>
+                <div style={{ fontSize: '10px', fontWeight: 800, color: '#22c55e', marginBottom: '8px' }}>MILLER-RABIN TEST (CAUGHT)</div>
+                {result.miller_rabin_witness ? (
+                  <div style={{ fontSize: '11px' }}>
+                    <div style={{ marginBottom: '4px' }}>Witness a = {result.miller_rabin_witness.a}</div>
+                    <div style={{ fontFamily: 'monospace', opacity: 0.8 }}>
+                      aᵈ mod n = {result.miller_rabin_witness.initial_x} <br/>
+                      Next square = {result.miller_rabin_witness.steps[0]}
+                    </div>
+                    <div style={{ fontSize: '10px', marginTop: '8px', color: '#22c55e', fontWeight: 700 }}>Result: COMPOSITE</div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '11px', opacity: 0.6 }}>Searching for witness...</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Benchmark Results */}
+        {result && result['64'] && (
+          <div className="benchmark-section animate-slide-in" style={{ 
+            padding: '20px', 
+            background: 'var(--bg2)', 
+            borderRadius: '12px', 
+            border: '1px solid var(--border)' 
+          }}>
+            <h3 style={{ fontSize: '15px', marginBottom: '16px' }}>📊 Primality Performance Benchmarks</h3>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '2px solid var(--border)' }}>
+                    <th style={{ padding: '8px' }}>Bit Size</th>
+                    <th style={{ padding: '8px' }}>Avg Samples</th>
+                    <th style={{ padding: '8px' }}>Theoretical (0.34×b)</th>
+                    <th style={{ padding: '8px' }}>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[64, 128, 256, 512, 1024, 2048].map(bits => (
+                    <tr key={bits} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '8px', fontWeight: 700 }}>{bits}</td>
+                      <td style={{ padding: '8px', color: 'var(--accent)' }}>
+                        {result[bits] ? result[bits].avg_candidates.toFixed(1) : '...'}
+                      </td>
+                      <td style={{ padding: '8px', opacity: 0.6 }}>{(bits * 0.346).toFixed(1)}</td>
+                      <td style={{ padding: '8px', fontFamily: 'monospace' }}>
+                        {result[bits] ? `${result[bits].avg_time_sec.toFixed(4)}s` : '...'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(var(--accent-rgb), 0.05)', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '10px', fontWeight: 800, color: 'var(--accent)', marginBottom: '4px', textTransform: 'uppercase' }}>Theoretical Insight</div>
+              <p style={{ fontSize: '11px', lineHeight: '1.4', opacity: 0.8, margin: 0 }}>
+                The <strong>Prime Number Theorem</strong> predicts a linear growth $O(\ln n)$ in the number of candidates sampled. 
+                Our actual data closely tracks the predicted <strong>0.34 × bits</strong> threshold, validating the mathematical distribution of primes!
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const activePAId = Number(pa.pa);
+  const isPaDemo1 = activePAId === 1;
+  const isPaDemo2 = activePAId === 2;
+  const isPaDemo6 = activePAId === 6;
+  const isPaDemo7 = activePAId === 7;
+  const isPaDemo8 = activePAId === 8;
+  const isPaDemo9 = activePAId === 9;
+  const isPaDemo10 = activePAId === 10;
+  const isPaDemo11 = activePAId === 11;
+  const isPaDemo13 = activePAId === 13;
+  const isPaDemo18 = activePAId === 18;
 
   return (
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -2120,7 +2712,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
             <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '16px' }}>{pa.desc}</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-              {def.params.map(p => (
+              {def.params
+                .filter(p => !isPaDemo7 && !isPaDemo13 && !isPaDemo2)
+                .map(p => (
                 <div className="field" key={p.name} style={{ marginBottom: 0 }}>
                   <label style={{ display: 'flex', justifyContent: 'space-between' }}>
                     {p.label}
@@ -2135,7 +2729,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       onChange={(e) => {
                         const next = { ...params, [p.name]: e.target.value };
                         setParams(next);
-                        if (isPA1 || isPA2 || isPA8) {
+                        if (isPaDemo1 || isPaDemo2 || isPaDemo7 || isPaDemo8) {
                           setShowStats(false);
                           setShowInversion(false);
                           setResult(prev => prev ? { ...prev, stats: null, ratio: null, inversion: null } : null);
@@ -2150,7 +2744,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       onChange={(e) => {
                         const next = { ...params, [p.name]: e.target.value };
                         setParams(next);
-                        if (isPA1 || isPA2 || isPA8) {
+                        if (isPaDemo1 || isPaDemo2 || isPaDemo7 || isPaDemo8) {
                           setShowStats(false);
                           setShowInversion(false);
                           setResult(prev => prev ? { ...prev, stats: null, ratio: null, inversion: null } : null);
@@ -2163,7 +2757,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPA1 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA18 && (
+            {!isPaDemo1 && !isPaDemo2 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPaDemo13 && !isPaDemo18 && (
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
@@ -2171,9 +2765,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPA1 && !isPA8 && !isPA9 && !isPA10 && !isPA11 && !isPA18 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPaDemo1 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPaDemo13 && !isPaDemo18 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : isPA11 ? renderPA11Special() : isPA18 ? renderPA18Special() : (result && renderResult(result))}
+            {isPaDemo7 ? renderPA7Special() : isPaDemo1 ? renderPA1Special() : isPaDemo2 ? renderPA2Special() : isPaDemo8 ? renderPA8Special() : isPaDemo9 ? renderPA9Special() : isPaDemo10 ? renderPA10Special() : isPaDemo11 ? renderPA11Special() : isPaDemo13 ? renderPA13Special() : isPaDemo18 ? renderPA18Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>

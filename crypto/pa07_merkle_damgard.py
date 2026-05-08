@@ -108,12 +108,28 @@ class MerkleDamgard:
             'digest': None,
         }
 
+        # Calculate where message data ends
+        msg_len = len(message)
+        
         cv = self.iv
         for i, block in enumerate(blocks):
             new_cv = self.compress(cv, block)
+            
+            # Determine label
+            start_offset = i * self.block_size
+            if start_offset + self.block_size <= msg_len:
+                label = "Message Data"
+            elif start_offset < msg_len:
+                label = "Data + Padding"
+            elif i == len(blocks) - 1:
+                label = "MD Length"
+            else:
+                label = "Padding"
+
             trace['steps'].append({
                 'block_index': i,
                 'block': to_hex(block),
+                'label': label,
                 'cv_in': to_hex(cv),
                 'cv_out': to_hex(new_cv),
             })

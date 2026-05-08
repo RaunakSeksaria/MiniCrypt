@@ -580,7 +580,7 @@ if __name__ == '__main__':
 
     # --- Backward: PRG ⇒ OWF ---
     print("\n--- Backward Direction: PRG ⇒ OWF ---")
-    inv_result = demonstrate_prg_is_owf(prg_aes, trials=20)
+    inv_result = demonstrate_prg_inversion_v2(prg_aes, trials=20)
     print(f"Inversion attempts: {inv_result['inversions']}/{inv_result['trials']}")
     print(f"Conclusion: {inv_result['conclusion']}")
 
