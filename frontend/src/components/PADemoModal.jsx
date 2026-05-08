@@ -4035,16 +4035,20 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const activePAId = Number(pa.pa);
   const isPaDemo1 = activePAId === 1;
   const isPaDemo2 = activePAId === 2;
-  const isPaDemo6 = activePAId === 6;
+  const isPaDemo3 = activePAId === 3;
+  const isPA4 = activePAId === 4;
+  const isPA5 = activePAId === 5;
+  const isPA6 = activePAId === 6;
   const isPaDemo7 = activePAId === 7;
   const isPaDemo8 = activePAId === 8;
   const isPaDemo9 = activePAId === 9;
   const isPaDemo10 = activePAId === 10;
   const isPaDemo11 = activePAId === 11;
   const isPaDemo13 = activePAId === 13;
+  const isPA17 = activePAId === 17;
   const isPaDemo18 = activePAId === 18;
-  const isPaDemo3 = activePAId === 3;
-  const isPA3 = activePAId === 3;
+  const isPA19 = activePAId === 19;
+  const isPA20 = activePAId === 20;
   return (
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
@@ -4058,7 +4062,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
               {def.params
-                .filter(p => !isPaDemo7 && !isPaDemo13 && !isPaDemo2)
+                .filter(p => !isPaDemo7 && !isPaDemo13 && !isPaDemo2 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20)
                 .map(p => (
                 <div className="field" key={p.name} style={{ marginBottom: 0 }}>
                   <label style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -4109,6 +4113,10 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
+            {isLoading && !isPaDemo1 && !isPaDemo3 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPaDemo13 && !isPaDemo18 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
+            {isPaDemo7 ? renderPA7Special() : isPaDemo1 ? renderPA1Special() : isPaDemo2 ? renderPA2Special() : isPaDemo3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA5 ? renderPA5Special() : isPA6 ? renderPA6Special() : isPaDemo8 ? renderPA8Special() : isPaDemo9 ? renderPA9Special() : isPaDemo10 ? renderPA10Special() : isPaDemo11 ? renderPA11Special() : isPaDemo13 ? renderPA13Special() : isPaDemo18 ? renderPA18Special() : isPA17 ? renderPA17Special() : isPA19 ? renderPA19Special() : isPA20 ? renderPA20Special() : (result && renderResult(result))}
+
             {!isPaDemo1 && !isPaDemo2 && !isPaDemo3 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPaDemo13 && !isPaDemo18 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20 && (
               <button className="run-button" onClick={handleRunDemo} disabled={isLoading} style={{ marginTop: '20px' }}>
                 {isLoading ? 'Running Demo...' : 'Run Interactive Demo'}
