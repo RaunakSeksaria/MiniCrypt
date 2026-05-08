@@ -72,6 +72,70 @@ const api = {
     const r = await fetch(`${API_BASE}/api/pa9/birthday/stop/${huntId}`, { method: 'POST' });
     return r.json();
   },
+
+  async pa10LengthExtension(suffix, hashMode = 'dlp') {
+    const r = await fetch(`${API_BASE}/api/pa10/length_extension`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ suffix, hash_mode: hashMode }),
+    });
+    return r.json();
+  },
+
+  async pa10HMAC(message, keyHex = '', tagHex = '') {
+    const r = await fetch(`${API_BASE}/api/pa10/hmac`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, key_hex: keyHex, tag_hex: tagHex }),
+    });
+    return r.json();
+  },
+
+  async pa10EufCma() {
+    const r = await fetch(`${API_BASE}/api/pa10/euf_cma`, { method: 'POST' });
+    return r.json();
+  },
+
+  async pa10MacCrhf() {
+    const r = await fetch(`${API_BASE}/api/pa10/mac_crhf`, { method: 'POST' });
+    return r.json();
+  },
+
+  async pa10EthEnc(message, keyEncHex = '', keyMacHex = '') {
+    const r = await fetch(`${API_BASE}/api/pa10/eth_enc`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, key_enc_hex: keyEncHex, key_mac_hex: keyMacHex }),
+    });
+    return r.json();
+  },
+
+  async pa10EthDec(keyEncHex, keyMacHex, nonceHex, ciphertextHex, tagHex, tamperByte = -1) {
+    const r = await fetch(`${API_BASE}/api/pa10/eth_dec`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key_enc_hex: keyEncHex, key_mac_hex: keyMacHex,
+        nonce_hex: nonceHex, ciphertext_hex: ciphertextHex,
+        tag_hex: tagHex, tamper_byte: tamperByte,
+      }),
+    });
+    return r.json();
+  },
+
+  async pa10Timing() {
+    const r = await fetch(`${API_BASE}/api/pa10/timing`, { method: 'POST' });
+    return r.json();
+  },
+
+  async pa10CcaGame(rounds = 30) {
+    const r = await fetch(`${API_BASE}/api/pa10/cca_game`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rounds }),
+    });
+    return r.json();
+  },
 };
 
 export default api;

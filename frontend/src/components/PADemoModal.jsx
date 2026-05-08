@@ -22,7 +22,7 @@ const PA_DEFINITIONS = {
   7: { params: [{ name: 'message', label: 'Message to Hash', default: 'Hello Hash!' }] },
   8: { params: [] },  // PA8 has its own input inside renderPA8Special
   9: { params: [] },  // PA9 has its own input inside renderPA9Special
-  10: { params: [{ name: 'message', label: 'Message to HMAC', default: 'HMAC test message' }] },
+  10: { params: [] }, // PA10 has its own special renderer
   11: { params: [] },
   12: { params: [{ name: 'message_int', label: 'Textbook RSA Message (Int)', default: '42' }, { name: 'message_pkcs', label: 'PKCS#1 Message (Text)', default: 'RSA!' }] },
   13: { params: [{ name: 'n', label: 'Number to Test Primality', default: '1009' }] },
@@ -59,6 +59,20 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa9Running, setPa9Running] = useState(false);
   const pa9PollRef = useRef(null);
 
+  // PA#10 state
+  const [pa10LeData, setPa10LeData]       = useState(null);  // length-extension
+  const [pa10LeSuffix, setPa10LeSuffix]   = useState('evil suffix');
+  const [pa10HashMode, setPa10HashMode]   = useState('dlp');
+  const [pa10LeLoading, setPa10LeLoading] = useState(false);
+  const [pa10EufData, setPa10EufData]     = useState(null);
+  const [pa10MacData, setPa10MacData]     = useState(null);
+  const [pa10EthData, setPa10EthData]     = useState(null); // enc result
+  const [pa10DecData, setPa10DecData]     = useState(null);
+  const [pa10TimingData, setPa10TimingData] = useState(null);
+  const [pa10CcaData, setPa10CcaData]     = useState(null);
+  const [pa10EthMsg, setPa10EthMsg]       = useState('Secret & authenticated!');
+  const [pa10Loading, setPa10Loading]     = useState({});
+
   const def = PA_DEFINITIONS[pa.pa] || { params: [] };
 
   // Stop polling helper — defined before useEffect so cleanup can reference it
@@ -84,17 +98,19 @@ const PADemoModal = ({ pa, onClose, api }) => {
     def.params.forEach(p => initialParams[p.name] = p.default);
     setParams(initialParams);
 
-    // Auto-run if no params (but NOT for PA8/PA9 — they have their own special renderers)
-    if (def.params.length === 0 && pa.pa !== 8 && pa.pa !== 9) {
+    // Auto-run if no params (but NOT for PA8/PA9/PA10 — they have their own special renderers)
+    if (def.params.length === 0 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10) {
       runDemo(initialParams);
     }
 
-    // Reset PA8 / PA9 state when modal switches PA
+    // Reset PA8 / PA9 / PA10 state when modal switches PA
     setPa8Hash(null);
     setHuntStatus(null);
     stopHunt();
     setPa9Status(null);
     stopPa9Hunt();
+    setPa10LeData(null); setPa10EufData(null); setPa10MacData(null);
+    setPa10EthData(null); setPa10DecData(null); setPa10TimingData(null); setPa10CcaData(null);
 
     return () => { stopHunt(); stopPa9Hunt(); };
   }, [pa]);
@@ -951,10 +967,360 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  // ─────────────────────────────────────────────────────────────────
+  // PA#10 — HMAC Interactive Demo
+  // ─────────────────────────────────────────────────────────────────
+  const renderPA10Special = () => {
+    const card = (children, accent = '#818cf8', title = '') => (
+      <div style={{
+        background: `linear-gradient(135deg, ${accent}14 0%, ${accent}08 100%)`,
+        border: `1px solid ${accent}50`,
+        borderRadius: '12px', padding: '18px', marginBottom: '16px',
+      }}>
+        {title && <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: accent, marginBottom: '12px', textTransform: 'uppercase' }}>{title}</div>}
+        {children}
+      </div>
+    );
+
+    const mono = (txt, color = '#a5b4fc') => (
+      <code style={{ fontFamily: 'monospace', fontSize: '11px', wordBreak: 'break-all', color, background: 'rgba(0,0,0,0.35)', borderRadius: '4px', padding: '2px 6px' }}>{txt}</code>
+    );
+
+    const badge = (ok, yes = 'Secure ✓', no = 'Vulnerable ✗') => (
+      <span style={{ fontWeight: 700, color: ok ? '#22c55e' : '#ef4444', background: ok ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.12)', border: `1px solid ${ok ? '#22c55e' : '#ef4444'}`, borderRadius: '6px', padding: '2px 10px', fontSize: '12px' }}>
+        {ok ? yes : no}
+      </span>
+    );
+
+    const btn = (label, onClick, accent = '#818cf8', loading = false) => (
+      <button onClick={onClick} disabled={loading} style={{
+        padding: '9px 18px', borderRadius: '8px', border: `1px solid ${accent}80`,
+        background: loading ? `${accent}22` : `linear-gradient(135deg, ${accent}cc, ${accent}88)`,
+        color: 'white', fontWeight: 700, fontSize: '12px', cursor: loading ? 'not-allowed' : 'pointer',
+        transition: 'all 0.2s',
+      }}>
+        {loading ? '⏳ …' : label}
+      </button>
+    );
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+
+        {/* ── Hash toggle ── */}
+        {card(
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text2)' }}>Underlying hash:</span>
+            {['dlp', 'sha256'].map(m => (
+              <button key={m} onClick={() => { setPa10HashMode(m); setPa10LeData(null); }} style={{
+                padding: '6px 16px', borderRadius: '8px', fontWeight: 700, fontSize: '12px', cursor: 'pointer',
+                background: pa10HashMode === m ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'rgba(0,0,0,0.2)',
+                border: `1px solid ${pa10HashMode === m ? '#818cf8' : 'rgba(99,102,241,0.25)'}`,
+                color: pa10HashMode === m ? 'white' : 'var(--text2)', transition: 'all 0.18s',
+              }}>
+                {m === 'dlp' ? '🔢 DLP Hash (PA#8)' : '🔒 SHA-256'}
+              </button>
+            ))}
+          </div>,
+          '#6366f1', '🔀 Hash Toggle'
+        )}
+
+        {/* ── Side-by-side length-extension ── */}
+        {card(
+          <div>
+            <div style={{ marginBottom: '12px', fontSize: '12px', color: 'var(--text2)', lineHeight: 1.5 }}>
+              Type a suffix m′. Left: naive <code>H(k‖m)</code> is forged. Right: HMAC resists.
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'center' }}>
+              <input
+                id="pa10-suffix-input"
+                type="text"
+                value={pa10LeSuffix}
+                placeholder="Type suffix m′…"
+                onChange={e => setPa10LeSuffix(e.target.value)}
+                style={{ flex: 1, padding: '9px 13px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', color: 'var(--text1)', fontSize: '13px', fontFamily: 'monospace', outline: 'none' }}
+              />
+              {btn('⚡ Attack!', async () => {
+                setPa10LeLoading(true);
+                const d = await api.pa10LengthExtension(pa10LeSuffix, pa10HashMode);
+                setPa10LeData(d); setPa10LeLoading(false);
+              }, '#ef4444', pa10LeLoading)}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {/* LEFT — broken */}
+              <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '10px', padding: '14px' }}>
+                <div style={{ fontWeight: 700, color: '#f87171', marginBottom: '10px', fontSize: '12px' }}>⚠️ Naive H(k‖m) — BROKEN</div>
+                {pa10LeLoading && <div className="spinner" style={{ margin: '10px auto' }} />}
+                {pa10LeData && <>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Original message</div>
+                  <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.message)}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Naive tag t = H(k‖m)</div>
+                  <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.naive_tag?.slice(0, 24) + '…', '#fca5a5')}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Forged message (m‖pad‖m′)</div>
+                  <div style={{ marginBottom: '8px', fontSize: '10px', fontFamily: 'monospace', wordBreak: 'break-all', color: '#fca5a5', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '6px' }}>{pa10LeData.forged_message}</div>
+                  <div style={{ marginBottom: '8px' }}>{badge(false, '', '🔥 Forgery Succeeded!')}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                    Attacker used naive_tag as IV, continued hashing m′ — valid without knowing k.
+                  </div>
+                </>}
+                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press ⚡ Attack!</div>}
+              </div>
+
+              {/* RIGHT — HMAC */}
+              <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.35)', borderRadius: '10px', padding: '14px' }}>
+                <div style={{ fontWeight: 700, color: '#4ade80', marginBottom: '10px', fontSize: '12px' }}>✅ HMAC — SECURE</div>
+                {pa10LeLoading && <div className="spinner" style={{ margin: '10px auto' }} />}
+                {pa10LeData && <>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Original message</div>
+                  <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.message)}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>HMAC tag</div>
+                  <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.hmac_tag?.slice(0, 24) + '…', '#86efac')}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>Same forged message attempted</div>
+                  <div style={{ marginBottom: '8px', fontSize: '10px', fontFamily: 'monospace', wordBreak: 'break-all', color: '#86efac', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '6px' }}>{pa10LeData.forged_message}</div>
+                  <div style={{ marginBottom: '8px' }}>{badge(true, '🔒 Forgery Failed!')}</div>
+                  <div style={{ fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                    HMAC wraps with outer hash — leaked state can't be reused without k.
+                  </div>
+                </>}
+                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '11px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press ⚡ Attack!</div>}
+              </div>
+            </div>
+          </div>,
+          '#ef4444', '4. Length-Extension Attack Demo'
+        )}
+
+        {/* ── EUF-CMA game ── */}
+        {card(
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+              50 oracle queries → 20 random forgery attempts. A secure MAC has 0 successes.
+            </div>
+            {btn('▶ Run EUF-CMA Game', async () => {
+              setPa10Loading(p => ({ ...p, euf: true }));
+              const d = await api.pa10EufCma();
+              setPa10EufData(d); setPa10Loading(p => ({ ...p, euf: false }));
+            }, '#6366f1', pa10Loading.euf)}
+            {pa10EufData && (
+              <div style={{ marginTop: '14px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px' }}>
+                {[
+                  ['Oracle Queries', pa10EufData.queries, '#818cf8'],
+                  ['Forgery Attempts', pa10EufData.forgery_attempts, '#f59e0b'],
+                  ['Successes', pa10EufData.successes, pa10EufData.successes === 0 ? '#22c55e' : '#ef4444'],
+                ].map(([l, v, c]) => (
+                  <div key={l} style={{ textAlign: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: `1px solid ${c}40` }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
+                    <div style={{ fontSize: '22px', fontWeight: 800, color: c }}>{v}</div>
+                  </div>
+                ))}
+                <div style={{ gridColumn: '1/-1', marginTop: '4px' }}>
+                  {badge(pa10EufData.secure, 'EUF-CMA Secure ✓ (0 forgeries)', 'Forgery Detected!')}
+                </div>
+              </div>
+            )}
+          </div>,
+          '#6366f1', '2. CRHF ⇒ MAC (EUF-CMA Game)'
+        )}
+
+        {/* ── MAC ⇒ CRHF ── */}
+        {card(
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+              Use HMAC as compression h′(cv, block) = HMAC_k(cv‖block) in Merkle-Damgård. All 5 messages hash to distinct values.
+            </div>
+            {btn('▶ Run MAC⇒CRHF Demo', async () => {
+              setPa10Loading(p => ({ ...p, mac: true }));
+              const d = await api.pa10MacCrhf();
+              setPa10MacData(d); setPa10Loading(p => ({ ...p, mac: false }));
+            }, '#8b5cf6', pa10Loading.mac)}
+            {pa10MacData && (
+              <div style={{ marginTop: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                  {[
+                    ['Messages', pa10MacData.total_messages],
+                    ['Distinct Hashes', pa10MacData.distinct_hashes],
+                  ].map(([l, v]) => (
+                    <div key={l} style={{ textAlign: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: '1px solid rgba(139,92,246,0.3)' }}>
+                      <div style={{ fontSize: '10px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
+                      <div style={{ fontSize: '22px', fontWeight: 800, color: '#c4b5fd' }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                {badge(pa10MacData.all_distinct, 'No Collisions — MAC⇒CRHF Holds ✓')}
+                <div style={{ marginTop: '10px', fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                  {pa10MacData.conclusion}
+                </div>
+              </div>
+            )}
+          </div>,
+          '#8b5cf6', '3. MAC ⇒ CRHF (Reverse Direction)'
+        )}
+
+        {/* ── Encrypt-then-HMAC ── */}
+        {card(
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+              EtH_Enc: encrypt with PA#3 CPA scheme, then HMAC the ciphertext. EtH_Dec: verify HMAC first, then decrypt.
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '12px', alignItems: 'center' }}>
+              <input
+                id="pa10-eth-msg-input"
+                type="text"
+                value={pa10EthMsg}
+                onChange={e => setPa10EthMsg(e.target.value)}
+                placeholder="Plaintext to encrypt…"
+                style={{ flex: 1, padding: '9px 13px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(16,185,129,0.4)', borderRadius: '8px', color: 'var(--text1)', fontSize: '13px', fontFamily: 'monospace', outline: 'none' }}
+              />
+              {btn('🔒 Encrypt', async () => {
+                setPa10Loading(p => ({ ...p, eth: true }));
+                setPa10DecData(null);
+                const d = await api.pa10EthEnc(pa10EthMsg);
+                setPa10EthData(d); setPa10Loading(p => ({ ...p, eth: false }));
+              }, '#10b981', pa10Loading.eth)}
+            </div>
+
+            {pa10EthData && (
+              <div style={{ marginTop: '4px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 10px', fontSize: '11px', marginBottom: '12px' }}>
+                  {[
+                    ['Plaintext', pa10EthData.plaintext, '#34d399'],
+                    ['Nonce (r)', pa10EthData.nonce_hex?.slice(0, 20) + '…', '#a5b4fc'],
+                    ['Ciphertext', pa10EthData.ciphertext_hex?.slice(0, 28) + '…', '#a5b4fc'],
+                    ['HMAC Tag', pa10EthData.tag_hex?.slice(0, 28) + '…', '#fbbf24'],
+                  ].map(([k, v, c]) => (
+                    <React.Fragment key={k}>
+                      <span style={{ color: 'var(--text3)', whiteSpace: 'nowrap', paddingTop: '2px' }}>{k}</span>
+                      <span style={{ fontFamily: 'monospace', color: c, wordBreak: 'break-all' }}>{v}</span>
+                    </React.Fragment>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {btn('🔓 Decrypt (clean)', async () => {
+                    setPa10Loading(p => ({ ...p, dec: true }));
+                    const d = await api.pa10EthDec(pa10EthData.key_enc_hex, pa10EthData.key_mac_hex, pa10EthData.nonce_hex, pa10EthData.ciphertext_hex, pa10EthData.tag_hex);
+                    setPa10DecData({ ...d, label: 'Clean decrypt' }); setPa10Loading(p => ({ ...p, dec: false }));
+                  }, '#10b981', pa10Loading.dec)}
+                  {btn('⚠️ Tamper & Decrypt', async () => {
+                    setPa10Loading(p => ({ ...p, tamper: true }));
+                    const d = await api.pa10EthDec(pa10EthData.key_enc_hex, pa10EthData.key_mac_hex, pa10EthData.nonce_hex, pa10EthData.ciphertext_hex, pa10EthData.tag_hex, 0);
+                    setPa10DecData({ ...d, label: 'Tampered byte 0' }); setPa10Loading(p => ({ ...p, tamper: false }));
+                  }, '#ef4444', pa10Loading.tamper)}
+                </div>
+
+                {pa10DecData && (
+                  <div style={{ marginTop: '12px', padding: '12px', background: pa10DecData.success ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)', border: `1px solid ${pa10DecData.success ? '#22c55e' : '#ef4444'}50`, borderRadius: '8px' }}>
+                    <div style={{ fontWeight: 700, fontSize: '12px', color: pa10DecData.success ? '#4ade80' : '#f87171', marginBottom: '6px' }}>{pa10DecData.result}</div>
+                    {pa10DecData.success && <div style={{ fontFamily: 'monospace', fontSize: '12px', color: '#34d399' }}>Decrypted: "{pa10DecData.plaintext}"</div>}
+                    {!pa10DecData.success && <div style={{ fontSize: '11px', color: 'var(--text3)' }}>HMAC verification failed — ciphertext rejected before decryption (CCA2 safety).</div>}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>,
+          '#10b981', '5. Encrypt-then-HMAC (CCA-Secure)'
+        )}
+
+        {/* ── IND-CCA2 game ── */}
+        {card(
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+              30 rounds: adversary guesses randomly, all tampered ciphertexts must be rejected.
+            </div>
+            {btn('▶ Run IND-CCA2 Game', async () => {
+              setPa10Loading(p => ({ ...p, cca: true }));
+              const d = await api.pa10CcaGame(30);
+              setPa10CcaData(d); setPa10Loading(p => ({ ...p, cca: false }));
+            }, '#0ea5e9', pa10Loading.cca)}
+            {pa10CcaData && (
+              <div style={{ marginTop: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '8px', marginBottom: '10px' }}>
+                  {[
+                    ['Rounds', pa10CcaData.rounds, '#818cf8'],
+                    ['Win Rate', (pa10CcaData.win_rate * 100).toFixed(0) + '%', '#f59e0b'],
+                    ['Advantage', (pa10CcaData.advantage * 100).toFixed(1) + '%', pa10CcaData.advantage < 0.15 ? '#22c55e' : '#ef4444'],
+                    ['Tamper Rej.', pa10CcaData.tamper_rejection_rate === 1 ? '100%' : (pa10CcaData.tamper_rejection_rate * 100).toFixed(0) + '%', pa10CcaData.tamper_rejection_rate === 1 ? '#22c55e' : '#ef4444'],
+                  ].map(([l, v, c]) => (
+                    <div key={l} style={{ textAlign: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: `1px solid ${c}40` }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
+                      <div style={{ fontSize: '18px', fontWeight: 800, color: c }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                {badge(pa10CcaData.secure, 'IND-CCA2 Secure ✓', 'Security Broken!')}
+                <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                  Tag size: {pa10CcaData.tag_size_bytes} bytes. {pa10CcaData.note}
+                </div>
+              </div>
+            )}
+          </div>,
+          '#0ea5e9', '6. IND-CCA2 Game'
+        )}
+
+        {/* ── Timing attack ── */}
+        {card(
+          <div>
+            <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
+              Naive early-exit comparison leaks the tag byte-by-byte via timing. Constant-time comparison runs in fixed time.
+            </div>
+            {btn('⏱️ Run Timing Demo', async () => {
+              setPa10Loading(p => ({ ...p, timing: true }));
+              const d = await api.pa10Timing();
+              setPa10TimingData(d); setPa10Loading(p => ({ ...p, timing: false }));
+            }, '#f59e0b', pa10Loading.timing)}
+            {pa10TimingData && (
+              <div style={{ marginTop: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '10px' }}>
+                  {[
+                    ['Early-diff avg', `${pa10TimingData.avg_early_diff_ns?.toFixed(0)} ns`, '#f59e0b'],
+                    ['Late-diff avg', `${pa10TimingData.avg_late_diff_ns?.toFixed(0)} ns`, '#f87171'],
+                    ['Correct avg', `${pa10TimingData.avg_correct_ns?.toFixed(0)} ns`, '#34d399'],
+                  ].map(([l, v, c]) => (
+                    <div key={l} style={{ textAlign: 'center', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '10px', border: `1px solid ${c}40` }}>
+                      <div style={{ fontSize: '9px', color: 'var(--text3)', marginBottom: '4px' }}>{l}</div>
+                      <div style={{ fontSize: '15px', fontWeight: 800, color: c }}>{v}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Mini bar chart */}
+                <div style={{ marginBottom: '10px' }}>
+                  {[
+                    ['Early-diff (byte 0)', pa10TimingData.avg_early_diff_ns, '#f59e0b'],
+                    ['Late-diff (last byte)', pa10TimingData.avg_late_diff_ns, '#f87171'],
+                    ['Correct tag', pa10TimingData.avg_correct_ns, '#34d399'],
+                  ].map(([label, val, c]) => {
+                    const max = Math.max(pa10TimingData.avg_early_diff_ns, pa10TimingData.avg_late_diff_ns, pa10TimingData.avg_correct_ns);
+                    const pct = max > 0 ? (val / max) * 100 : 0;
+                    return (
+                      <div key={label} style={{ marginBottom: '6px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text3)', marginBottom: '2px' }}>
+                          <span>{label}</span><span style={{ color: c }}>{val?.toFixed(0)} ns</span>
+                        </div>
+                        <div style={{ height: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${pct}%`, background: c, borderRadius: '4px', transition: 'width 0.5s ease' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {badge(pa10TimingData.timing_leak, 'Timing Leak Detected in Naive Compare!', 'No Clear Timing Leak')}
+                <div style={{ marginTop: '8px', fontSize: '10px', color: 'var(--text3)', lineHeight: 1.4 }}>
+                  {pa10TimingData.note}. Constant-time secure_compare() prevents this attack.
+                </div>
+              </div>
+            )}
+          </div>,
+          '#f59e0b', '7. Constant-Time Comparison (Timing Demo)'
+        )}
+
+      </div>
+    );
+  };
+
   const isPA1 = pa.pa === 1;
   const isPA2 = pa.pa === 2;
   const isPA8 = pa.pa === 8;
   const isPA9 = pa.pa === 9;
+  const isPA10 = pa.pa === 10;
 
   return (
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -1011,7 +1377,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               ))}
             </div>
 
-            {!isPA1 && !isPA8 && !isPA9 && (
+            {!isPA1 && !isPA8 && !isPA9 && !isPA10 && (
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => runDemo()}>
                 ▶ Run Demo
               </button>
@@ -1019,9 +1385,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
 
           <div id="demoOutputContainer">
-            {isLoading && !isPA1 && !isPA8 && !isPA9 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
+            {isLoading && !isPA1 && !isPA8 && !isPA9 && !isPA10 && <div style={{ textAlign: 'center', padding: '20px' }}><div className="spinner"></div></div>}
             {error && <pre style={{ color: 'var(--red)' }}>{error}</pre>}
-            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : (result && renderResult(result))}
+            {isPA1 ? renderPA1Special() : isPA2 ? renderPA2Special() : isPA8 ? renderPA8Special() : isPA9 ? renderPA9Special() : isPA10 ? renderPA10Special() : (result && renderResult(result))}
           </div>
         </div>
       </div>
