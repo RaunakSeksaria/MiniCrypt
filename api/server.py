@@ -381,7 +381,7 @@ def run_demo(req: DemoRequest):
             from crypto.pa03_cpa_enc import CPAEncryption, ind_cpa_game
             from crypto.pa02_prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
-            prf_mode = 'ggm' if req.foundation == 'DLP' else 'aes'
+            prf_mode = 'ggm' if req.params.get('foundation') == 'DLP' else 'aes'
             enc = CPAEncryption(prf=PRF(mode=prf_mode)); k = random_bytes(16)
             msg = req.params.get("message","Hello CPA!").encode()
             r, ct = enc.encrypt(k, msg)
@@ -403,7 +403,7 @@ def run_demo(req: DemoRequest):
             from crypto.pa05_mac import MAC, euf_cma_game
             from crypto.pa02_prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
-            prf_mode = 'ggm' if req.foundation == 'DLP' else 'aes'
+            prf_mode = 'ggm' if req.params.get('foundation') == 'DLP' else 'aes'
             mac = MAC(mode='cbc', prf=PRF(mode=prf_mode)); k = random_bytes(16)
             msg = b"Authenticate me!"
             tag = mac.Mac(k, msg)
@@ -411,10 +411,13 @@ def run_demo(req: DemoRequest):
             return {"message":msg.decode(),"tag":to_hex(tag),"verify":mac.Vrfy(k,msg,tag),"game":game,"prf_mode":prf_mode}
         elif req.pa == 6:
             from crypto.pa06_cca_enc import CCAEncryption, malleability_attack_demo, key_separation_demo
+            from crypto.pa03_cpa_enc import CPAEncryption
+            from crypto.pa05_mac import MAC
             from crypto.pa02_prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
-            prf_mode = 'ggm' if req.foundation == 'DLP' else 'aes'
-            cca = CCAEncryption(prf=PRF(mode=prf_mode)); ke=random_bytes(16); km=random_bytes(16)
+            prf_mode = 'ggm' if req.params.get('foundation') == 'DLP' else 'aes'
+            cca = CCAEncryption(enc=CPAEncryption(prf=PRF(mode=prf_mode)), mac=MAC(mode='cbc', prf=PRF(mode=prf_mode)))
+            ke=random_bytes(16); km=random_bytes(16)
             msg = b"CCA-secure message!"
             r,ct,tag = cca.encrypt(ke,km,msg)
             pt = cca.decrypt(ke,km,r,ct,tag)
