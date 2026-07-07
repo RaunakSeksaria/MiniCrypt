@@ -360,7 +360,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               }
             }}
           >
-            🧪 Randomness Tests
+            Randomness Tests
           </button>
           <button
             className="btn btn-secondary"
@@ -375,7 +375,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               }
             }}
           >
-            🛡️ One-Wayness
+            One-Wayness
           </button>
         </div>
 
@@ -423,7 +423,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 </div>
               ) : (
                 <div style={{ padding: '12px', background: 'rgba(var(--accent-rgb), 0.05)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>🔒 Backward Reduction: PRG ⇒ OWF</div>
+                  <div style={{ fontSize: '14px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>Backward Reduction: PRG ⇒ OWF</div>
                   <div style={{ fontSize: '13px', color: 'var(--text2)', lineHeight: '1.4', marginBottom: '12px' }}>
                   <strong>Theoretical Proof:</strong> To show that <strong>f(s) = G(s)</strong> is a One-Way Function, we assume an adversary exists who can invert it. If they can recover <strong>s</strong> from <strong>G(s)</strong>, they can distinguish the PRG from random bits. Since <strong>G</strong> is secure, such an adversary cannot exist.
                 </div>
@@ -449,7 +449,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                               fontFamily: 'monospace',
                               wordBreak: 'break-all'
                             }}>
-                              Tried: {g} → ❌ NO MATCH
+                              Tried: {g} → ✗ NO MATCH
                             </div>
                           ))
                         ) : (
@@ -571,7 +571,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             placeholder={params.is_hex ? "Enter hex (e.g. 48656c6c6f...)" : "Type your message here..."}
           />
           <div style={{ fontSize: '10px', color: 'var(--text3)', marginTop: '6px', fontStyle: 'italic' }}>
-            💡 Tip: You can also edit the hex directly inside the "Message Data" blocks below!
+            Tip: You can also edit the hex directly inside the "Message Data" blocks below!
           </div>
         </div>
 
@@ -616,7 +616,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 color: 'var(--accent)',
                 animation: 'bounceRight 2s infinite'
               }}>
-                ➜
+                →
               </div>
               
               <div style={{ 
@@ -714,7 +714,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           ))}
           
           <div className="chain-step final-step" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '150px', marginLeft: '20px' }}>
-            <div style={{ position: 'absolute', left: '-35px', top: '115px', fontSize: '24px', color: 'var(--accent2)' }}>➜</div>
+            <div style={{ position: 'absolute', left: '-35px', top: '115px', fontSize: '24px', color: 'var(--accent2)' }}>→</div>
             <div style={{ fontSize: '11px', color: 'var(--accent2)', marginBottom: '10px', fontWeight: 800, letterSpacing: '0.1em' }}>OUTPUT</div>
             <div style={{ 
               padding: '16px 24px', 
@@ -1014,7 +1014,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       setPa4FlipResult(d); setL('flip', false);
                     }}
                   />
-                  <text x={x + blockW / 2} y={ctY + (mode === 'CBC' ? 21 : 41)} textAnchor="middle" fontSize={8} fill={blockColor} fontFamily="monospace" style={{ pointerEvents: 'none' }}>C{i} {isFlipped ? '⚡' : ''}</text>
+                  <text x={x + blockW / 2} y={ctY + (mode === 'CBC' ? 21 : 41)} textAnchor="middle" fontSize={8} fill={blockColor} fontFamily="monospace" style={{ pointerEvents: 'none' }}>C{i}</text>
                   <text x={x + blockW / 2} y={ctY + (mode === 'CBC' ? 31 : 51)} textAnchor="middle" fontSize={7} fill={blockColor} fontFamily="monospace" style={{ pointerEvents: 'none' }}>{shortHex(blk.ciphertext_hex)}</text>
 
                   {/* Chain arrow between blocks */}
@@ -1040,7 +1040,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
       const exp = expected[pa4Mode] || [];
       return (
         <div style={{ marginTop: '10px', padding: '10px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)', fontSize: '14px' }}>
-          <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: '4px' }}>⚡ Bit Flip Error Propagation</div>
+          <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: '4px' }}>Bit Flip Error Propagation</div>
           <div style={{ color: 'var(--text2)', lineHeight: 1.5 }}>
             Flipped C{pa4FlippedBlock} → corrupted plaintext blocks: {corrupted.length > 0 ? corrupted.map(b => `M${b}`).join(', ') : 'None'}
           </div>
@@ -1048,7 +1048,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             {pa4Mode === 'CBC' ? `CBC: flipped C${pa4FlippedBlock} corrupts M${pa4FlippedBlock} completely + flips 1 bit in M${pa4FlippedBlock + 1}` : `${pa4Mode}: error stays in exactly the same block — only M${pa4FlippedBlock} is affected`}
           </div>
           <div style={{ marginTop: '4px', fontSize: '13px', color: corrupted.join(',') === exp.join(',') ? '#22c55e' : '#f59e0b' }}>
-            {corrupted.join(',') === exp.join(',') ? `✅ Matches expected pattern for ${pa4Mode}` : `Expected blocks: ${exp.map(b => `M${b}`).join(', ')}`}
+            {corrupted.join(',') === exp.join(',') ? `✓ Matches expected pattern for ${pa4Mode}` : `Expected blocks: ${exp.map(b => `M${b}`).join(', ')}`}
           </div>
         </div>
       );
@@ -1076,15 +1076,15 @@ const PADemoModal = ({ pa, onClose, api }) => {
         <div style={{ display: 'flex', gap: '8px' }}>
           <input id="pa4-msg-input" type="text" value={pa4Msg} onChange={e => setPa4Msg(e.target.value)} placeholder="3-block message (48 chars)..." style={{ flex: 1, padding: '9px 12px', background: 'rgba(0,0,0,0.35)', border: `1px solid ${ac}60`, borderRadius: '8px', color: 'var(--text1)', fontSize: '15px', fontFamily: 'monospace', outline: 'none' }} />
           <button id="pa4-run-btn" disabled={busyPA4('anim')} onClick={() => runAnimate()} style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: busyPA4('anim') ? `${ac}44` : `linear-gradient(135deg,${ac}cc,${ac}88)`, color: 'white', fontWeight: 700, fontSize: '15px', cursor: busyPA4('anim') ? 'not-allowed' : 'pointer' }}>
-            {busyPA4('anim') ? '⏳' : '▶ Animate'}
+            {busyPA4('anim') ? '…' : '▶ Animate'}
           </button>
         </div>
 
         {/* Mode info bar */}
         <div style={{ fontSize: '13px', color: '#94a3b8', padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: '6px', border: `1px solid ${ac}30` }}>
-          {pa4Mode === 'CBC' && '🔗 CBC: C_i = E_k(C_{i-1} ⊕ M_i) — sequential encryption, parallel decryption. Click any ciphertext block to flip a bit.'}
-          {pa4Mode === 'OFB' && '🔄 OFB: C_i = M_i ⊕ E_k(E_k(…E_k(IV)…)) — pre-computable keystream, enc=dec. Click any ciphertext block to flip a bit.'}
-          {pa4Mode === 'CTR' && '⚡ CTR: C_i = M_i ⊕ E_k(nonce+i) — fully parallel, stream-cipher mode. Click any ciphertext block to flip a bit.'}
+          {pa4Mode === 'CBC' && 'CBC: C_i = E_k(C_{i-1} ⊕ M_i) — sequential encryption, parallel decryption. Click any ciphertext block to flip a bit.'}
+          {pa4Mode === 'OFB' && 'OFB: C_i = M_i ⊕ E_k(E_k(…E_k(IV)…)) — pre-computable keystream, enc=dec. Click any ciphertext block to flip a bit.'}
+          {pa4Mode === 'CTR' && 'CTR: C_i = M_i ⊕ E_k(nonce+i) — fully parallel, stream-cipher mode. Click any ciphertext block to flip a bit.'}
         </div>
 
         {!pa4Trace && !busyPA4('anim') && (
@@ -1102,7 +1102,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               Block Cipher Mode Diagram — Click a ciphertext block (C0, C1, C2) to flip a bit
             </div>
             {renderBlockDiagram(pa4Trace, pa4Mode, pa4Trace)}
-            {busyPA4('flip') && <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>⏳ Re-decrypting with flipped bit…</div>}
+            {busyPA4('flip') && <div style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>Re-decrypting with flipped bit…</div>}
             {renderErrorBadge(pa4FlipResult?.corrupted_pt_blocks)}
           </div>
 
@@ -1115,7 +1115,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           {/* ── IV Reuse attack (CBC only) ── */}
           {pa4Mode === 'CBC' && (
             <div style={{ background: 'linear-gradient(135deg,rgba(239,68,68,0.08),rgba(239,68,68,0.04))', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '12px', padding: '14px' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>⚠️ CBC IV-Reuse Attack</div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.07em' }}>CBC IV-Reuse Attack</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '10px' }}>
                 <input id="pa4-ivruse-m1" type="text" value={pa4IvMsg1} onChange={e => setPa4IvMsg1(e.target.value)} placeholder="Message 1 (first 16 chars shared)" style={{ padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '6px', color: 'var(--text1)', fontSize: '14px', fontFamily: 'monospace', outline: 'none' }} />
                 <input id="pa4-ivruse-m2" type="text" value={pa4IvMsg2} onChange={e => setPa4IvMsg2(e.target.value)} placeholder="Message 2 (same first 16 chars)" style={{ padding: '7px 10px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '6px', color: 'var(--text1)', fontSize: '14px', fontFamily: 'monospace', outline: 'none' }} />
@@ -1125,7 +1125,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 const d = await api.pa4IvReuse(pa4IvMsg1, pa4IvMsg2, pa4Trace?.key_hex || '', pa4Trace?.iv_hex || '');
                 setPa4IvReuseData(d); setPa4IvReuseOn(true); setL('ivr', false);
               }} style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.6)', background: busyPA4('ivr') ? 'rgba(239,68,68,0.1)' : 'linear-gradient(135deg,#ef4444cc,#ef444488)', color: 'white', fontWeight: 700, fontSize: '15px', cursor: busyPA4('ivr') ? 'not-allowed' : 'pointer' }}>
-                {busyPA4('ivr') ? '⏳ Running…' : '💥 Run IV-Reuse Attack'}
+                {busyPA4('ivr') ? 'Running…' : 'Run IV-Reuse Attack'}
               </button>
 
               {pa4IvReuseData && pa4IvReuseOn && (
@@ -1139,7 +1139,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       const match = (pa4IvReuseData.block_match || [])[i];
                       return (
                         <div key={i} style={{ borderRadius: '8px', padding: '8px', background: match ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.08)', border: `1px solid ${match ? '#ef4444' : '#22c55e'}` }}>
-                          <div style={{ fontSize: '12px', fontWeight: 700, color: match ? '#ef4444' : '#22c55e', marginBottom: '4px' }}>Block {i} {match ? '🔴 MATCH' : '🟢 diff'}</div>
+                          <div style={{ fontSize: '12px', fontWeight: 700, color: match ? '#ef4444' : '#22c55e', marginBottom: '4px' }}>Block {i} {match ? 'MATCH' : 'diff'}</div>
                           <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#a5b4fc', wordBreak: 'break-all', marginBottom: '2px' }}>M1: {ct1.slice(0, 10)}…</div>
                           <div style={{ fontSize: '10px', fontFamily: 'monospace', color: '#a5b4fc', wordBreak: 'break-all' }}>M2: {ct2.slice(0, 10)}…</div>
                         </div>
@@ -1161,7 +1161,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               {['', 'Para. Enc', 'Para. Dec', 'Error Prop', 'IV Reuse'].map((h, i) => (
                 <div key={i} style={{ fontWeight: 700, color: 'var(--text3)', paddingBottom: '4px', borderBottom: '1px solid var(--border)' }}>{h}</div>
               ))}
-              {[['CBC', '✗', '✓', '2 blocks', '💀 Fatal'], ['OFB', '✗', '✗', '1 block', '💀 Fatal'], ['CTR', '✓', '✓', '1 block', '💀 Fatal']].map(([m, pe, pd, ep, ir]) => (
+              {[['CBC', '✗', '✓', '2 blocks', 'Fatal'], ['OFB', '✗', '✗', '1 block', 'Fatal'], ['CTR', '✓', '✓', '1 block', 'Fatal']].map(([m, pe, pd, ep, ir]) => (
                 <React.Fragment key={m}>
                   <div style={{ fontWeight: 700, color: modeColor[m], padding: '4px' }}>{m}</div>
                   {[pe, pd].map((v, j) => <div key={j} style={{ color: v === '✓' ? '#22c55e' : '#ef4444', padding: '4px' }}>{v}</div>)}
@@ -1195,7 +1195,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         color: 'white', fontWeight: 700, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
         transition: 'all 0.2s',
       }}>
-        {loading ? '⏳ …' : label}
+        {loading ? '…' : label}
       </button>
     );
 
@@ -1211,11 +1211,11 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 border: `1px solid ${pa5Tab === m ? '#818cf8' : 'rgba(99,102,241,0.25)'}`,
                 color: pa5Tab === m ? 'white' : 'var(--text2)', transition: 'all 0.18s',
               }}>
-                {m === 'euf' ? '🎯 EUF-CMA Forgery Game' : '⚡ Length-Extension Demo'}
+                {m === 'euf' ? 'EUF-CMA Forgery Game' : 'Length-Extension Demo'}
               </button>
             ))}
           </div>,
-          '#6366f1', 'PA#5 Interactive Demos'
+          '#6366f1', 'MAC Interactive Demos'
         )}
 
         {pa5Tab === 'euf' && card(
@@ -1225,7 +1225,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             </div>
             
             <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-              {btn('📡 Get Signed Messages (Oracle)', async () => {
+              {btn('Get Signed Messages (Oracle)', async () => {
                 setPa5Loading(p => ({ ...p, eufInit: true }));
                 const d = await api.pa5EufInit();
                 setPa5Session(d.session_id);
@@ -1250,7 +1250,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
             {pa5Session && (
               <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: '10px', padding: '14px' }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>😈 Submit Forgery</div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>Submit Forgery</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                   <input type="text" value={pa5EufMsg} onChange={e => setPa5EufMsg(e.target.value)} placeholder="New message m* (hex, 32 chars)" style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '14px', outline: 'none' }} />
                   <input type="text" value={pa5EufTag} onChange={e => setPa5EufTag(e.target.value)} placeholder="Forged tag t* (hex, 32 chars)" style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(245,158,11,0.4)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '14px', outline: 'none' }} />
@@ -1271,7 +1271,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
                 {pa5EufResult !== null && (
                   <div style={{ marginTop: '12px', padding: '10px', borderRadius: '6px', background: pa5EufResult ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)', color: pa5EufResult ? '#fca5a5' : '#86efac', fontWeight: 700, fontSize: '15px', border: `1px solid ${pa5EufResult ? '#ef4444' : '#22c55e'}` }}>
-                    {pa5EufResult ? '💥 Forgery accepted! (Security broken)' : '🔒 Forgery rejected!'}
+                    {pa5EufResult ? 'Forgery accepted! (Security broken)' : 'Forgery rejected!'}
                   </div>
                 )}
 
@@ -1314,7 +1314,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
             {pa5LeData && (
               <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '10px', padding: '14px', fontSize: '14px' }}>
-                <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: '10px' }}>⚠️ Vulnerability Demonstrated</div>
+                <div style={{ fontWeight: 700, color: '#ef4444', marginBottom: '10px' }}>Vulnerability Demonstrated</div>
                 
                 <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', color: 'var(--text2)' }}>
                   <span>Original msg (m):</span> <code style={{ color: '#a5b4fc', wordBreak: 'break-all' }}>{pa5LeData.message}</code>
@@ -1324,7 +1324,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 </div>
                 
                 <div style={{ marginTop: '12px', paddingTop: '10px', borderTop: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5', fontWeight: 700 }}>
-                  {pa5LeData.naive_vulnerable ? '💥 Attack Successful: The forged tag is perfectly valid for the extended message.' : 'Attack Failed'}
+                  {pa5LeData.naive_vulnerable ? 'Attack Successful: The forged tag is perfectly valid for the extended message.' : 'Attack Failed'}
                 </div>
                 <div style={{ fontSize: '13px', color: 'var(--text3)', marginTop: '6px', lineHeight: 1.4 }}>
                   The extended tag was computed by resuming the hash function state from the original tag 't'. The secret key 'k' was not required. This is why HMAC uses a double-hash structure.
@@ -1447,7 +1447,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               disabled={pa6Loading.init}
               style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none' }}
             >
-              {pa6Loading.init ? '⏳...' : 'Encrypt & Load'}
+              {pa6Loading.init ? '...' : 'Encrypt & Load'}
             </button>
           </div>
         </div>
@@ -1457,7 +1457,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             
             {/* Left: CPA */}
             <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '16px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '12px', textTransform: 'uppercase' }}>❌ CPA-Only (Malleable)</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '12px', textTransform: 'uppercase' }}>✗ CPA-Only (Malleable)</div>
               
               <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '8px' }}>Ciphertext Bits (Click to flip):</div>
               <div style={{ marginBottom: '16px', opacity: pa6Loading.flip ? 0.5 : 1, pointerEvents: pa6Loading.flip ? 'none' : 'auto' }}>
@@ -1478,7 +1478,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
             {/* Right: CCA */}
             <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '12px', padding: '16px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e', marginBottom: '12px', textTransform: 'uppercase' }}>✅ CCA (Encrypt-then-MAC)</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e', marginBottom: '12px', textTransform: 'uppercase' }}>✓ CCA (Encrypt-then-MAC)</div>
               
               <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '8px' }}>Ciphertext Bits (Click to flip):</div>
               <div style={{ marginBottom: '16px', opacity: pa6Loading.flip ? 0.5 : 1, pointerEvents: pa6Loading.flip ? 'none' : 'auto' }}>
@@ -1568,7 +1568,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               disabled={pa17Loading.init}
               style={{ padding: '8px 16px', borderRadius: '6px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}
             >
-              {pa17Loading.init ? '⏳...' : 'Encrypt & Load'}
+              {pa17Loading.init ? '...' : 'Encrypt & Load'}
             </button>
           </div>
         </div>
@@ -1578,7 +1578,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             
             {/* Left: CPA */}
             <div style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '12px', padding: '16px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '12px', textTransform: 'uppercase' }}>❌ CPA-Only (ElGamal)</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#ef4444', marginBottom: '12px', textTransform: 'uppercase' }}>✗ CPA-Only (ElGamal)</div>
               
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '16px' }}>
                 <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '4px' }}>Ciphertext <span style={{ fontFamily: 'serif', fontStyle: 'italic' }}>C<sub>E</sub> = (c<sub>1</sub>, c<sub>2</sub>)</span>:</div>
@@ -1613,7 +1613,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
             {/* Right: CCA */}
             <div style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '12px', padding: '16px' }}>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e', marginBottom: '12px', textTransform: 'uppercase' }}>✅ CCA-Secure (Encrypt-then-Sign)</div>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: '#22c55e', marginBottom: '12px', textTransform: 'uppercase' }}>✓ CCA-Secure (Encrypt-then-Sign)</div>
               
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', marginBottom: '16px' }}>
                 <div style={{ fontSize: '13px', color: 'var(--text3)', marginBottom: '4px' }}>Ciphertext & Signature <span style={{ fontFamily: 'serif', fontStyle: 'italic' }}>C = (C<sub>E</sub>, σ)</span>:</div>
@@ -1701,7 +1701,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               setPa19Loading(p => ({ ...p, and: false }));
             }}
           >
-            {pa19Loading.and ? '⏳ Computing...' : '▶ Compute Secure AND'}
+            {pa19Loading.and ? 'Computing...' : '▶ Compute Secure AND'}
           </button>
           
           <button 
@@ -1715,7 +1715,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               setPa19Loading(p => ({ ...p, table: false }));
             }}
           >
-            {pa19Loading.table ? '⏳...' : '▦ Run All (Truth Table)'}
+            {pa19Loading.table ? '...' : '▦ Run All (Truth Table)'}
           </button>
         </div>
 
@@ -1849,12 +1849,12 @@ const PADemoModal = ({ pa, onClose, api }) => {
     let plainResult = "";
     if (isFinished) {
       if (pa20Mode === 'comparator') {
-        if (pa20Data.alice_val_hidden > pa20Data.bob_val_hidden) plainResult = "Alice is richer 🤑";
-        else if (pa20Data.alice_val_hidden < pa20Data.bob_val_hidden) plainResult = "Bob is richer 🤑";
-        else plainResult = "Wealth is Equal 🤝";
+        if (pa20Data.alice_val_hidden > pa20Data.bob_val_hidden) plainResult = "Alice is richer ";
+        else if (pa20Data.alice_val_hidden < pa20Data.bob_val_hidden) plainResult = "Bob is richer ";
+        else plainResult = "Wealth is Equal ";
       } else if (pa20Mode === 'equality') {
-        if (pa20Data.output === 1) plainResult = "Match! 🟢";
-        else plainResult = "No Match 🔴";
+        if (pa20Data.output === 1) plainResult = "Match! ";
+        else plainResult = "No Match ";
       } else if (pa20Mode === 'adder') {
         plainResult = `The Sum is ${pa20Data.output}`;
       }
@@ -1885,17 +1885,17 @@ const PADemoModal = ({ pa, onClose, api }) => {
             className={`btn ${pa20Mode === 'comparator' ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => { setPa20Mode('comparator'); setPa20Data(null); }}
             style={{ flex: 1 }}
-          >💰 Millionaire's Problem</button>
+          >Millionaire's Problem</button>
           <button 
             className={`btn ${pa20Mode === 'equality' ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => { setPa20Mode('equality'); setPa20Data(null); }}
             style={{ flex: 1 }}
-          >🤝 Secure Equality</button>
+          >Secure Equality</button>
           <button 
             className={`btn ${pa20Mode === 'adder' ? 'btn-primary' : 'btn-ghost'}`}
             onClick={() => { setPa20Mode('adder'); setPa20Data(null); }}
             style={{ flex: 1 }}
-          >➕ Secure Adder</button>
+          >Secure Adder</button>
         </div>
 
         <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
@@ -1940,7 +1940,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           disabled={pa20Loading}
           onClick={handleCompute}
         >
-          {pa20Loading ? '⏳ Garbling & Evaluating Circuit...' : btnText}
+          {pa20Loading ? 'Garbling & Evaluating Circuit...' : btnText}
         </button>
 
         {pa20Data && (
@@ -2034,7 +2034,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           borderRadius: '12px',
           padding: '18px',
         }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase' }}>🔢 Live DLP Hash</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase' }}>Live DLP Hash</div>
           <input
             id="pa8-message-input"
             type="text"
@@ -2093,7 +2093,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '14px',
             border: '1px solid var(--border)', fontSize: '13px',
           }}>
-            <div style={{ fontWeight: 700, color: 'var(--text2)', marginBottom: '8px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>⚙️ Group Parameters (q ≈ 2³²)</div>
+            <div style={{ fontWeight: 700, color: 'var(--text2)', marginBottom: '8px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Group Parameters (q ≈ 2³²)</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px' }}>
               {[['p (safe prime)', pa8Hash.p], ['q (subgroup order)', pa8Hash.q], ['g (generator)', pa8Hash.g], ['ĥ = gᵅ (α discarded)', pa8Hash.h_pub]].map(([k, v]) => (
                 <React.Fragment key={k}>
@@ -2115,7 +2115,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           borderRadius: '12px',
           padding: '18px',
         }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>🎯 Collision Hunt  (birthday bound demo)</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>Collision Hunt  (birthday bound demo)</div>
 
           <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '14px', lineHeight: 1.5 }}>
             Truncates the hash to <strong>16 bits</strong> (output space = 65 536). Birthday bound ≈ 2<sup>16/2</sup> = <strong>256 evaluations</strong>.
@@ -2149,7 +2149,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 }, 350);
               }}
             >
-              {huntRunning ? '⚡ Hunting…' : collision ? '🔄 Hunt Again' : '🔍 Start Collision Hunt'}
+              {huntRunning ? 'Hunting…' : collision ? 'Hunt Again' : 'Start Collision Hunt'}
             </button>
 
             {huntRunning && (
@@ -2207,7 +2207,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 animation: 'fadeIn 0.4s ease',
               }}
             >
-              <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '10px', fontSize: '16px' }}>💥 Collision Found after {evals.toLocaleString()} evaluations!</div>
+              <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '10px', fontSize: '16px' }}>Collision Found after {evals.toLocaleString()} evaluations!</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: '14px' }}>
                 <span style={{ color: 'var(--text3)' }}>Input 1</span>
                 <code style={{ color: '#86efac', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px' }}>{collision.msg1}</code>
@@ -2291,7 +2291,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           borderRadius: '12px',
           padding: '18px',
         }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase' }}>🎛️ Output Bit-Length n</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--accent)', marginBottom: '12px', textTransform: 'uppercase' }}>Output Bit-Length n</div>
 
           {/* Segmented pill selector */}
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -2343,7 +2343,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           borderRadius: '12px',
           padding: '18px',
         }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>🎯 Birthday Attack</div>
+          <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: '#f59e0b', marginBottom: '12px', textTransform: 'uppercase' }}>Birthday Attack</div>
 
           <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
             <button
@@ -2376,7 +2376,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 }, 250);
               }}
             >
-              {pa9Running ? '⚡ Attacking…' : collision ? '🔄 Run Again' : '▶ Run Attack'}
+              {pa9Running ? 'Attacking…' : collision ? 'Run Again' : '▶ Run Attack'}
             </button>
 
             {pa9Running && (
@@ -2426,7 +2426,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             borderRadius: '12px',
             padding: '14px',
           }}>
-            <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text2)', marginBottom: '10px', textTransform: 'uppercase' }}>📈 Collision Probability vs Hashes Computed</div>
+            <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text2)', marginBottom: '10px', textTransform: 'uppercase' }}>Collision Probability vs Hashes Computed</div>
             <svg
               id="pa9-probability-chart"
               width={W}
@@ -2505,7 +2505,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               animation: 'fadeIn 0.4s ease',
             }}
           >
-            <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '10px', fontSize: '16px' }}>💥 Collision Found in {evals.toLocaleString()} evaluations! (expected ≈ {Math.round(bound)})</div>
+            <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '10px', fontSize: '16px' }}>Collision Found in {evals.toLocaleString()} evaluations! (expected ≈ {Math.round(bound)})</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px', fontSize: '14px' }}>
               <span style={{ color: 'var(--text3)' }}>Input 1</span>
               <code style={{ color: '#86efac', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px', wordBreak: 'break-all' }}>0x{collision.input1}</code>
@@ -2546,7 +2546,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             }}
             onClick={() => setPa2Tab('forward')}
           >
-            🌲 Tab 1: Forward (GGM Tree)
+            Tab 1: Forward (GGM Tree)
           </button>
           <button 
             className="btn"
@@ -2558,7 +2558,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             }}
             onClick={() => setPa2Tab('backward')}
           >
-            ⏪ Tab 2: Backward (PRG from PRF)
+            Tab 2: Backward (PRG from PRF)
           </button>
         </div>
 
@@ -2607,7 +2607,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   }
                 }}
               >
-                🎮 PRF Distinguishing Game Demo
+                PRF Distinguishing Game Demo
               </button>
             </div>
           </div>
@@ -2634,7 +2634,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 className="btn btn-primary"
                 onClick={() => runDemo(params, 'randomness')}
               >
-                🧪 Run NIST Tests
+                Run NIST Tests
               </button>
             </div>
 
@@ -2680,7 +2680,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           <div className="result-section animate-fade-in" style={{ marginTop: '20px' }}>
             <h3 style={{ margin: 0, marginBottom: '12px' }}>Distinguishing Game (PRF Security)</h3>
             <div style={{ padding: '12px', background: 'rgba(var(--accent-rgb), 0.05)', borderRadius: '8px', border: '1px dashed var(--border)' }}>
-              <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>🎯 Goal: Is it PRF or Random?</div>
+              <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '8px', color: 'var(--accent)' }}>Goal: Is it PRF or Random?</div>
               
               <div style={{ display: 'flex', gap: '10px', marginBottom: '12px' }}>
                 <div style={{ flex: 1, background: 'var(--bg2)', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
@@ -2709,8 +2709,8 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
               <div style={{ fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic', marginTop: '12px' }}>
                 {result.game.advantage < 0.1 ? 
-                  "✅ Success! The adversary has no significant advantage. The PRF is indistinguishable from random." : 
-                  "⚠️ Noticeable bias detected in this trial."}              
+                  "✓ Success! The adversary has no significant advantage. The PRF is indistinguishable from random." : 
+                  "Noticeable bias detected in this trial."}              
               </div>
             </div>
           </div>
@@ -2751,7 +2751,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         color: 'white', fontWeight: 700, fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer',
         transition: 'all 0.2s',
       }}>
-        {loading ? '⏳ …' : label}
+        {loading ? '…' : label}
       </button>
     );
 
@@ -2769,11 +2769,11 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 border: `1px solid ${pa10HashMode === m ? '#818cf8' : 'rgba(99,102,241,0.25)'}`,
                 color: pa10HashMode === m ? 'white' : 'var(--text2)', transition: 'all 0.18s',
               }}>
-                {m === 'dlp' ? '🔢 DLP Hash (PA#8)' : '🔒 SHA-256'}
+                {m === 'dlp' ? 'DLP Hash' : 'SHA-256'}
               </button>
             ))}
           </div>,
-          '#6366f1', '🔀 Hash Toggle'
+          '#6366f1', 'Hash Toggle'
         )}
 
         {/* ── Side-by-side length-extension ── */}
@@ -2791,7 +2791,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 onChange={e => setPa10LeSuffix(e.target.value)}
                 style={{ flex: 1, padding: '9px 13px', background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '8px', color: 'var(--text1)', fontSize: '15px', fontFamily: 'monospace', outline: 'none' }}
               />
-              {btn('⚡ Attack!', async () => {
+              {btn('Attack!', async () => {
                 setPa10LeLoading(true);
                 const d = await api.pa10LengthExtension(pa10LeSuffix, pa10HashMode);
                 setPa10LeData(d); setPa10LeLoading(false);
@@ -2801,7 +2801,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               {/* LEFT — broken */}
               <div style={{ background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '10px', padding: '14px' }}>
-                <div style={{ fontWeight: 700, color: '#f87171', marginBottom: '10px', fontSize: '14px' }}>⚠️ Naive H(k‖m) — BROKEN</div>
+                <div style={{ fontWeight: 700, color: '#f87171', marginBottom: '10px', fontSize: '14px' }}>Naive H(k‖m) — BROKEN</div>
                 {pa10LeLoading && <div className="spinner" style={{ margin: '10px auto' }} />}
                 {pa10LeData && <>
                   <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>Original message</div>
@@ -2810,17 +2810,17 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.naive_tag?.slice(0, 24) + '…', '#fca5a5')}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>Forged message (m‖pad‖m′)</div>
                   <div style={{ marginBottom: '8px', fontSize: '12px', fontFamily: 'monospace', wordBreak: 'break-all', color: '#fca5a5', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '6px' }}>{pa10LeData.forged_message}</div>
-                  <div style={{ marginBottom: '8px' }}>{badge(false, '', '🔥 Forgery Succeeded!')}</div>
+                  <div style={{ marginBottom: '8px' }}>{badge(false, '', 'Forgery Succeeded!')}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.4 }}>
                     Attacker used naive_tag as IV, continued hashing m′ — valid without knowing k.
                   </div>
                 </>}
-                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press ⚡ Attack!</div>}
+                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press Attack!</div>}
               </div>
 
               {/* RIGHT — HMAC */}
               <div style={{ background: 'rgba(34,197,94,0.07)', border: '1px solid rgba(34,197,94,0.35)', borderRadius: '10px', padding: '14px' }}>
-                <div style={{ fontWeight: 700, color: '#4ade80', marginBottom: '10px', fontSize: '14px' }}>✅ HMAC — SECURE</div>
+                <div style={{ fontWeight: 700, color: '#4ade80', marginBottom: '10px', fontSize: '14px' }}>✓ HMAC — SECURE</div>
                 {pa10LeLoading && <div className="spinner" style={{ margin: '10px auto' }} />}
                 {pa10LeData && <>
                   <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>Original message</div>
@@ -2829,12 +2829,12 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   <div style={{ marginBottom: '8px' }}>{mono(pa10LeData.hmac_tag?.slice(0, 24) + '…', '#86efac')}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text3)', marginBottom: '4px' }}>Same forged message attempted</div>
                   <div style={{ marginBottom: '8px', fontSize: '12px', fontFamily: 'monospace', wordBreak: 'break-all', color: '#86efac', background: 'rgba(0,0,0,0.3)', borderRadius: '4px', padding: '6px' }}>{pa10LeData.forged_message}</div>
-                  <div style={{ marginBottom: '8px' }}>{badge(true, '🔒 Forgery Failed!')}</div>
+                  <div style={{ marginBottom: '8px' }}>{badge(true, 'Forgery Failed!')}</div>
                   <div style={{ fontSize: '12px', color: 'var(--text3)', lineHeight: 1.4 }}>
                     HMAC wraps with outer hash — leaked state can't be reused without k.
                   </div>
                 </>}
-                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press ⚡ Attack!</div>}
+                {!pa10LeData && !pa10LeLoading && <div style={{ fontSize: '13px', color: 'var(--text3)', textAlign: 'center', padding: '20px' }}>Press Attack!</div>}
               </div>
             </div>
           </div>,
@@ -2950,7 +2950,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               padding: '7px 10px', borderRadius: '6px', border: `1px solid ${color}55`,
               background: 'rgba(0,0,0,0.2)', color: color, cursor: 'pointer', fontSize: '16px',
             }}
-          >🎲</button>
+          ></button>
         </div>
       </div>
     );
@@ -2965,7 +2965,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             border: '1px solid var(--border)', fontSize: '13px',
             display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 14px',
           }}>
-            <span style={{ color: 'var(--text3)', fontWeight: 600 }}>⚙️ Group</span>
+            <span style={{ color: 'var(--text3)', fontWeight: 600 }}>Group</span>
             <span />
             {[['p (safe prime)', pa11Data.p], ['q (order)', pa11Data.q], ['g (generator)', pa11Data.g]].map(([k, v]) => (
               <React.Fragment key={k}>
@@ -2984,7 +2984,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             background: 'linear-gradient(135deg, rgba(129,140,248,0.1) 0%, rgba(99,102,241,0.05) 100%)',
             border: `1px solid ${aliceClr}55`, borderRadius: '12px', padding: '16px',
           }}>
-            <div style={{ fontWeight: 700, color: aliceClr, fontSize: '15px', marginBottom: '14px' }}>👩 Alice</div>
+            <div style={{ fontWeight: 700, color: aliceClr, fontSize: '15px', marginBottom: '14px' }}>Alice</div>
             {inputField('Private exponent a (hex)', pa11AliceExp, setPa11AliceExp, 'random', aliceClr)}
             {pa11Data && (
               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -3003,7 +3003,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             background: 'linear-gradient(135deg, rgba(52,211,153,0.1) 0%, rgba(16,185,129,0.05) 100%)',
             border: `1px solid ${bobClr}55`, borderRadius: '12px', padding: '16px',
           }}>
-            <div style={{ fontWeight: 700, color: bobClr, fontSize: '15px', marginBottom: '14px' }}>👨 Bob</div>
+            <div style={{ fontWeight: 700, color: bobClr, fontSize: '15px', marginBottom: '14px' }}>Bob</div>
             {inputField('Private exponent b (hex)', pa11BobExp, setPa11BobExp, 'random', bobClr)}
             {pa11Data && (
               <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -3067,7 +3067,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               transition: 'all 0.2s',
             }}
           >
-            {busy('exchange') ? '⚡ Exchanging…' : pa11Data ? '🔄 Re-Exchange' : '🔑 Exchange'}
+            {busy('exchange') ? 'Exchanging…' : pa11Data ? 'Re-Exchange' : 'Exchange'}
           </button>
 
           {/* Eve checkbox */}
@@ -3093,7 +3093,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               {pa11EveEnabled ? '✓' : ''}
             </span>
             <span style={{ fontSize: '14px', fontWeight: 600, color: pa11EveEnabled ? eveClr : 'var(--text2)', whiteSpace: 'nowrap' }}>
-              👿 Enable Eve
+              Enable Eve
             </span>
           </label>
         </div>
@@ -3107,7 +3107,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             animation: 'fadeIn 0.35s ease',
           }}>
             <div style={{ fontWeight: 700, color: eveClr, fontSize: '15px', marginBottom: '14px' }}>
-              👿 Eve — Man-in-the-Middle
+              Eve — Man-in-the-Middle
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
@@ -3131,7 +3131,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                 borderRadius: '8px', padding: '10px 14px',
                 fontSize: '14px', color: '#fca5a5', lineHeight: 1.5,
               }}>
-                💥 <strong>Attack successful!</strong> Eve holds both shared secrets.
+                <strong>Attack successful!</strong> Eve holds both shared secrets.
                 She can decrypt all traffic from Alice, re-encrypt for Bob, and vice versa — completely transparently.
                 Alice and Bob each believe they share a secret, but Eve reads everything.
               </div>
@@ -3146,7 +3146,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           borderRadius: '12px', padding: '16px',
         }}>
           <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '12px' }}>
-            🔬 CDH Hardness Demonstration
+            CDH Hardness Demonstration
           </div>
           <div style={{ fontSize: '14px', color: 'var(--text2)', marginBottom: '12px', lineHeight: 1.5 }}>
             For tiny parameters (q ≈ 2<sup>{pa11CdhBits}</sup>), brute-forcing the discrete log is feasible.
@@ -3181,7 +3181,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               border: 'none', color: busy('cdh') ? '#f59e0b' : 'white', transition: 'all 0.2s',
             }}
           >
-            {busy('cdh') ? '⏳ Brute-forcing…' : '💪 Run Brute Force'}
+            {busy('cdh') ? 'Brute-forcing…' : 'Run Brute Force'}
           </button>
 
           {pa11CdhData && (
@@ -3244,37 +3244,37 @@ const PADemoModal = ({ pa, onClose, api }) => {
       setPa18Loading(true);
       setPa18Step(0);
       setPa18PlayData(null);
-      setPa18Log([{ icon: '🔑', text: `Bob selects b=${choice} — generating key pairs…`, color: '#a5b4fc' }]);
+      setPa18Log([{ icon: '', text: `Bob selects b=${choice} — generating key pairs…`, color: '#a5b4fc' }]);
       try {
         const data = await api.pa18Play(choice, Number(pa18M0), Number(pa18M1));
         // Step 1 — keys ready
         await sleep(500);
         setPa18Step(1);
         setPa18Log([
-          { icon: '🔑', text: `Bob selects b=${choice} — generating key pairs…`, color: '#a5b4fc' },
+          { icon: '', text: `Bob selects b=${choice} — generating key pairs…`, color: '#a5b4fc' },
           { icon: '✓', text: `pk_${choice}   = g^sk (honest) →  …${shortNum(choice === 0 ? data.pk0_h : data.pk1_h)}`, color: '#34d399' },
           { icon: '✓', text: `pk_${1-choice} = random element  →  …${shortNum(choice === 0 ? data.pk1_h : data.pk0_h)}  (no trapdoor)`, color: '#fbbf24' },
-          { icon: '📤', text: `(pk₀, pk₁) sent to Alice`, color: '#a5b4fc' },
+          { icon: '', text: `(pk₀, pk₁) sent to Alice`, color: '#a5b4fc' },
         ]);
         // Step 2 — ciphertexts
         await sleep(600);
         setPa18Step(2);
         setPa18Log(prev => [...prev,
-          { icon: '🔒', text: `Alice encrypts: C₀ = ElGamal(pk₀, m₀)  →  […${shortNum(data.C0[0])}, …${shortNum(data.C0[1])}]`, color: '#c4b5fd' },
-          { icon: '🔒', text: `Alice encrypts: C₁ = ElGamal(pk₁, m₁)  →  […${shortNum(data.C1[0])}, …${shortNum(data.C1[1])}]`, color: '#c4b5fd' },
-          { icon: '📥', text: `(C₀, C₁) received by Bob`, color: '#a5b4fc' },
+          { icon: '', text: `Alice encrypts: C₀ = ElGamal(pk₀, m₀)  →  […${shortNum(data.C0[0])}, …${shortNum(data.C0[1])}]`, color: '#c4b5fd' },
+          { icon: '', text: `Alice encrypts: C₁ = ElGamal(pk₁, m₁)  →  […${shortNum(data.C1[0])}, …${shortNum(data.C1[1])}]`, color: '#c4b5fd' },
+          { icon: '', text: `(C₀, C₁) received by Bob`, color: '#a5b4fc' },
         ]);
         // Step 3 — decrypt
         await sleep(600);
         setPa18Step(3);
         setPa18PlayData(data);
         setPa18Log(prev => [...prev,
-          { icon: '🔓', text: `Bob decrypts C_${choice} using sk_${choice}…`, color: '#a5b4fc' },
-          { icon: '✨', text: `m_${choice} = ${data.mb}  ← revealed!`, color: '#34d399' },
-          { icon: '🔒', text: `m_${1-choice} = ??  ← no sk_${1-choice}, cannot decrypt`, color: '#f87171' },
+          { icon: '', text: `Bob decrypts C_${choice} using sk_${choice}…`, color: '#a5b4fc' },
+          { icon: '', text: `m_${choice} = ${data.mb}  ← revealed!`, color: '#34d399' },
+          { icon: '', text: `m_${1-choice} = ??  ← no sk_${1-choice}, cannot decrypt`, color: '#f87171' },
         ]);
       } catch (err) {
-        setPa18Log(prev => [...prev, { icon: '❌', text: `Error: ${err.message}`, color: '#f87171' }]);
+        setPa18Log(prev => [...prev, { icon: '✗', text: `Error: ${err.message}`, color: '#f87171' }]);
       }
       setPa18Loading(false);
     };
@@ -3313,7 +3313,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             minWidth: 180,
           }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: '#c4b5fd', letterSpacing: '0.06em' }}>
-              👩 ALICE &nbsp;<span style={{ fontWeight: 400, opacity: 0.6, fontSize: '10px' }}>Sender</span>
+              ALICE &nbsp;<span style={{ fontWeight: 400, opacity: 0.6, fontSize: '10px' }}>Sender</span>
             </div>
 
             {[['m₀', pa18M0, setPa18M0], ['m₁', pa18M1, setPa18M1]].map(([label, val, setter]) => (
@@ -3329,7 +3329,6 @@ const PADemoModal = ({ pa, onClose, api }) => {
                     color: 'var(--text1)', outline: 'none',
                   }}
                 />
-                <span style={{ fontSize: '16px' }}>{done ? '🔒' : '❓'}</span>
               </div>
             ))}
 
@@ -3348,7 +3347,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             minWidth: 180,
           }}>
             <div style={{ fontSize: '12px', fontWeight: 700, color: '#86efac', letterSpacing: '0.06em' }}>
-              🧑 BOB &nbsp;<span style={{ fontWeight: 400, opacity: 0.6, fontSize: '10px' }}>Receiver</span>
+              BOB &nbsp;<span style={{ fontWeight: 400, opacity: 0.6, fontSize: '10px' }}>Receiver</span>
             </div>
 
             <div style={{ fontSize: '12px', color: 'var(--text2)', marginBottom: '4px' }}>Choose which message to receive:</div>
@@ -3370,7 +3369,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                     transition: 'all 0.25s',
                   }}
                 >
-                  {pa18Loading && b === choice ? '⏳' : `m${choice === 0 ? '₀' : '₁'}`}
+                  {pa18Loading && b === choice ? '…' : `m${choice === 0 ? '₀' : '₁'}`}
                 </button>
               ))}
             </div>
@@ -3383,7 +3382,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   border: '2px solid #22c55e', borderRadius: '10px', padding: '12px',
                   textAlign: 'center',
                 }}>
-                  <div style={{ fontSize: '11px', color: '#86efac', marginBottom: '4px' }}>m_{b} revealed ✨</div>
+                  <div style={{ fontSize: '11px', color: '#86efac', marginBottom: '4px' }}>m_{b} revealed </div>
                   <div style={{ fontSize: '28px', fontWeight: 900, color: '#22c55e', fontFamily: 'monospace' }}>
                     {pa18PlayData?.mb}
                   </div>
@@ -3432,7 +3431,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             borderRadius: '10px', padding: '14px',
           }}>
             <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text3)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
-              📋 Protocol Log
+              Protocol Log
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {pa18Log.map((entry, i) => (
@@ -3458,7 +3457,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             border: '1px solid rgba(245,158,11,0.35)', borderRadius: '12px', padding: '16px',
           }}>
             <div style={{ fontSize: '11px', fontWeight: 700, color: '#f59e0b', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '10px' }}>
-              🕵️ Cheat Attempt — Try Decrypting m_&#123;1-b&#125;
+              Cheat Attempt — Try Decrypting m_&#123;1-b&#125;
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '12px' }}>
               Bob tries brute-forcing <code style={{ color: '#fbbf24' }}>sk_&#123;1-b&#125;</code> by trying 5 000 consecutive guesses and decrypting C<sub>&#123;1-b&#125;</sub>. Since sk_&#123;1-b&#125; was chosen uniformly from a ~2³¹ group, the odds of a hit are ≈ 0.00025 %.
@@ -3503,7 +3502,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               color: pa18CorrectnessData ? '#86efac' : '#a5b4fc',
             }}
           >
-            {pa18CtlLoading.correctness ? '⏳ Running…' : '🧪 100-Trial Correctness'}
+            {pa18CtlLoading.correctness ? 'Running…' : '100-Trial Correctness'}
           </button>
           <button
             id="pa18-privacy-btn"
@@ -3521,7 +3520,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               color: pa18PrivacyData ? '#fbbf24' : '#a5b4fc',
             }}
           >
-            {pa18CtlLoading.privacy ? '⏳ Running…' : '🔍 Privacy Analysis'}
+            {pa18CtlLoading.privacy ? 'Running…' : 'Privacy Analysis'}
           </button>
         </div>
 
@@ -3532,7 +3531,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             borderRadius: '10px', padding: '14px',
           }}>
             <div style={{ fontWeight: 700, color: '#22c55e', marginBottom: '8px', fontSize: '13px' }}>
-              🧪 Correctness: {pa18CorrectnessData.correct}/{pa18CorrectnessData.trials} trials passed
+              Correctness: {pa18CorrectnessData.correct}/{pa18CorrectnessData.trials} trials passed
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={{ flex: 1, height: 8, background: 'rgba(0,0,0,0.3)', borderRadius: 4, overflow: 'hidden' }}>
@@ -3547,7 +3546,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               </span>
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text3)', marginTop: '8px' }}>
-              {pa18CorrectnessData.all_correct ? '✓ All 100 trials: receiver always recovers m_b correctly.' : '⚠ Some failures — check group parameters.'}
+              {pa18CorrectnessData.all_correct ? '✓ All 100 trials: receiver always recovers m_b correctly.' : 'Some failures — check group parameters.'}
             </div>
           </div>
         )}
@@ -3558,7 +3557,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.3)',
             borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px',
           }}>
-            <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '13px' }}>🔍 Privacy Analysis</div>
+            <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '13px' }}>Privacy Analysis</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               {/* Receiver privacy */}
               <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '8px', padding: '10px' }}>
@@ -3624,26 +3623,26 @@ const PADemoModal = ({ pa, onClose, api }) => {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button className="btn btn-primary" onClick={() => { setResult(null); runDemo({ ...params, task: params.n === '561' ? 'carmichael' : 'test' }); }}>
-                🧪 Run Miller-Rabin
+                Run Miller-Rabin
               </button>
               <button className="btn btn-secondary" onClick={() => { setResult(null); runDemo({ ...params, task: 'generate', bits: 64 }); }}>
-                🎲 Gen 64-bit Prime
+                Gen 64-bit Prime
               </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button className="btn btn-secondary" style={{ fontSize: '11px' }} onClick={() => { setParams({ ...params, n: '561' }); setResult(null); }}>
-                🛡️ Load 561 (Carmichael)
+                Load 561 (Carmichael)
               </button>
               <button className="btn btn-secondary" style={{ fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis' }} onClick={() => { setParams({ ...params, n: '50454031626014583076315936191179085094450305445103984158485369931027336053089', task: 'test' }); setResult(null); }}>
-                🧩 Load Known Composite
+                Load Known Composite
               </button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
               <button className="btn btn-secondary" style={{ fontSize: '11px', overflow: 'hidden', textOverflow: 'ellipsis' }} onClick={() => { setParams({ ...params, n: '99143722431692432695197203697643226071348800903354283165788708015992029220483', task: 'test' }); setResult(null); }}>
-                💎 Load 256-bit Prime
+                Load 256-bit Prime
               </button>
               <button className="btn btn-secondary" style={{ fontSize: '11px' }} onClick={() => { setResult(null); runDemo({ ...params, task: 'benchmark' }); }}>
-                📊 Performance Benchmark
+                Performance Benchmark
               </button>
             </div>
           </div>
@@ -3736,7 +3735,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         {result && result.fermat_samples && (
           <div className="carmichael-section animate-slide-in" style={{ padding: '20px', background: 'var(--bg2)', borderRadius: '12px', border: '1px solid var(--border)', marginBottom: '20px' }}>
             <h3 style={{ fontSize: '15px', color: '#f59e0b', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              🛡️ The Carmichael Paradox (n = 561)
+              The Carmichael Paradox (n = 561)
             </h3>
             <p style={{ fontSize: '12px', margin: '8px 0', opacity: 0.8, lineHeight: '1.5' }}>
               561 is composite (3×11×17), but it passes the Fermat test for <strong>all</strong> bases 'a' coprime to n. 
@@ -3782,7 +3781,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             borderRadius: '12px', 
             border: '1px solid var(--border)' 
           }}>
-            <h3 style={{ fontSize: '15px', marginBottom: '16px' }}>📊 Primality Performance Benchmarks</h3>
+            <h3 style={{ fontSize: '15px', marginBottom: '16px' }}>Primality Performance Benchmarks</h3>
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                 <thead>
@@ -3844,7 +3843,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             <div><label style={{ fontSize: '12px', color: 'var(--text3)' }}>Plaintext Integer</label><input type="text" value={pa12MsgInt} onChange={e => setPa12MsgInt(e.target.value)} style={{ width: '100%', padding: '6px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px' }} /></div>
             <div><label style={{ fontSize: '12px', color: 'var(--text3)' }}>PKCS Message</label><input type="text" value={pa12MsgPkcs} onChange={e => setPa12MsgPkcs(e.target.value)} style={{ width: '100%', padding: '6px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px' }} /></div>
           </div>
-          <button onClick={runPA12} disabled={pa12Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa12Loading ? '⏳ Generating Keys...' : '🔐 Generate RSA Keys & Run'}</button>
+          <button onClick={runPA12} disabled={pa12Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa12Loading ? 'Generating Keys...' : 'Generate RSA Keys & Run'}</button>
         </div>
         {pa12Data && (<>
           <div style={sectionBox}>
@@ -3855,7 +3854,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
           <div style={{ display: 'flex', gap: '4px', marginBottom: '4px' }}>
             <button onClick={() => setPa12Tab('textbook')} style={tabStyle('textbook')}>Textbook RSA</button>
             <button onClick={() => setPa12Tab('pkcs')} style={tabStyle('pkcs')}>PKCS#1 v1.5</button>
-            <button onClick={() => setPa12Tab('attacks')} style={tabStyle('attacks')}>⚠️ Attacks</button>
+            <button onClick={() => setPa12Tab('attacks')} style={tabStyle('attacks')}>Attacks</button>
           </div>
           <div style={{ background: 'rgba(0,0,0,0.2)', padding: '16px', borderRadius: '0 10px 10px 10px', border: '1px solid var(--border)' }}>
             {pa12Tab === 'textbook' && (<div>
@@ -3871,9 +3870,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
               <div style={sectionBox}><div style={labelSt}>PKCS#1 v1.5 Padding: 0x00 ‖ 0x02 ‖ PS ‖ 0x00 ‖ M</div><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}><div><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Original</div><div style={{ fontSize: '18px', color: 'var(--accent)' }}>{pa12Data.pkcs.message}</div></div><div><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Decrypted</div><div style={{ fontSize: '18px', color: pa12Data.pkcs.match ? '#4ade80' : '#ef4444' }}>{pa12Data.pkcs.decrypted} {pa12Data.pkcs.match ? '✓' : '✗'}</div></div></div></div>
             </div>)}
             {pa12Tab === 'attacks' && (<div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ ...sectionBox, borderColor: 'rgba(239,68,68,0.3)' }}><div style={{ ...labelSt, color: '#ef4444' }}>⚠️ Determinism Attack</div><div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{pa12Data.determinism?.vulnerability}</div><div style={monoVal}>c₁ = Enc({pa12Data.determinism?.message}) = {String(pa12Data.determinism?.c1)?.slice(0,40)}...</div><div style={monoVal}>c₂ = Enc({pa12Data.determinism?.message}) = {String(pa12Data.determinism?.c2)?.slice(0,40)}...</div><div style={{ color: pa12Data.determinism?.identical ? '#ef4444' : '#4ade80', fontWeight: 700, marginTop: '6px' }}>Identical: {pa12Data.determinism?.identical ? '✓ YES — Deterministic!' : 'No'}</div></div>
-              <div style={{ ...sectionBox, borderColor: 'rgba(251,191,36,0.3)' }}><div style={{ ...labelSt, color: '#fbbf24' }}>⚠️ Multiplicative Homomorphism</div><div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{pa12Data.homomorphism?.vulnerability}</div><div style={monoVal}>Enc({pa12Data.homomorphism?.m1}) · Enc({pa12Data.homomorphism?.m2}) mod n → Dec = {pa12Data.homomorphism?.c1_c2_decrypted}</div><div style={{ color: pa12Data.homomorphism?.homomorphic ? '#ef4444' : '#4ade80', fontWeight: 700, marginTop: '6px' }}>Homomorphic: {pa12Data.homomorphism?.homomorphic ? '✓ Attack works!' : 'No'}</div></div>
-              <div style={{ ...sectionBox, borderColor: 'rgba(168,85,247,0.3)' }}><div style={{ ...labelSt, color: '#a855f7' }}>⚠️ Bleichenbacher Padding Oracle</div><div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{pa12Data.bleichenbacher?.vulnerability}</div><div style={monoVal}>Valid ciphertext passes oracle: {pa12Data.bleichenbacher?.valid_ciphertext_oracle ? '✓' : '✗'}</div><div style={monoVal}>Random ciphertexts accepted: {pa12Data.bleichenbacher?.random_oracle_accepts}/{pa12Data.bleichenbacher?.random_trials} ({(pa12Data.bleichenbacher?.accept_rate * 100)?.toFixed(1)}%)</div></div>
+              <div style={{ ...sectionBox, borderColor: 'rgba(239,68,68,0.3)' }}><div style={{ ...labelSt, color: '#ef4444' }}>Determinism Attack</div><div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{pa12Data.determinism?.vulnerability}</div><div style={monoVal}>c₁ = Enc({pa12Data.determinism?.message}) = {String(pa12Data.determinism?.c1)?.slice(0,40)}...</div><div style={monoVal}>c₂ = Enc({pa12Data.determinism?.message}) = {String(pa12Data.determinism?.c2)?.slice(0,40)}...</div><div style={{ color: pa12Data.determinism?.identical ? '#ef4444' : '#4ade80', fontWeight: 700, marginTop: '6px' }}>Identical: {pa12Data.determinism?.identical ? '✓ YES — Deterministic!' : 'No'}</div></div>
+              <div style={{ ...sectionBox, borderColor: 'rgba(251,191,36,0.3)' }}><div style={{ ...labelSt, color: '#fbbf24' }}>Multiplicative Homomorphism</div><div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{pa12Data.homomorphism?.vulnerability}</div><div style={monoVal}>Enc({pa12Data.homomorphism?.m1}) · Enc({pa12Data.homomorphism?.m2}) mod n → Dec = {pa12Data.homomorphism?.c1_c2_decrypted}</div><div style={{ color: pa12Data.homomorphism?.homomorphic ? '#ef4444' : '#4ade80', fontWeight: 700, marginTop: '6px' }}>Homomorphic: {pa12Data.homomorphism?.homomorphic ? '✓ Attack works!' : 'No'}</div></div>
+              <div style={{ ...sectionBox, borderColor: 'rgba(168,85,247,0.3)' }}><div style={{ ...labelSt, color: '#a855f7' }}>Bleichenbacher Padding Oracle</div><div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>{pa12Data.bleichenbacher?.vulnerability}</div><div style={monoVal}>Valid ciphertext passes oracle: {pa12Data.bleichenbacher?.valid_ciphertext_oracle ? '✓' : '✗'}</div><div style={monoVal}>Random ciphertexts accepted: {pa12Data.bleichenbacher?.random_oracle_accepts}/{pa12Data.bleichenbacher?.random_trials} ({(pa12Data.bleichenbacher?.accept_rate * 100)?.toFixed(1)}%)</div></div>
             </div>)}
           </div>
         </>)}
@@ -3901,7 +3900,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             <div><label style={{ fontSize: '12px', color: 'var(--text3)' }}>Residues (comma-sep)</label><input type="text" value={pa14Residues} onChange={e => setPa14Residues(e.target.value)} style={{ width: '100%', padding: '6px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px' }} /></div>
             <div><label style={{ fontSize: '12px', color: 'var(--text3)' }}>Moduli (comma-sep)</label><input type="text" value={pa14Moduli} onChange={e => setPa14Moduli(e.target.value)} style={{ width: '100%', padding: '6px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px' }} /></div>
           </div>
-          <button onClick={runPA14} disabled={pa14Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa14Loading ? '⏳ Computing...' : '🧮 Solve CRT & Run Håstad'}</button>
+          <button onClick={runPA14} disabled={pa14Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa14Loading ? 'Computing...' : 'Solve CRT & Run Håstad'}</button>
         </div>
         {pa14Data && (<>
           <div style={sectionBox}>
@@ -3916,7 +3915,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             <div style={{ textAlign: 'center', fontSize: '20px', color: 'var(--accent)', fontWeight: 700 }}>x = {pa14Data.crt_result?.solution}</div>
           </div>
           <div style={{ ...sectionBox, borderColor: 'rgba(239,68,68,0.3)' }}>
-            <div style={{ ...labelSt, color: '#ef4444' }}>⚠️ Håstad Broadcast Attack (e=3)</div>
+            <div style={{ ...labelSt, color: '#ef4444' }}>Håstad Broadcast Attack (e=3)</div>
             <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>If the same message m is encrypted with e=3 under 3 different RSA public keys, the attacker can use CRT to recover m³ mod N₁N₂N₃, then compute the cube root to recover m.</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div><div style={{ fontSize: '12px', color: 'var(--text3)' }}>Key Size</div><div style={{ fontSize: '16px', color: 'var(--text1)' }}>{pa14Data.hastad?.bits}-bit</div></div>
@@ -3945,7 +3944,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         <div style={sectionBox}>
           <div style={labelSt}>Message to Sign</div>
           <input type="text" value={pa15Msg} onChange={e => setPa15Msg(e.target.value)} style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px', marginBottom: '10px' }} />
-          <button onClick={runPA15} disabled={pa15Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa15Loading ? '⏳ Signing...' : '✍️ Sign & Verify'}</button>
+          <button onClick={runPA15} disabled={pa15Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa15Loading ? 'Signing...' : 'Sign & Verify'}</button>
         </div>
         {pa15Data && (<>
           <div style={sectionBox}>
@@ -3960,11 +3959,11 @@ const PADemoModal = ({ pa, onClose, api }) => {
             </div>
           </div>
           <div style={{ ...sectionBox, borderColor: 'rgba(239,68,68,0.3)' }}>
-            <div style={{ ...labelSt, color: '#ef4444' }}>⚠️ Signature Homomorphism Attack</div>
+            <div style={{ ...labelSt, color: '#ef4444' }}>Signature Homomorphism Attack</div>
             <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>Textbook RSA signatures are homomorphic: σ(m₁)·σ(m₂) = σ(m₁·m₂). Hash-then-sign prevents this because H(m₁·m₂) ≠ H(m₁)·H(m₂).</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div style={{ padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', textAlign: 'center' }}><div style={{ fontSize: '12px', color: '#fca5a5' }}>Raw RSA Attack</div><div style={{ fontSize: '16px', color: pa15Data.attack?.raw_works ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa15Data.attack?.raw_works ? '⚠️ Works!' : '✓ Blocked'}</div></div>
-              <div style={{ padding: '10px', background: 'rgba(34,197,94,0.08)', borderRadius: '8px', textAlign: 'center' }}><div style={{ fontSize: '12px', color: '#86efac' }}>Hash-then-Sign</div><div style={{ fontSize: '16px', color: pa15Data.attack?.hash_works ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa15Data.attack?.hash_works ? '⚠️ Works!' : '✓ Blocked!'}</div></div>
+              <div style={{ padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px', textAlign: 'center' }}><div style={{ fontSize: '12px', color: '#fca5a5' }}>Raw RSA Attack</div><div style={{ fontSize: '16px', color: pa15Data.attack?.raw_works ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa15Data.attack?.raw_works ? 'Works!' : '✓ Blocked'}</div></div>
+              <div style={{ padding: '10px', background: 'rgba(34,197,94,0.08)', borderRadius: '8px', textAlign: 'center' }}><div style={{ fontSize: '12px', color: '#86efac' }}>Hash-then-Sign</div><div style={{ fontSize: '16px', color: pa15Data.attack?.hash_works ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa15Data.attack?.hash_works ? 'Works!' : '✓ Blocked!'}</div></div>
             </div>
           </div>
         </>)}
@@ -3989,7 +3988,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
         <div style={sectionBox}>
           <div style={labelSt}>ElGamal Plaintext (Integer)</div>
           <input type="number" value={pa16MsgInt} onChange={e => setPa16MsgInt(e.target.value)} style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid var(--border)', borderRadius: '6px', color: 'white', fontFamily: 'monospace', fontSize: '13px', marginBottom: '10px' }} />
-          <button onClick={runPA16} disabled={pa16Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa16Loading ? '⏳ Encrypting...' : '🔑 ElGamal Encrypt & Attack'}</button>
+          <button onClick={runPA16} disabled={pa16Loading} style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent)', color: '#000', fontWeight: 700, cursor: 'pointer', border: 'none', fontSize: '14px' }}>{pa16Loading ? 'Encrypting...' : 'ElGamal Encrypt & Attack'}</button>
         </div>
         {pa16Data && (<>
           <div style={sectionBox}>
@@ -4003,9 +4002,9 @@ const PADemoModal = ({ pa, onClose, api }) => {
           </div>
           <div style={{ ...sectionBox, textAlign: 'center' }}><div style={labelSt}>Decrypted</div><div style={{ fontSize: '28px', color: pa16Data.match ? '#4ade80' : '#ef4444' }}>{pa16Data.decrypted} {pa16Data.match ? '✓' : '✗'}</div></div>
           <div style={{ ...sectionBox, borderColor: 'rgba(239,68,68,0.3)' }}>
-            <div style={{ ...labelSt, color: '#ef4444' }}>⚠️ Malleability Attack</div>
+            <div style={{ ...labelSt, color: '#ef4444' }}>Malleability Attack</div>
             <div style={{ fontSize: '13px', color: 'var(--text2)', marginBottom: '8px' }}>ElGamal is multiplicatively homomorphic: multiplying c₂ by a factor t yields Dec(c₁, t·c₂) = t·m. An attacker can manipulate the plaintext without knowing it.</div>
-            <div style={{ textAlign: 'center', padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px' }}><div style={{ fontSize: '16px', color: pa16Data.malleability ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa16Data.malleability ? '⚠️ Malleability Confirmed!' : '✓ Not Malleable'}</div></div>
+            <div style={{ textAlign: 'center', padding: '10px', background: 'rgba(239,68,68,0.08)', borderRadius: '8px' }}><div style={{ fontSize: '16px', color: pa16Data.malleability ? '#ef4444' : '#4ade80', fontWeight: 700 }}>{pa16Data.malleability ? 'Malleability Confirmed!' : '✓ Not Malleable'}</div></div>
           </div>
         </>)}
       </div>
@@ -4037,7 +4036,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-header">
-          <h2>PA#{pa.pa} — {pa.title}</h2>
+          <h2>{pa.title}</h2>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">

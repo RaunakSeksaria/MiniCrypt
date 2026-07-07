@@ -147,7 +147,7 @@ const GGMVisualizer = ({ tree, queryBits, output }) => {
       </div>
       
       <div style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text3)', fontStyle: 'italic' }}>
-        💡 Blue path shows the route determined by the bits of x. Hover over nodes to see hex values.
+        The highlighted path shows the route determined by the bits of x. Hover over nodes to see hex values.
       </div>
     </div>
   );

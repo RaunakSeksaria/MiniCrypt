@@ -77,7 +77,7 @@ const Explorer = ({ foundation, api }) => {
       {/* Column 1: Build */}
       <div className="panel">
         <div className="panel-header">
-          <h2>⚡ Build Source Primitive <span className="badge">Leg 1</span></h2>
+          <h2>Build Source Primitive <span className="badge">Leg 1</span></h2>
         </div>
         <div className="panel-body">
           <div className="field">
@@ -119,7 +119,7 @@ const Explorer = ({ foundation, api }) => {
       {/* Column 2: Reduce */}
       <div className="panel">
         <div className="panel-header">
-          <h2>🔄 Reduce to Target <span className="badge">Leg 2</span></h2>
+          <h2>Reduce to Target <span className="badge">Leg 2</span></h2>
         </div>
         <div className="panel-body">
           <div className="field">
@@ -152,7 +152,7 @@ const Explorer = ({ foundation, api }) => {
           
           {reduceError && (
             <div style={{ color: 'var(--amber)', padding: '12px', background: 'var(--bg)', borderRadius: '8px' }}>
-              ⚠️ {reduceError}
+              {reduceError}
             </div>
           )}
           

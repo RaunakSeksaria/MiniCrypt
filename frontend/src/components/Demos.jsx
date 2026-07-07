@@ -38,12 +38,12 @@ const Demos = ({ onSelectPA }) => {
           >
             <div className="card-header">
               <h3>{p.title}</h3>
-              <span className="pa-num">PA#{p.pa}</span>
+              <span className="pa-num">Module {p.pa}</span>
             </div>
             <div className="card-body">
               {p.desc}<br />
               <small style={{ color: 'var(--text3)' }}>
-                Phase {p.phase}: {phaseNames[p.phase]}
+                {phaseNames[p.phase]}
               </small>
             </div>
           </div>

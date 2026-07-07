@@ -8,7 +8,7 @@ const ProofPanel = ({ proofData, foundation, source, target }) => {
   return (
     <div className="proof-panel">
       <div className="proof-header" onClick={() => setIsOpen(!isOpen)}>
-        <span>📜 Reduction Chain & Security Proofs</span>
+        <span>Reduction Chain & Security Proofs</span>
         <span>{isOpen ? '▲' : '▼'}</span>
       </div>
       <div className={`proof-body ${isOpen ? 'open' : ''}`}>

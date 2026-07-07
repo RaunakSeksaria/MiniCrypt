@@ -6,8 +6,8 @@ const Header = ({ foundation, setFoundation }) => {
       <div className="logo">
         <div className="logo-icon">M</div>
         <div>
-          <h1>Minicrypt Clique Explorer</h1>
-          <span>CS8.401 · Principles of Information Security</span>
+          <h1>MiniCrypt Explorer</h1>
+          <span>Cryptographic primitives &amp; reductions, from scratch</span>
         </div>
       </div>
       <div className="foundation-toggle">

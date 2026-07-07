@@ -7,19 +7,19 @@ const Nav = ({ activeTab, setActiveTab }) => {
         className={activeTab === 'explorer' ? 'active' : ''} 
         onClick={() => setActiveTab('explorer')}
       >
-        🔗 Clique Explorer
+        Clique Explorer
       </button>
       <button 
         className={activeTab === 'demos' ? 'active' : ''} 
         onClick={() => setActiveTab('demos')}
       >
-        🧪 PA Demos
+        Demos
       </button>
       <button 
         className={activeTab === 'graph' ? 'active' : ''} 
         onClick={() => setActiveTab('graph')}
       >
-        📊 Dependency Graph
+        Dependency Graph
       </button>
     </nav>
   );
