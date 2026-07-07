@@ -1,5 +1,5 @@
 """
-api/server.py — FastAPI backend for the Minicrypt Clique Web Explorer (PA#0).
+api/server.py — FastAPI backend for the MiniCrypt Explorer.
 Exposes all crypto primitives via REST endpoints.
 """
 import sys, os
@@ -7,13 +7,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 import json, traceback, threading, uuid, time
 
-app = FastAPI(title="Minicrypt Clique Explorer API") # Reload trigger v2
+app = FastAPI(title="MiniCrypt Explorer API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ── Pydantic models ──
@@ -41,18 +39,18 @@ def safe_hex(b):
 
 # ── ROUTING TABLE ──
 DIRECT_REDUCTIONS = {
-    ("OWF", "PRG"): ("OWF→PRG", "HILL hard-core-bit (PA#1)"),
+    ("OWF", "PRG"): ("OWF→PRG", "HILL hard-core-bit"),
     ("OWF", "OWP"): ("OWF→OWP", "DLP is already a OWP"),
-    ("PRG", "PRF"): ("PRG→PRF", "GGM tree construction (PA#2)"),
+    ("PRG", "PRF"): ("PRG→PRF", "GGM tree construction"),
     ("PRF", "PRP"): ("PRF→PRP", "Luby-Rackoff 3-round Feistel"),
-    ("PRF", "MAC"): ("PRF→MAC", "Mac_k(m)=F_k(m) (PA#5)"),
+    ("PRF", "MAC"): ("PRF→MAC", "Mac_k(m)=F_k(m)"),
     ("PRP", "PRF"): ("PRP→PRF", "PRP/PRF switching lemma"),
-    ("CRHF", "HMAC"): ("CRHF→HMAC", "HMAC construction (PA#10)"),
+    ("CRHF", "HMAC"): ("CRHF→HMAC", "HMAC construction"),
     ("HMAC", "MAC"): ("HMAC→MAC", "HMAC is a MAC (direct)"),
     ("MAC", "PRF"): ("MAC→PRF", "Secure MAC is a PRF on random inputs"),
     ("PRG", "OWF"): ("PRG→OWF", "Any PRG is a OWF (immediate)"),
-    ("PRF", "PRG"): ("PRF→PRG", "G(s)=F_s(0)||F_s(1) (PA#2)"),
-    ("MAC", "CRHF"): ("MAC→CRHF", "MAC as compression in Merkle-Damgård (PA#7)"),
+    ("PRF", "PRG"): ("PRF→PRG", "G(s)=F_s(0)||F_s(1)"),
+    ("MAC", "CRHF"): ("MAC→CRHF", "MAC as compression in Merkle-Damgård"),
     ("HMAC", "CRHF"): ("HMAC→CRHF", "Fix key, H'(m)=HMAC_k(m) is CRHF"),
 }
 
@@ -76,19 +74,19 @@ def find_shortest_path(start, end):
     return None
 
 PROOF_DB = {
-    "OWF→PRG": {"theorem":"HILL Theorem","security":"If PRG broken with advantage ε, OWF invertible with prob ε/poly(n)","pa":"PA#1"},
-    "PRG→PRF": {"theorem":"GGM Theorem","security":"If PRF broken with advantage ε, PRG broken with advantage ε/n","pa":"PA#2"},
-    "PRF→PRP": {"theorem":"Luby-Rackoff","security":"3-round Feistel: PRP advantage ≤ PRF advantage + q²/2ⁿ","pa":"PA#2"},
-    "PRF→MAC": {"theorem":"PRF⇒MAC","security":"If MAC forged, PRF distinguished from random","pa":"PA#5"},
-    "PRP→PRF": {"theorem":"PRP/PRF Switching Lemma","security":"Advantage ≤ q²/2ⁿ⁺¹ for q queries","pa":"PA#2"},
-    "CRHF→HMAC": {"theorem":"HMAC Security (Bellare 2006)","security":"If compression is PRF, HMAC is secure MAC","pa":"PA#10"},
-    "HMAC→MAC": {"theorem":"Direct","security":"HMAC satisfies EUF-CMA definition","pa":"PA#10"},
-    "PRG→OWF": {"theorem":"Immediate","security":"Inverting G recovers seed, breaking pseudorandomness","pa":"PA#1"},
-    "PRF→PRG": {"theorem":"PRF⇒PRG","security":"G(s)=F_s(0)||F_s(1); distinguisher for G breaks PRF","pa":"PA#2"},
-    "OWF→OWP": {"theorem":"DLP OWP","security":"f(x)=gˣ mod p is already a permutation on Zq","pa":"PA#1"},
-    "MAC→PRF": {"theorem":"MAC⇒PRF","security":"EUF-CMA MAC on random messages is pseudorandom","pa":"PA#5"},
-    "MAC→CRHF": {"theorem":"MAC compression","security":"Collision in MAC = forgery, contradicting EUF-CMA","pa":"PA#7"},
-    "HMAC→CRHF": {"theorem":"HMAC→CRHF","security":"Fix key k; collision in HMAC_k = MAC forgery","pa":"PA#10"},
+    "OWF→PRG": {"theorem":"HILL Theorem","security":"If PRG broken with advantage ε, OWF invertible with prob ε/poly(n)","pa":"Module 1"},
+    "PRG→PRF": {"theorem":"GGM Theorem","security":"If PRF broken with advantage ε, PRG broken with advantage ε/n","pa":"Module 2"},
+    "PRF→PRP": {"theorem":"Luby-Rackoff","security":"3-round Feistel: PRP advantage ≤ PRF advantage + q²/2ⁿ","pa":"Module 2"},
+    "PRF→MAC": {"theorem":"PRF⇒MAC","security":"If MAC forged, PRF distinguished from random","pa":"Module 5"},
+    "PRP→PRF": {"theorem":"PRP/PRF Switching Lemma","security":"Advantage ≤ q²/2ⁿ⁺¹ for q queries","pa":"Module 2"},
+    "CRHF→HMAC": {"theorem":"HMAC Security (Bellare 2006)","security":"If compression is PRF, HMAC is secure MAC","pa":"Module 10"},
+    "HMAC→MAC": {"theorem":"Direct","security":"HMAC satisfies EUF-CMA definition","pa":"Module 10"},
+    "PRG→OWF": {"theorem":"Immediate","security":"Inverting G recovers seed, breaking pseudorandomness","pa":"Module 1"},
+    "PRF→PRG": {"theorem":"PRF⇒PRG","security":"G(s)=F_s(0)||F_s(1); distinguisher for G breaks PRF","pa":"Module 2"},
+    "OWF→OWP": {"theorem":"DLP OWP","security":"f(x)=gˣ mod p is already a permutation on Zq","pa":"Module 1"},
+    "MAC→PRF": {"theorem":"MAC⇒PRF","security":"EUF-CMA MAC on random messages is pseudorandom","pa":"Module 5"},
+    "MAC→CRHF": {"theorem":"MAC compression","security":"Collision in MAC = forgery, contradicting EUF-CMA","pa":"Module 7"},
+    "HMAC→CRHF": {"theorem":"HMAC→CRHF","security":"Fix key k; collision in HMAC_k = MAC forgery","pa":"Module 10"},
 }
 
 # ── PRIMITIVE ABSTRACTION LAYER ──
@@ -248,7 +246,7 @@ def reduce_primitive(req: ReduceRequest):
                 
                 iter_x = current_state
                 for i in range(4):
-                    steps.append({"fn": f"HILL (PA#1) Iteration {i+1}", "input": f"x_{i}: {safe_hex(iter_x)[:8]}...", "output": f"Bit: {all_bits[i]} → Next"})
+                    steps.append({"fn": f"HILL Iteration {i+1}", "input": f"x_{i}: {safe_hex(iter_x)[:8]}...", "output": f"Bit: {all_bits[i]} → Next"})
                     iter_x = (int.from_bytes(iter_x, 'big') + 1).to_bytes(16, 'big') # visualization mock
                 
                 steps.append({"fn": "...", "input": "Iterations 5-128", "output": f"Full PRG Out: {res_bytes.hex()[:8]}..."})
@@ -267,7 +265,7 @@ def reduce_primitive(req: ReduceRequest):
                     g0 = ggm.prg.G0(node_val)
                     g1 = ggm.prg.G1(node_val)
                     chosen = g0 if bit == 0 else g1
-                    steps.append({"fn": f"GGM (PA#2) Depth {i+1}", "input": f"Node: {safe_hex(node_val)[:8]}... (Bit {bit})", "output": f"→ {safe_hex(chosen)[:8]}..."})
+                    steps.append({"fn": f"GGM Depth {i+1}", "input": f"Node: {safe_hex(node_val)[:8]}... (Bit {bit})", "output": f"→ {safe_hex(chosen)[:8]}..."})
                     node_val = chosen
                 
                 steps.append({"fn": "...", "input": "Depths 5-128", "output": "Truncated for brevity"})
@@ -578,7 +576,7 @@ def run_demo(req: DemoRequest):
                 results[name] = {"x":alice_val,"y":bob_val,"result":val}
             return results
         else:
-            return {"error":f"PA#{req.pa} not found"}
+            return {"error":f"Demo {req.pa} not found"}
     except Exception as e:
         raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
 
@@ -1904,14 +1902,6 @@ def pa5_length_extension(req: PA5LengthExtensionRequest):
 # ── Routing table ──
 @app.get("/api/reductions")
 def get_reductions():
-    return {"reductions":{f"{a}→{b}": [{"step":l,"desc":d} for l,d in v] for (a,b),v in REDUCTIONS.items()},
+    return {"reductions":{f"{a}→{b}": [{"step":l,"desc":d}] for (a,b),(l,d) in DIRECT_REDUCTIONS.items()},
             "proofs":PROOF_DB,
             "primitives":["OWF","PRG","PRF","PRP","MAC","CRHF","HMAC"]}
-
-# ── Serve frontend ──
-STATIC_DIR = os.path.join(os.path.dirname(__file__), '..', 'web')
-if os.path.isdir(STATIC_DIR):
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-    @app.get("/")
-    def serve_index():
-        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
