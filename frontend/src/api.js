@@ -31,12 +31,12 @@ const api = {
   },
 
   async pa5EufInit() {
-    const r = await fetch(`${API_BASE}/api/pa5/euf_init`);
+    const r = await fetch(`${API_BASE}/api/mac/euf_init`);
     return r.json();
   },
 
   async pa5EufVerify(sessionId, messageHex, tagHex) {
-    const r = await fetch(`${API_BASE}/api/pa5/euf_verify`, {
+    const r = await fetch(`${API_BASE}/api/mac/euf_verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId, message_hex: messageHex, tag_hex: tagHex }),
@@ -45,7 +45,7 @@ const api = {
   },
 
   async pa5EufCheat(sessionId) {
-    const r = await fetch(`${API_BASE}/api/pa5/euf_cheat`, {
+    const r = await fetch(`${API_BASE}/api/mac/euf_cheat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId }),
@@ -54,7 +54,7 @@ const api = {
   },
 
   async pa5LengthExtension(suffix) {
-    const r = await fetch(`${API_BASE}/api/pa5/length_extension`, {
+    const r = await fetch(`${API_BASE}/api/mac/length_extension`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ suffix }),
@@ -63,7 +63,7 @@ const api = {
   },
 
   async pa6MalleabilityInit(message) {
-    const r = await fetch(`${API_BASE}/api/pa6/malleability_init`, {
+    const r = await fetch(`${API_BASE}/api/cca_enc/malleability_init`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message }),
@@ -72,7 +72,7 @@ const api = {
   },
 
   async pa6MalleabilityFlip(payload) {
-    const r = await fetch(`${API_BASE}/api/pa6/malleability_flip`, {
+    const r = await fetch(`${API_BASE}/api/cca_enc/malleability_flip`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -81,7 +81,7 @@ const api = {
   },
 
   async pa8Hash(message) {
-    const r = await fetch(`${API_BASE}/api/pa8/hash`, {
+    const r = await fetch(`${API_BASE}/api/dlp_crhf/hash`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message })
@@ -90,7 +90,7 @@ const api = {
   },
 
   async pa17MalleabilityInit(message) {
-    const r = await fetch(`${API_BASE}/api/pa17/malleability_init`, {
+    const r = await fetch(`${API_BASE}/api/cca_pkc/malleability_init`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: parseInt(message) || 42 }),
@@ -99,7 +99,7 @@ const api = {
   },
 
   async pa17MalleabilityFlip(payload) {
-    const r = await fetch(`${API_BASE}/api/pa17/malleability_flip`, {
+    const r = await fetch(`${API_BASE}/api/cca_pkc/malleability_flip`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -107,7 +107,7 @@ const api = {
     return r.json();
   },
   async pa19SecureAnd(a, b) {
-    const r = await fetch(`${API_BASE}/api/pa19/secure_and`, {
+    const r = await fetch(`${API_BASE}/api/secure_and/gate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ a, b }),
@@ -116,12 +116,12 @@ const api = {
   },
 
   async pa19TruthTable() {
-    const r = await fetch(`${API_BASE}/api/pa19/truth_table`, { method: 'POST' });
+    const r = await fetch(`${API_BASE}/api/secure_and/truth_table`, { method: 'POST' });
     return r.json();
   },
 
   async pa20Evaluate(alice_val, bob_val, mode = 'comparator', bits = 4) {
-    const r = await fetch(`${API_BASE}/api/pa20/evaluate`, {
+    const r = await fetch(`${API_BASE}/api/mpc/evaluate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ alice_val, bob_val, bits, mode }),
@@ -130,22 +130,22 @@ const api = {
   },
 
   async pa8CollisionStart() {
-    const r = await fetch(`${API_BASE}/api/pa8/collision/start`, { method: 'POST' });
+    const r = await fetch(`${API_BASE}/api/dlp_crhf/collision/start`, { method: 'POST' });
     return r.json();
   },
 
   async pa8CollisionStatus(huntId) {
-    const r = await fetch(`${API_BASE}/api/pa8/collision/status/${huntId}`);
+    const r = await fetch(`${API_BASE}/api/dlp_crhf/collision/status/${huntId}`);
     return r.json();
   },
 
   async pa8CollisionStop(huntId) {
-    const r = await fetch(`${API_BASE}/api/pa8/collision/stop/${huntId}`, { method: 'POST' });
+    const r = await fetch(`${API_BASE}/api/dlp_crhf/collision/stop/${huntId}`, { method: 'POST' });
     return r.json();
   },
 
   async pa9BirthdayStart(nBits) {
-    const r = await fetch(`${API_BASE}/api/pa9/birthday/start`, {
+    const r = await fetch(`${API_BASE}/api/birthday/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ n_bits: nBits }),
@@ -154,17 +154,17 @@ const api = {
   },
 
   async pa9BirthdayStatus(huntId) {
-    const r = await fetch(`${API_BASE}/api/pa9/birthday/status/${huntId}`);
+    const r = await fetch(`${API_BASE}/api/birthday/status/${huntId}`);
     return r.json();
   },
 
   async pa9BirthdayStop(huntId) {
-    const r = await fetch(`${API_BASE}/api/pa9/birthday/stop/${huntId}`, { method: 'POST' });
+    const r = await fetch(`${API_BASE}/api/birthday/stop/${huntId}`, { method: 'POST' });
     return r.json();
   },
 
   async pa10LengthExtension(suffix, hashMode = 'dlp') {
-    const r = await fetch(`${API_BASE}/api/pa10/length_extension`, {
+    const r = await fetch(`${API_BASE}/api/hmac/length_extension`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ suffix, hash_mode: hashMode }),
@@ -172,9 +172,9 @@ const api = {
     return r.json();
   },
 
-  // ── PA#11 Diffie-Hellman ──
+  // ── Diffie-Hellman ──
   async pa11Exchange(a = null, b = null) {
-    const r = await fetch(`${API_BASE}/api/pa11/exchange`, {
+    const r = await fetch(`${API_BASE}/api/diffie_hellman/exchange`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ a, b }),
@@ -183,7 +183,7 @@ const api = {
   },
 
   async pa11Mitm(a = null, b = null) {
-    const r = await fetch(`${API_BASE}/api/pa11/mitm`, {
+    const r = await fetch(`${API_BASE}/api/diffie_hellman/mitm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ a, b }),
@@ -192,7 +192,7 @@ const api = {
   },
 
   async pa11Cdh(bits = 20) {
-    const r = await fetch(`${API_BASE}/api/pa11/cdh`, {
+    const r = await fetch(`${API_BASE}/api/diffie_hellman/cdh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ bits }),
@@ -200,9 +200,9 @@ const api = {
     return r.json();
   },
 
-  // ── PA#18 Oblivious Transfer ──
+  // ── Oblivious Transfer ──
   async pa18Play(b, m0, m1) {
-    const r = await fetch(`${API_BASE}/api/pa18/ot/play`, {
+    const r = await fetch(`${API_BASE}/api/ot/play`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ b, m0, m1 }),
@@ -210,9 +210,9 @@ const api = {
     return r.json();
   },
 
-  // ── PA#3 IND-CPA Interactive Game ──
+  // ── IND-CPA Interactive Game ──
   async pa3Init(broken = false) {
-    const r = await fetch(`${API_BASE}/api/pa3/init`, {
+    const r = await fetch(`${API_BASE}/api/cpa_enc/init`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ broken }),
@@ -221,17 +221,17 @@ const api = {
   },
 
   async pa18Correctness() {
-    const r = await fetch(`${API_BASE}/api/pa18/ot/correctness`, { method: 'POST' });
+    const r = await fetch(`${API_BASE}/api/ot/correctness`, { method: 'POST' });
     return r.json();
   },
 
   async pa18Privacy() {
-    const r = await fetch(`${API_BASE}/api/pa18/ot/privacy`, { method: 'POST' });
+    const r = await fetch(`${API_BASE}/api/ot/privacy`, { method: 'POST' });
     return r.json();
   },
 
   async pa3Oracle(sessionId, message) {
-    const r = await fetch(`${API_BASE}/api/pa3/oracle`, {
+    const r = await fetch(`${API_BASE}/api/cpa_enc/oracle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId, message }),
@@ -240,7 +240,7 @@ const api = {
   },
 
   async pa3Challenge(sessionId, m0, m1) {
-    const r = await fetch(`${API_BASE}/api/pa3/challenge`, {
+    const r = await fetch(`${API_BASE}/api/cpa_enc/challenge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId, m0, m1 }),
@@ -249,7 +249,7 @@ const api = {
   },
 
   async pa3Guess(sessionId, guess) {
-    const r = await fetch(`${API_BASE}/api/pa3/guess`, {
+    const r = await fetch(`${API_BASE}/api/cpa_enc/guess`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_id: sessionId, guess }),
@@ -258,7 +258,7 @@ const api = {
   },
 
   async pa3Simulate(rounds = 20, broken = false) {
-    const r = await fetch(`${API_BASE}/api/pa3/simulate`, {
+    const r = await fetch(`${API_BASE}/api/cpa_enc/simulate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rounds, broken }),
@@ -266,9 +266,9 @@ const api = {
     return r.json();
   },
 
-  // ── PA#4 Modes Visual Animator ──
+  // ── Modes Visual Animator ──
   async pa4Animate(mode, message, keyHex = '', ivHex = '') {
-    const r = await fetch(`${API_BASE}/api/pa4/animate`, {
+    const r = await fetch(`${API_BASE}/api/modes/animate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode, message, key_hex: keyHex, iv_hex: ivHex }),
@@ -277,7 +277,7 @@ const api = {
   },
 
   async pa4Flip(mode, keyHex, ivHex, ciphertextHex, flipBlock) {
-    const r = await fetch(`${API_BASE}/api/pa4/flip`, {
+    const r = await fetch(`${API_BASE}/api/modes/flip`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode, key_hex: keyHex, iv_hex: ivHex, ciphertext_hex: ciphertextHex, flip_block: flipBlock }),
@@ -286,7 +286,7 @@ const api = {
   },
 
   async pa4IvReuse(message1, message2, keyHex = '', ivHex = '') {
-    const r = await fetch(`${API_BASE}/api/pa4/iv_reuse`, {
+    const r = await fetch(`${API_BASE}/api/modes/iv_reuse`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message1, message2, key_hex: keyHex, iv_hex: ivHex }),

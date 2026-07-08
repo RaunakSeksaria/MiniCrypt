@@ -1,20 +1,20 @@
 """
-crypto/pa15_signatures.py — PA#15: Digital Signatures
+crypto/signatures.py — Digital Signatures
 
 Implements:
   1. RSA-based signatures: Sign(sk, m) = H(m)^d mod N
-  2. Hash-then-sign using PA#8 DLP hash
+  2. Hash-then-sign using DLP hash
   3. Verify: check H(m)^e ≡ σ^e (mod N)? No: check σ^e ≡ H(m) (mod N)
   4. Multiplicative homomorphism attack on raw RSA signatures
   5. EUF-CMA security game
 
-Dependencies: crypto.pa12_rsa, crypto.pa08_dlp_crhf, crypto.utils
-Used by: PA#17 (CCA-PKC)
+Dependencies: crypto.rsa, crypto.dlp_crhf, crypto.utils
+Used by: (CCA-PKC)
 """
 
 from crypto.utils import mod_exp, random_bytes, bytes_to_int, int_to_bytes, to_hex
-from crypto.pa12_rsa import rsa_keygen, RSAKeyPair
-from crypto.pa08_dlp_crhf import DLP_CRHF, get_crhf
+from crypto.rsa import rsa_keygen, RSAKeyPair
+from crypto.dlp_crhf import DLP_CRHF, get_crhf
 
 
 # ---------------------------------------------------------------------------
@@ -28,7 +28,7 @@ class DigitalSignature:
     Sign: σ = H(m)^d mod N
     Verify: σ^e mod N == H(m)
 
-    Uses Hash-then-Sign with the DLP-CRHF from PA#8.
+    Uses Hash-then-Sign with the DLP-CRHF from .
     """
 
     def __init__(self, key_pair: RSAKeyPair = None, crhf: DLP_CRHF = None,
@@ -172,7 +172,7 @@ def euf_cma_game(ds: DigitalSignature = None,
 
 
 # ---------------------------------------------------------------------------
-# Interface (for PA#17)
+# Interface
 # ---------------------------------------------------------------------------
 
 def Sign(sk, message: bytes) -> int:
@@ -190,7 +190,7 @@ def Verify(vk, message: bytes, sigma: int) -> bool:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#15: Digital Signatures")
+    print("Digital Signatures")
     print("=" * 60)
 
     ds = DigitalSignature(bits=512)

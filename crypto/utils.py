@@ -1,5 +1,5 @@
 """
-crypto/utils.py — Common utility functions used across all PAs.
+crypto/utils.py — Common utility functions used across all modules.
 
 Provides:
   - Modular arithmetic (mod_exp, egcd, mod_inverse)

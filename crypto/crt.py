@@ -1,5 +1,5 @@
 """
-crypto/pa14_crt.py — PA#14: Chinese Remainder Theorem + Håstad Broadcast Attack
+crypto/crt.py — Chinese Remainder Theorem + Håstad Broadcast Attack
 
 Implements:
   1. Chinese Remainder Theorem (multi-modulus)
@@ -8,12 +8,12 @@ Implements:
   4. Håstad broadcast attack (e=3, same plaintext, different moduli)
   5. Integer n-th root via Newton's method
 
-Dependencies: crypto.pa12_rsa, crypto.pa13_miller_rabin, crypto.utils
+Dependencies: crypto.rsa, crypto.miller_rabin, crypto.utils
 """
 
 import time
 from crypto.utils import mod_exp, mod_inverse, random_int, to_hex
-from crypto.pa12_rsa import rsa_keygen, rsa_encrypt, rsa_decrypt, RSAKeyPair
+from crypto.rsa import rsa_keygen, rsa_encrypt, rsa_decrypt, RSAKeyPair
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ def padding_defeats_hastad(bits: int = 256, e: int = 3) -> dict:
     Show that PKCS#1 v1.5 padding defeats Håstad's attack
     because each ciphertext encrypts a different padded message.
     """
-    from crypto.pa12_rsa import pkcs15_encrypt, pkcs15_decrypt
+    from crypto.rsa import pkcs15_encrypt, pkcs15_decrypt
 
     keys = [rsa_keygen(bits, e=e) for _ in range(e)]
     message = b"Hi"
@@ -249,7 +249,7 @@ def padding_defeats_hastad(bits: int = 256, e: int = 3) -> dict:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#14: CRT + Håstad Broadcast Attack")
+    print("CRT + Håstad Broadcast Attack")
     print("=" * 60)
 
     # Basic CRT

@@ -1,5 +1,5 @@
 """
-crypto/pa11_diffie_hellman.py — PA#11: Diffie-Hellman Key Exchange
+crypto/diffie_hellman.py — Diffie-Hellman Key Exchange
 
 Implements:
   1. DH group parameter generation (safe prime, generator)
@@ -7,12 +7,12 @@ Implements:
   3. MITM attack demonstration (Eve intercepts)
   4. CDH hardness verification
 
-Dependencies: crypto.pa13_miller_rabin (safe prime generation)
-Used by: PA#16 (ElGamal)
+Dependencies: crypto.miller_rabin (safe prime generation)
+Used by: (ElGamal)
 """
 
 from crypto.utils import mod_exp, random_int, random_bytes, to_hex, int_to_bytes
-from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
+from crypto.miller_rabin import gen_safe_prime, find_generator
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ def cdh_hardness_demo(dh: DiffieHellman = None, tiny_bits: int = 20) -> dict:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#11: Diffie-Hellman Key Exchange")
+    print("Diffie-Hellman Key Exchange")
     print("=" * 60)
 
     dh = DiffieHellman(bits=64)

@@ -2,40 +2,40 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GGMVisualizer from './GGMVisualizer';
 
 const PA_DEFINITIONS = {
-  1: {
+  "owf_prg": {
     params: [
       { name: 'seed', label: 'Hex Seed (s)', default: '2b7e151628aed2a6abf7158809cf4f3c' },
       { name: 'length', label: 'Output Length (ℓ)', type: 'range', min: 8, max: 256, default: 32 }
     ]
   },
-  2: {
+  "prf_ggm": {
     params: [
       { name: 'key', label: 'Secret Key (k)', default: '2b7e151628aed2a6abf7158809cf4f3c' },
       { name: 'query', label: 'Query (x) [Bit String]', default: '00' },
       { name: 'depth', label: 'Tree Depth (n)', type: 'range', min: 2, max: 8, default: 4 }
     ]
   },
-  3: { params: [] },  // PA3 has its own interactive renderer
-  4: { params: [] },  // PA4 has its own visual animator renderer
-  5: { params: [] },  // PA5 has its own interactive renderer
-  6: { params: [] },  // PA6 has its own interactive renderer
-  7: { params: [
+  "cpa_enc": { params: [] },  // has its own interactive renderer
+  "modes": { params: [] },  // has its own visual animator renderer
+  "mac": { params: [] },  // has its own interactive renderer
+  "cca_enc": { params: [] },  // has its own interactive renderer
+  "merkle_damgard": { params: [
     { name: 'message', label: 'Message to Hash', default: 'Hello Hash!' },
     { name: 'output_size', label: 'Output Digest Size (bytes)', type: 'range', min: 1, max: 16, default: 4 }
   ] },
-  8: { params: [] },  // PA8 has its own input inside renderPA8Special
-  9: { params: [] },  // PA9 has its own input inside renderPA9Special
-  10: { params: [] }, // PA10 has its own special renderer
-  11: { params: [] },
-  12: { params: [] },  // PA12 has its own interactive renderer
-  13: { params: [{ name: 'n', label: 'Number to Test Primality', default: '' }] },
-  14: { params: [] },  // PA14 has its own interactive renderer
-  15: { params: [] },  // PA15 has its own interactive renderer
-  16: { params: [] },  // PA16 has its own interactive renderer
-  17: { params: [] },  // PA17 has its own interactive renderer
-  18: { params: [] }, // PA18 has its own special renderer
-  19: { params: [] },  // PA19 has its own interactive renderer
-  20: { params: [] }  // PA20 has its own interactive renderer
+  "dlp_crhf": { params: [] },  // has its own input inside renderPA8Special
+  "birthday": { params: [] },  // has its own input inside renderPA9Special
+  "hmac": { params: [] }, // has its own special renderer
+  "diffie_hellman": { params: [] },
+  "rsa": { params: [] },  // has its own interactive renderer
+  "miller_rabin": { params: [{ name: 'n', label: 'Number to Test Primality', default: '' }] },
+  "crt": { params: [] },  // has its own interactive renderer
+  "signatures": { params: [] },  // has its own interactive renderer
+  "elgamal": { params: [] },  // has its own interactive renderer
+  "cca_pkc": { params: [] },  // has its own interactive renderer
+  "ot": { params: [] }, // has its own special renderer
+  "secure_and": { params: [] },  // has its own interactive renderer
+  "mpc": { params: [] }  // has its own interactive renderer
 };
 
 const PADemoModal = ({ pa, onClose, api }) => {
@@ -46,23 +46,23 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [showStats, setShowStats] = useState(false);
   const [showInversion, setShowInversion] = useState(false);
 
-  // PA#8 live hash state
+  // live hash state
   const [pa8Hash, setPa8Hash] = useState(null);
   const [pa8Loading, setPa8Loading] = useState(false);
-  // PA#8 collision hunt state
+  // collision hunt state
   const [huntId, setHuntId] = useState(null);
   const [huntStatus, setHuntStatus] = useState(null);  // null | {status, evaluations, progress_pct, collision}
   const [huntRunning, setHuntRunning] = useState(false);
   const pollRef = useRef(null);
 
-  // PA#9 birthday attack state
+  // birthday attack state
   const [pa9NBits, setPa9NBits] = useState(12);
   const [pa9HuntId, setPa9HuntId] = useState(null);
   const [pa9Status, setPa9Status] = useState(null);
   const [pa9Running, setPa9Running] = useState(false);
   const pa9PollRef = useRef(null);
 
-  // PA#3 interactive IND-CPA game state
+  // interactive IND-CPA game state
   const [pa3SessionId, setPa3SessionId]   = useState(null);
   const [pa3Broken, setPa3Broken]         = useState(false);
   const [pa3M0, setPa3M0]                 = useState('Hello World!');
@@ -77,7 +77,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa3Loading, setPa3Loading]       = useState({});
   const [pa3LenError, setPa3LenError]     = useState(null);
 
-  // PA#4 Modes visual animator state
+  // Modes visual animator state
   const [pa4Mode, setPa4Mode]           = useState('CBC');
   const [pa4Msg, setPa4Msg]             = useState('Block 0 plaintext!!Block 1 plaintext!!Block 2 !!');
   const [pa4Trace, setPa4Trace]         = useState(null);  // animate response
@@ -90,16 +90,16 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa4Loading, setPa4Loading]     = useState({});
   const [pa4AnimStep, setPa4AnimStep]   = useState(0); // for animation stepping
 
-  // PA#10 state
+  // state
   const [pa10LeData, setPa10LeData]       = useState(null);  // length-extension
   const [pa10LeSuffix, setPa10LeSuffix]   = useState('evil suffix');
   const [pa10HashMode, setPa10HashMode]   = useState('dlp');
   const [pa10LeLoading, setPa10LeLoading] = useState(false);
 
-  // PA#11 state
+  // state
   const [pa11Data,        setPa11Data]        = useState(null);   // exchange result
 
-  // PA#2 state
+  // state
   const [pa2Tab, setPa2Tab] = useState('forward');
   const [pa11MitmData,    setPa11MitmData]    = useState(null);   // MITM result
   const [pa11CdhData,     setPa11CdhData]     = useState(null);   // CDH result
@@ -110,7 +110,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa11CdhBits,     setPa11CdhBits]     = useState(20);
   const [pa11Loading,     setPa11Loading]     = useState({});
 
-  // PA#18 OT state
+  // OT state
   const [pa18M0,              setPa18M0]              = useState(42);
   const [pa18M1,              setPa18M1]              = useState(99);
   const [pa18Step,            setPa18Step]            = useState(0);   // 0=idle 1=keys 2=ciphers 3=done
@@ -121,7 +121,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa18PrivacyData,     setPa18PrivacyData]     = useState(null);
   const [pa18CtlLoading,      setPa18CtlLoading]      = useState({});  // {correctness, privacy}
 
-  // PA5 State
+  // State
   const [pa5Tab, setPa5Tab] = useState('euf');
   const [pa5Session, setPa5Session] = useState(null);
   const [pa5Messages, setPa5Messages] = useState([]);
@@ -133,7 +133,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa5LeData, setPa5LeData] = useState(null);
   const [pa5Loading, setPa5Loading] = useState({});
 
-  // PA6 State
+  // State
   const [pa6Msg, setPa6Msg] = useState('Transfer $1000 to Bob');
   const [pa6Data, setPa6Data] = useState(null);
   const [pa6CpaFlipped, setPa6CpaFlipped] = useState(null);
@@ -145,30 +145,30 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa6CcaRej, setPa6CcaRej] = useState(false);
   const [pa6Loading, setPa6Loading] = useState({});
 
-  // PA12 State
+  // State
   const [pa12MsgInt, setPa12MsgInt] = useState('42');
   const [pa12MsgPkcs, setPa12MsgPkcs] = useState('RSA!');
   const [pa12Data, setPa12Data] = useState(null);
   const [pa12Loading, setPa12Loading] = useState(false);
   const [pa12Tab, setPa12Tab] = useState('textbook');
 
-  // PA14 State
+  // State
   const [pa14Residues, setPa14Residues] = useState('2,3,2');
   const [pa14Moduli, setPa14Moduli] = useState('3,5,7');
   const [pa14Data, setPa14Data] = useState(null);
   const [pa14Loading, setPa14Loading] = useState(false);
 
-  // PA15 State
+  // State
   const [pa15Msg, setPa15Msg] = useState('Sign this!');
   const [pa15Data, setPa15Data] = useState(null);
   const [pa15Loading, setPa15Loading] = useState(false);
 
-  // PA16 State
+  // State
   const [pa16MsgInt, setPa16MsgInt] = useState('42');
   const [pa16Data, setPa16Data] = useState(null);
   const [pa16Loading, setPa16Loading] = useState(false);
 
-  // PA17 State
+  // State
   const [pa17Msg, setPa17Msg] = useState('42');
   const [pa17Data, setPa17Data] = useState(null);
   const [pa17CpaTampered, setPa17CpaTampered] = useState(false);
@@ -178,14 +178,14 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa17CcaRej, setPa17CcaRej] = useState(false);
   const [pa17Loading, setPa17Loading] = useState({});
 
-  // PA19 State
+  // State
   const [pa19A, setPa19A] = useState(1);
   const [pa19B, setPa19B] = useState(1);
   const [pa19Data, setPa19Data] = useState(null);
   const [pa19Table, setPa19Table] = useState(null);
   const [pa19Loading, setPa19Loading] = useState({});
 
-  // PA20 State
+  // State
   const [pa20Alice, setPa20Alice] = useState(7);
   const [pa20Bob, setPa20Bob] = useState(3);
   const [pa20Data, setPa20Data] = useState(null);
@@ -219,10 +219,10 @@ const PADemoModal = ({ pa, onClose, api }) => {
     def.params.forEach(p => initialParams[p.name] = p.default);
     setParams(initialParams);
 
-    if (def.params.length === 0 && pa.pa !== 3 && pa.pa !== 4 && pa.pa !== 5 && pa.pa !== 6 && pa.pa !== 7 && pa.pa !== 8 && pa.pa !== 9 && pa.pa !== 10 && pa.pa !== 11 && pa.pa !== 12 && pa.pa !== 13 && pa.pa !== 14 && pa.pa !== 15 && pa.pa !== 16 && pa.pa !== 17 && pa.pa !== 18 && pa.pa !== 19 && pa.pa !== 20) {      runDemo(initialParams);
+    if (def.params.length === 0 && pa.pa !== "cpa_enc" && pa.pa !== "modes" && pa.pa !== "mac" && pa.pa !== "cca_enc" && pa.pa !== "merkle_damgard" && pa.pa !== "dlp_crhf" && pa.pa !== "birthday" && pa.pa !== "hmac" && pa.pa !== "diffie_hellman" && pa.pa !== "rsa" && pa.pa !== "miller_rabin" && pa.pa !== "crt" && pa.pa !== "signatures" && pa.pa !== "elgamal" && pa.pa !== "cca_pkc" && pa.pa !== "ot" && pa.pa !== "secure_and" && pa.pa !== "mpc") {      runDemo(initialParams);
     }
 
-    // Reset PA3 / PA4 / PA8 / PA9 / PA10 / PA11 state when modal switches PA
+    // Reset per-demo interactive state when the modal switches demo
     setPa3SessionId(null); setPa3Challenge(null); setPa3GuessResult(null);
     setPa3Rounds([]); setPa3Stats(null); setPa3SimData(null);
     setPa3OracleLog([]); setPa3Loading({}); setPa3LenError(null);
@@ -242,16 +242,16 @@ const PADemoModal = ({ pa, onClose, api }) => {
     return () => { stopHunt(); stopPa9Hunt(); };
   }, [pa]);
 
-  // PA8: auto-hash the default message when the modal opens
-  const PA8_DEFAULT_MSG = 'Hello, DLP Hash!';
+  // auto-hash the default message when the modal opens
+  const DLP_HASH_DEFAULT_MSG = 'Hello, DLP Hash!';
   useEffect(() => {
-    if (pa.pa !== 8) return;
-    setParams(p => ({ ...p, message: PA8_DEFAULT_MSG }));
-    api.pa8Hash(PA8_DEFAULT_MSG).then(data => setPa8Hash(data)).catch(() => {});
+    if (pa.pa !== "dlp_crhf") return;
+    setParams(p => ({ ...p, message: DLP_HASH_DEFAULT_MSG }));
+    api.pa8Hash(DLP_HASH_DEFAULT_MSG).then(data => setPa8Hash(data)).catch(() => {});
   }, [pa]);
 
   useEffect(() => {
-    if (pa.pa === 1 || pa.pa === 2 || pa.pa === 7) {
+    if (pa.pa === "owf_prg" || pa.pa === "prf_ggm" || pa.pa === "merkle_damgard") {
       const initialParams = {};
       (PA_DEFINITIONS[pa.pa]?.params || []).forEach(p => {
         initialParams[p.name] = p.default;
@@ -754,7 +754,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
-  // PA3 special renderer
+  // special renderer
   const renderPA3Special = () => {
     const busy = (k) => !!pa3Loading[k];
     const setLoading = (k, v) => setPa3Loading(p => ({ ...p, [k]: v }));
@@ -927,7 +927,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────
-  // PA#4 — Modes of Operation Visual Animator
+  // — Modes of Operation Visual Animator
   // ─────────────────────────────────────────────────────────────────
   const renderPA4Special = () => {
     const busyPA4 = (k) => !!pa4Loading[k];
@@ -2234,7 +2234,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────
-  // PA#9 — Birthday Attack demo
+  // — Birthday Attack demo
   // ─────────────────────────────────────────────────────────────────
   const renderPA9Special = () => {
     const collision = pa9Status?.collision;
@@ -2720,7 +2720,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────
-  // PA#10 — HMAC Interactive Demo
+  // — HMAC Interactive Demo
   // ─────────────────────────────────────────────────────────────────
   const renderPA10Special = () => {
     const card = (children, accent = '#818cf8', title = '') => (
@@ -2846,7 +2846,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   };
 
   // ─────────────────────────────────────────────────────────────────
-  // PA#11 — Diffie-Hellman Key Exchange interactive demo
+  // — Diffie-Hellman Key Exchange interactive demo
   // ─────────────────────────────────────────────────────────────────
   const renderPA11Special = () => {
     const busy      = (k) => !!pa11Loading[k];
@@ -3826,7 +3826,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     const runPA12 = async () => {
       setPa12Loading(true);
       try {
-        const data = await api.runDemo(12, { message_int: pa12MsgInt, message_pkcs: pa12MsgPkcs });
+        const data = await api.runDemo("rsa", { message_int: pa12MsgInt, message_pkcs: pa12MsgPkcs });
         setPa12Data(data);
       } catch (e) { setError(e.message); }
       finally { setPa12Loading(false); }
@@ -3884,7 +3884,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     const runPA14 = async () => {
       setPa14Loading(true);
       try {
-        const data = await api.runDemo(14, { residues: pa14Residues, moduli: pa14Moduli });
+        const data = await api.runDemo("crt", { residues: pa14Residues, moduli: pa14Moduli });
         setPa14Data(data);
       } catch (e) { setError(e.message); }
       finally { setPa14Loading(false); }
@@ -3931,7 +3931,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     const runPA15 = async () => {
       setPa15Loading(true);
       try {
-        const data = await api.runDemo(15, { message: pa15Msg });
+        const data = await api.runDemo("signatures", { message: pa15Msg });
         setPa15Data(data);
       } catch (e) { setError(e.message); }
       finally { setPa15Loading(false); }
@@ -3975,7 +3975,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     const runPA16 = async () => {
       setPa16Loading(true);
       try {
-        const data = await api.runDemo(16, { message_int: pa16MsgInt });
+        const data = await api.runDemo("elgamal", { message_int: pa16MsgInt });
         setPa16Data(data);
       } catch (e) { setError(e.message); }
       finally { setPa16Loading(false); }
@@ -4011,27 +4011,27 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
-  const activePAId = Number(pa.pa);
-  const isPaDemo1 = activePAId === 1;
-  const isPaDemo2 = activePAId === 2;
-  const isPaDemo3 = activePAId === 3;
-  const isPA4 = activePAId === 4;
-  const isPA5 = activePAId === 5;
-  const isPA6 = activePAId === 6;
-  const isPaDemo7 = activePAId === 7;
-  const isPaDemo8 = activePAId === 8;
-  const isPaDemo9 = activePAId === 9;
-  const isPaDemo10 = activePAId === 10;
-  const isPaDemo11 = activePAId === 11;
-  const isPA12 = activePAId === 12;
-  const isPaDemo13 = activePAId === 13;
-  const isPA14 = activePAId === 14;
-  const isPA15 = activePAId === 15;
-  const isPA16 = activePAId === 16;
-  const isPA17 = activePAId === 17;
-  const isPaDemo18 = activePAId === 18;
-  const isPA19 = activePAId === 19;
-  const isPA20 = activePAId === 20;
+  const activePAId = pa.pa;
+  const isPaDemo1 = activePAId === "owf_prg";
+  const isPaDemo2 = activePAId === "prf_ggm";
+  const isPaDemo3 = activePAId === "cpa_enc";
+  const isPA4 = activePAId === "modes";
+  const isPA5 = activePAId === "mac";
+  const isPA6 = activePAId === "cca_enc";
+  const isPaDemo7 = activePAId === "merkle_damgard";
+  const isPaDemo8 = activePAId === "dlp_crhf";
+  const isPaDemo9 = activePAId === "birthday";
+  const isPaDemo10 = activePAId === "hmac";
+  const isPaDemo11 = activePAId === "diffie_hellman";
+  const isPA12 = activePAId === "rsa";
+  const isPaDemo13 = activePAId === "miller_rabin";
+  const isPA14 = activePAId === "crt";
+  const isPA15 = activePAId === "signatures";
+  const isPA16 = activePAId === "elgamal";
+  const isPA17 = activePAId === "cca_pkc";
+  const isPaDemo18 = activePAId === "ot";
+  const isPA19 = activePAId === "secure_and";
+  const isPA20 = activePAId === "mpc";
   return (
     <div className="modal-overlay open" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">

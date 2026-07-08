@@ -1,5 +1,5 @@
 """
-crypto/pa07_merkle_damgard.py — PA#7: Merkle-Damgård Transform
+crypto/merkle_damgard.py — Merkle-Damgård Transform
 
 Implements:
   1. Generic MerkleDamgard(compress, IV, block_size) framework
@@ -8,7 +8,7 @@ Implements:
   4. Collision propagation demo
 
 Dependencies: crypto.utils
-Used by: PA#8 (DLP-CRHF), PA#10 (HMAC)
+Used by: (DLP-CRHF), (HMAC)
 """
 
 from crypto.utils import int_to_bytes, bytes_to_int, xor_bytes, to_hex
@@ -217,7 +217,7 @@ def collision_propagation_demo() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Interface (for PA#8)
+# Interface
 # ---------------------------------------------------------------------------
 
 def hash_message(message: bytes, compress, iv: bytes = None,
@@ -237,7 +237,7 @@ def hash_message(message: bytes, compress, iv: bytes = None,
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#7: Merkle-Damgård Transform")
+    print("Merkle-Damgård Transform")
     print("=" * 60)
 
     # Toy hash

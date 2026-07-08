@@ -1,19 +1,19 @@
 """
-crypto/pa16_elgamal.py — PA#16: ElGamal Public-Key Cryptosystem
+crypto/elgamal.py — ElGamal Public-Key Cryptosystem
 
 Implements:
-  1. Key generation using PA#11 DH group
+  1. Key generation using DH group
   2. ElGamal encryption: C = (g^r, m · h^r)
   3. ElGamal decryption: m = c2 / c1^x
   4. Malleability attack: (c1, 2·c2) decrypts to 2m
   5. IND-CPA game
 
-Dependencies: crypto.pa11_diffie_hellman, crypto.pa13_miller_rabin, crypto.utils
-Used by: PA#17 (CCA-PKC), PA#18 (OT)
+Dependencies: crypto.diffie_hellman, crypto.miller_rabin, crypto.utils
+Used by: (CCA-PKC), (OT)
 """
 
 from crypto.utils import mod_exp, mod_inverse, random_int, to_hex
-from crypto.pa11_diffie_hellman import DHGroup
+from crypto.diffie_hellman import DHGroup
 
 
 # ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ def small_group_distinguisher(q_bits: int = 10) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Interface (for PA#17, PA#18)
+# Interface
 # ---------------------------------------------------------------------------
 
 def Enc(pk: dict, m: int) -> tuple:
@@ -295,7 +295,7 @@ def Dec(sk: int, p: int, c1: int, c2: int) -> int:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#16: ElGamal Public-Key Cryptosystem")
+    print("ElGamal Public-Key Cryptosystem")
     print("=" * 60)
 
     key = elgamal_keygen(bits=64)

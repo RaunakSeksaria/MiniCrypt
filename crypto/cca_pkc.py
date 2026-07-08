@@ -1,5 +1,5 @@
 """
-crypto/pa17_cca_pkc.py — PA#17: CCA-Secure Public-Key Cryptosystem
+crypto/cca_pkc.py — CCA-Secure Public-Key Cryptosystem
 
 Implements:
   1. Signcrypt (Encrypt-then-Sign): CCA_PKC_Enc(pk_enc, sk_sign, m)
@@ -7,17 +7,17 @@ Implements:
   3. IND-CCA2 game
   4. Contrast: malleability on plain ElGamal vs blocked on CCA-PKC
 
-Dependencies: crypto.pa15_signatures, crypto.pa16_elgamal
-Full lineage: PA#17 → PA#15 → PA#12 → PA#13
-              PA#17 → PA#16 → PA#11 → PA#13
+Dependencies: crypto.signatures, crypto.elgamal
+Full lineage: → → → 
+              → → → 
 """
 
 from crypto.utils import int_to_bytes, bytes_to_int, random_int
-from crypto.pa16_elgamal import (
+from crypto.elgamal import (
     elgamal_keygen, elgamal_encrypt, elgamal_decrypt, ElGamalKey
 )
-from crypto.pa15_signatures import DigitalSignature
-from crypto.pa12_rsa import rsa_keygen
+from crypto.signatures import DigitalSignature
+from crypto.rsa import rsa_keygen
 
 
 # ---------------------------------------------------------------------------
@@ -183,16 +183,16 @@ def contrast_demo(cca: CCA_PKC = None) -> dict:
 def lineage_trace() -> str:
     """Return the dependency chain as a string for the README."""
     return """
-    PA#17 (CCA-PKC)
-    ├── PA#16 (ElGamal) → encrypt/decrypt
-    │   └── PA#11 (Diffie-Hellman) → group parameters
-    │       └── PA#13 (Miller-Rabin) → safe prime generation
-    └── PA#15 (Digital Signatures) → sign/verify
-        ├── PA#12 (RSA) → signing key
-        │   └── PA#13 (Miller-Rabin) → prime generation
-        └── PA#8 (DLP-CRHF) → hash function for hash-then-sign
-            ├── PA#7 (Merkle-Damgård) → hash framework
-            └── PA#13 (Miller-Rabin) → DLP group setup
+    (CCA-PKC)
+    ├── (ElGamal) → encrypt/decrypt
+    │   └── (Diffie-Hellman) → group parameters
+    │       └── (Miller-Rabin) → safe prime generation
+    └── (Digital Signatures) → sign/verify
+        ├── (RSA) → signing key
+        │   └── (Miller-Rabin) → prime generation
+        └── (DLP-CRHF) → hash function for hash-then-sign
+            ├── (Merkle-Damgård) → hash framework
+            └── (Miller-Rabin) → DLP group setup
     """
 
 
@@ -202,7 +202,7 @@ def lineage_trace() -> str:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#17: CCA-Secure PKC (Encrypt-then-Sign)")
+    print("CCA-Secure PKC (Encrypt-then-Sign)")
     print("=" * 60)
 
     cca = CCA_PKC(eg_bits=64, rsa_bits=256)

@@ -1,9 +1,9 @@
 """
-crypto/pa20_mpc.py — PA#20: All 2-Party Secure Computation (Yao / GMW)
+crypto/mpc.py — All 2-Party Secure Computation (Yao / GMW)
 
 Implements:
   1. Circuit class: DAG of AND, XOR, NOT gates with wire indices
-  2. Secure circuit evaluation using PA#19 secure gates
+  2. Secure circuit evaluation using secure gates
   3. Three mandatory circuits:
      - Millionaire's problem (x > y for n-bit integers)
      - Secure equality test (x == y)
@@ -12,14 +12,14 @@ Implements:
   5. End-to-end lineage trace
   6. Performance report
 
-Dependencies: crypto.pa19_secure_and, crypto.pa18_ot
-Full lineage: PA#20 → PA#19 → PA#18 → PA#16 → PA#11 → PA#13
+Dependencies: crypto.secure_and, crypto.ot
+Full lineage: → → → → → 
 """
 
 import time
-from crypto.pa19_secure_and import SecureGates, AND, XOR, NOT
-from crypto.pa18_ot import OTProtocol
-from crypto.pa11_diffie_hellman import DHGroup
+from crypto.secure_and import SecureGates, AND, XOR, NOT
+from crypto.ot import OTProtocol
+from crypto.diffie_hellman import DHGroup
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +137,7 @@ def secure_eval(circuit: Circuit, x_alice: list, y_bob: list,
     Securely evaluate a circuit on Alice's and Bob's private inputs.
 
     Traverses the circuit in topological order (gates are already sorted).
-    Uses PA#19 secure AND, XOR, NOT for each gate.
+    Uses secure AND, XOR, NOT for each gate.
 
     Args:
         circuit: The Circuit to evaluate.
@@ -409,29 +409,29 @@ def verify_circuit(circuit: Circuit, test_cases: list) -> dict:
 def end_to_end_lineage_trace():
     """
     Return the full lineage trace for one AND gate evaluation.
-    PA#20 → PA#19 → PA#18 → PA#16 → PA#11 → PA#13
+    → → → → → 
     """
     return """
     END-TO-END LINEAGE TRACE (one AND gate)
     ═══════════════════════════════════════
-    PA#20 Secure_Eval: encounters AND gate
+    Secure_Eval: encounters AND gate
     │
-    ├── PA#19 Secure_AND(a, b):
+    ├── Secure_AND(a, b):
     │   ├── Alice prepares OT messages (0, a)
     │   ├── Bob prepares choice bit b
     │   │
-    │   └── PA#18 OT (Bellare-Micali):
+    │   └── OT (Bellare-Micali):
     │       ├── Receiver_Step1(b):
-    │       │   └── PA#16 ElGamal: generate key pair (pk_b, sk_b)
-    │       │       └── PA#11 DH: safe-prime subgroup (p, g, q)
-    │       │           └── PA#13 Miller-Rabin: generate safe prime p = 2q+1
+    │       │   └── ElGamal: generate key pair (pk_b, sk_b)
+    │       │       └── DH: safe-prime subgroup (p, g, q)
+    │       │           └── Miller-Rabin: generate safe prime p = 2q+1
     │       │
     │       ├── Sender_Step(pk0, pk1, m0, m1):
-    │       │   └── PA#16 ElGamal.Enc(pk_0, m_0) and ElGamal.Enc(pk_1, m_1)
+    │       │   └── ElGamal.Enc(pk_0, m_0) and ElGamal.Enc(pk_1, m_1)
     │       │       └── mod_exp via crypto.utils (square-and-multiply)
     │       │
     │       └── Receiver_Step2(state, C0, C1):
-    │           └── PA#16 ElGamal.Dec(sk_b, C_b)
+    │           └── ElGamal.Dec(sk_b, C_b)
     │               └── mod_exp + mod_inverse via crypto.utils
     │
     └── Bob receives m_b = a ∧ b
@@ -477,7 +477,7 @@ def performance_report(n_bits: int = 4) -> dict:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#20: All 2-Party Secure Computation")
+    print("All 2-Party Secure Computation")
     print("=" * 60)
 
     n = 4  # 4-bit inputs for demo

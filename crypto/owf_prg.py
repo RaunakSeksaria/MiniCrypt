@@ -1,5 +1,5 @@
 """
-crypto/pa01_owf_prg.py — PA#1: One-Way Functions & Pseudorandom Generators
+crypto/owf_prg.py — One-Way Functions & Pseudorandom Generators
 
 Implements:
   1. OWF (three concrete instantiations):
@@ -14,8 +14,8 @@ Implements:
   4. Backward direction: PRG ⇒ OWF (f(s) = G(s))
   5. NIST SP 800-22 statistical tests (monobit, runs, serial)
 
-Dependencies: crypto.utils, crypto.aes, crypto.pa13_miller_rabin
-Used by: PA#2 (GGM PRF)
+Dependencies: crypto.utils, crypto.aes, crypto.miller_rabin
+Used by: (GGM PRF)
 
 Bidirectional: OWF ⇔ PRG
   Forward:  OWF ⇒ PRG via HILL hard-core-bit construction
@@ -30,7 +30,7 @@ from crypto.utils import (
     bytes_to_bits, bits_to_bytes
 )
 from crypto.aes import aes_encrypt_block, aes_owf, BLOCK_SIZE, KEY_SIZE
-from crypto.pa13_miller_rabin import gen_safe_prime, find_generator, is_prime
+from crypto.miller_rabin import gen_safe_prime, find_generator, is_prime
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ class FactoringOWF:
 
     def verify_hardness(self, bits: int = 32) -> dict:
         """Show that factoring a small product takes effort."""
-        from crypto.pa13_miller_rabin import gen_prime
+        from crypto.miller_rabin import gen_prime
         p, _ = gen_prime(bits)
         q, _ = gen_prime(bits)
         n = p * q
@@ -198,14 +198,14 @@ class PRG_from_OWF:
         self.current_state = None
 
     def seed(self, s: any):
-        """PA#1 Requirement: Initialize with seed."""
+        """Requirement: Initialize with seed."""
         if isinstance(s, bytes):
             self.current_state = int.from_bytes(s, 'big')
         else:
             self.current_state = s % getattr(self.owf, 'q', (1 << 128))
 
     def next_bits(self, n: int) -> list:
-        """PA#1 Requirement: Extract next n bits."""
+        """Requirement: Extract next n bits."""
         if self.current_state is None:
             raise ValueError("PRG not seeded. Call seed(s) first.")
         
@@ -277,14 +277,14 @@ class PRG_from_AES:
         self.counter = 0
 
     def seed(self, s: bytes):
-        """PA#1 Requirement: Initialize with seed."""
+        """Requirement: Initialize with seed."""
         if len(s) != 16:
             raise ValueError("Seed must be 16 bytes for AES PRG")
         self.current_seed = s
         self.counter = 0
 
     def next_bits(self, n: int) -> list:
-        """PA#1 Requirement: Extract next n bits."""
+        """Requirement: Extract next n bits."""
         if self.current_seed is None:
             raise ValueError("PRG not seeded. Call seed(s) first.")
         
@@ -354,7 +354,7 @@ class PRG_from_AES:
 
 
 # ---------------------------------------------------------------------------
-# PA#1b: Backward Direction (PRG ⇒ OWF)
+# b: Backward Direction (PRG ⇒ OWF)
 # ---------------------------------------------------------------------------
 
 def demonstrate_prg_inversion_v2(prg, trials: int = 50):
@@ -536,7 +536,7 @@ def run_statistical_tests(bits: list) -> list:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#1: One-Way Functions & Pseudorandom Generators")
+    print("One-Way Functions & Pseudorandom Generators")
     print("=" * 60)
 
     # --- AES-based PRG (practical) ---

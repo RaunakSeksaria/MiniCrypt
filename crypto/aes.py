@@ -16,7 +16,7 @@ State layout: column-major flat list of 16 bytes.
   state[col*4 + row] = state_matrix[row][col]
   Indices 0-3 = column 0, indices 4-7 = column 1, etc.
 
-This is a concrete PRP/PRF used throughout the project (PA#2, PA#4, etc.).
+This is a concrete PRP/PRF used throughout the project.
 NO external crypto libraries used.
 """
 

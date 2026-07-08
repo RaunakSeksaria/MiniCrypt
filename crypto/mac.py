@@ -1,15 +1,15 @@
 """
-crypto/pa05_mac.py — PA#5: Message Authentication Codes (MACs)
+crypto/mac.py — Message Authentication Codes (MACs)
 
 Implements:
   1. PRF-MAC (fixed-length): Mac(k, m) = F_k(m)
   2. CBC-MAC (variable-length): chain F_k over message blocks
-  3. HMAC stub (full implementation in PA#10)
+  3. HMAC stub (full implementation in )
   4. MAC ⇒ PRF backward direction
   5. EUF-CMA forgery game
 
-Dependencies: crypto.pa02_prf_ggm (PRF), crypto.utils
-Used by: PA#6 (CCA-secure encryption)
+Dependencies: crypto.prf_ggm (PRF), crypto.utils
+Used by: (CCA-secure encryption)
 
 Bidirectional: PRF ⇔ MAC
   Forward:  Mac_k(m) = F_k(m) — PRF output is a secure tag
@@ -20,7 +20,7 @@ from crypto.utils import (
     xor_bytes, random_bytes, int_to_bytes, bytes_to_int,
     pad_pkcs7, to_hex, split_blocks
 )
-from crypto.pa02_prf_ggm import PRF
+from crypto.prf_ggm import PRF
 from crypto.aes import BLOCK_SIZE
 
 
@@ -100,17 +100,17 @@ class CBCMAC:
 
 
 # ---------------------------------------------------------------------------
-# HMAC Stub (full implementation in PA#10)
+# HMAC Stub (full implementation in )
 # ---------------------------------------------------------------------------
 
 def hmac_stub(key: bytes, message: bytes) -> bytes:
     """
-    HMAC stub — full implementation deferred to PA#10.
-    Raises NotImplementedError until PA#10 is complete.
+    HMAC stub — full implementation deferred to .
+    Raises NotImplementedError until is complete.
     """
     raise NotImplementedError(
-        "HMAC is not yet implemented. See PA#10 (crypto/pa10_hmac.py) "
-        "for the full HMAC implementation using the DLP hash from PA#8."
+        "HMAC is not yet implemented. See (crypto/hmac.py) "
+        "for the full HMAC implementation using the DLP hash from ."
     )
 
 
@@ -262,7 +262,7 @@ def euf_cma_game(mac_obj: MAC = None, num_queries: int = 50,
 
 
 # ---------------------------------------------------------------------------
-# Interface functions (for use by PA#6)
+# Interface functions
 # ---------------------------------------------------------------------------
 
 _default_mac = None
@@ -288,7 +288,7 @@ def Vrfy(key: bytes, message: bytes, tag: bytes) -> bool:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#5: Message Authentication Codes")
+    print("Message Authentication Codes")
     print("=" * 60)
 
     key = random_bytes(BLOCK_SIZE)

@@ -1,5 +1,5 @@
 """
-crypto/pa03_cpa_enc.py — PA#3: CPA-Secure Symmetric Encryption
+crypto/cpa_enc.py — CPA-Secure Symmetric Encryption
 
 Implements:
   1. CPA-secure encryption: C = ⟨r, F_k(r) ⊕ m⟩ with fresh random r
@@ -7,15 +7,15 @@ Implements:
   3. IND-CPA game simulation
   4. Broken variant (deterministic encryption with reused r)
 
-Dependencies: crypto.pa02_prf_ggm (PRF), crypto.utils
-Used by: PA#6 (CCA-secure encryption), PA#10 (Encrypt-then-HMAC)
+Dependencies: crypto.prf_ggm (PRF), crypto.utils
+Used by: (CCA-secure encryption), (Encrypt-then-HMAC)
 """
 
 from crypto.utils import (
     xor_bytes, random_bytes, int_to_bytes, bytes_to_int,
     pad_pkcs7, unpad_pkcs7, to_hex, split_blocks
 )
-from crypto.pa02_prf_ggm import PRF
+from crypto.prf_ggm import PRF
 from crypto.aes import BLOCK_SIZE
 
 
@@ -212,7 +212,7 @@ def demonstrate_deterministic_attack(enc: CPAEncryption) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Interface functions (for use by PA#6)
+# Interface functions
 # ---------------------------------------------------------------------------
 
 _default_enc = None
@@ -238,7 +238,7 @@ def Dec(key: bytes, r: bytes, ciphertext: bytes) -> bytes:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#3: CPA-Secure Symmetric Encryption")
+    print("CPA-Secure Symmetric Encryption")
     print("=" * 60)
 
     enc = CPAEncryption()

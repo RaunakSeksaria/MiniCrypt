@@ -1,8 +1,8 @@
 """
-crypto/pa10_hmac.py — PA#10: HMAC and HMAC-Based CCA-Secure Encryption
+crypto/hmac.py — HMAC and HMAC-Based CCA-Secure Encryption
 
 Implements:
-  1. HMAC using PA#8 DLP Hash: H((k⊕opad) ‖ H((k⊕ipad) ‖ m))
+  1. HMAC using DLP Hash: H((k⊕opad) ‖ H((k⊕ipad) ‖ m))
   2. HMAC_Verify with constant-time comparison
   3. CRHF ⇒ MAC (EUF-CMA game on HMAC)
   4. MAC ⇒ CRHF (HMAC as compression function in Merkle-Damgård)
@@ -10,7 +10,7 @@ Implements:
   6. Encrypt-then-HMAC (CCA-secure encryption)
   7. Constant-time comparison with timing demo
 
-Dependencies: crypto.pa08_dlp_crhf, crypto.pa07_merkle_damgard, crypto.pa03_cpa_enc
+Dependencies: crypto.dlp_crhf, crypto.merkle_damgard, crypto.cpa_enc
 Bidirectional: CRHF ⇔ MAC via HMAC
 """
 
@@ -18,9 +18,9 @@ import time
 from crypto.utils import (
     xor_bytes, random_bytes, bytes_to_int, int_to_bytes, to_hex
 )
-from crypto.pa07_merkle_damgard import MerkleDamgard
-from crypto.pa08_dlp_crhf import DLP_CRHF, get_crhf
-from crypto.pa03_cpa_enc import CPAEncryption
+from crypto.merkle_damgard import MerkleDamgard
+from crypto.dlp_crhf import DLP_CRHF, get_crhf
+from crypto.cpa_enc import CPAEncryption
 from crypto.aes import BLOCK_SIZE
 
 
@@ -30,7 +30,7 @@ from crypto.aes import BLOCK_SIZE
 
 class HMAC:
     """
-    HMAC construction using the DLP hash from PA#8.
+    HMAC construction using the DLP hash from .
 
     HMAC_k(m) = H((k ⊕ opad) ‖ H((k ⊕ ipad) ‖ m))
 
@@ -182,7 +182,7 @@ def length_extension_attack(crhf, naive_tag: bytes, key_len: int, message: bytes
     We create a new MerkleDamgard instance with IV = naive_tag
     and hash just `suffix`. The result equals H(k‖m‖pad(k‖m)‖suffix).
     """
-    from crypto.pa07_merkle_damgard import MerkleDamgard
+    from crypto.merkle_damgard import MerkleDamgard
     
     # The total message the server will hash is: k ‖ m ‖ pad(k‖m) ‖ suffix
     # The server will apply MD padding to this entire string.
@@ -430,7 +430,7 @@ def EtH_Dec(key_enc: bytes, key_mac: bytes, r: bytes, ciphertext: bytes, tag: by
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#10: HMAC and HMAC-Based CCA-Secure Encryption")
+    print("HMAC and HMAC-Based CCA-Secure Encryption")
     print("=" * 60)
 
     hmac = HMAC(bits=32)

@@ -1,5 +1,5 @@
 """
-crypto/pa04_modes.py — PA#4: Modes of Operation (CBC, OFB, CTR)
+crypto/modes.py — Modes of Operation (CBC, OFB, CTR)
 
 Implements:
   1. CBC (Cipher Block Chaining): sequential encrypt, parallel decrypt
@@ -8,7 +8,7 @@ Implements:
   4. Unified API: Encrypt(mode, k, M) / Decrypt(mode, k, C)
   5. Attack demos: CBC IV-reuse, OFB keystream-reuse
 
-Dependencies: crypto.pa02_prf_ggm (PRF/PRP), crypto.aes, crypto.utils
+Dependencies: crypto.prf_ggm (PRF/PRP), crypto.aes, crypto.utils
 """
 
 from crypto.utils import (
@@ -331,7 +331,7 @@ def bit_flip_error_propagation() -> dict:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#4: Modes of Operation")
+    print("Modes of Operation")
     print("=" * 60)
 
     key = random_bytes(BLOCK_SIZE)

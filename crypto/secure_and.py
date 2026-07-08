@@ -1,5 +1,5 @@
 """
-crypto/pa19_secure_and.py — PA#19: Secure AND Gate
+crypto/secure_and.py — Secure AND Gate
 
 Implements:
   1. Secure AND from OT: Alice(a), Bob(b) → a ∧ b
@@ -8,8 +8,8 @@ Implements:
   4. Privacy proof (comments)
   5. Truth table test (4 combos × 50 runs)
 
-Dependencies: crypto.pa18_ot (Oblivious Transfer)
-Used by: PA#20 (2-party MPC)
+Dependencies: crypto.ot (Oblivious Transfer)
+Used by: (2-party MPC)
 
 Privacy argument:
   - Secure AND: Alice plays OT sender with (0, a), Bob plays OT receiver with b.
@@ -22,8 +22,8 @@ Privacy argument:
 """
 
 from crypto.utils import random_int
-from crypto.pa18_ot import OTProtocol
-from crypto.pa11_diffie_hellman import DHGroup
+from crypto.ot import OTProtocol
+from crypto.diffie_hellman import DHGroup
 
 
 # ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ def privacy_test(gates: SecureGates = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Interface (for PA#20)
+# Interface
 # ---------------------------------------------------------------------------
 
 def AND(a: int, b: int, gates: SecureGates = None) -> int:
@@ -271,7 +271,7 @@ def NOT(a: int) -> int:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#19: Secure AND Gate")
+    print("Secure AND Gate")
     print("=" * 60)
 
     gates = SecureGates(bits=32)

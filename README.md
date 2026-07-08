@@ -43,13 +43,13 @@ Every cryptographic module runs independently from the command line, printing it
 
 ```bash
 # Birthday attack simulation
-python3 -m crypto.pa09_birthday
+python3 -m crypto.birthday
 
 # 1-of-2 Oblivious Transfer protocol
-python3 -m crypto.pa18_ot
+python3 -m crypto.ot
 
 # Two-party MPC circuit evaluation
-python3 -m crypto.pa20_mpc
+python3 -m crypto.mpc
 ```
 
 ## Project Structure

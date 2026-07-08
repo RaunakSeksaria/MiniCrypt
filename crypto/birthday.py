@@ -1,5 +1,5 @@
 """
-crypto/pa09_birthday.py — PA#9: Birthday Attack (Collision Finding)
+crypto/birthday.py — Birthday Attack (Collision Finding)
 
 Implements:
   1. Naive birthday algorithm (sort-based): O(2^{n/2}) time, O(2^{n/2}) space
@@ -8,7 +8,7 @@ Implements:
   4. Attack on truncated DLP hash
   5. Empirical birthday curve
 
-Dependencies: crypto.pa08_dlp_crhf, crypto.utils
+Dependencies: crypto.dlp_crhf, crypto.utils
 """
 
 import time
@@ -285,9 +285,9 @@ def attack_toy_hash(n_bits_list=None, num_trials: int = 20):
 def attack_dlp_hash_truncated(output_bits: int = 16,
                                num_trials: int = 5) -> dict:
     """
-    Attack the DLP hash from PA#8 with truncated output.
+    Attack the DLP hash from with truncated output.
     """
-    from crypto.pa08_dlp_crhf import DLP_CRHF
+    from crypto.dlp_crhf import DLP_CRHF
 
     crhf = DLP_CRHF(bits=32)  # Small group for speed
     mask = (1 << output_bits) - 1
@@ -429,7 +429,7 @@ def practical_context():
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#9: Birthday Attack (Collision Finding)")
+    print("Birthday Attack (Collision Finding)")
     print("=" * 60)
 
     # Toy hash attacks

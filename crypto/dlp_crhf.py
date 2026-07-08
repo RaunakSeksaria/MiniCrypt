@@ -1,22 +1,22 @@
 """
-crypto/pa08_dlp_crhf.py — PA#8: DLP-Based Collision-Resistant Hash Function
+crypto/dlp_crhf.py — DLP-Based Collision-Resistant Hash Function
 
 Implements:
   1. Group setup: safe-prime subgroup with generators g, h = g^α (α discarded)
   2. DLP compression function: compress(x, y) = g^x · h^y mod p
-  3. Full CRHF: plug into PA#7 Merkle-Damgård framework
+  3. Full CRHF: plug into Merkle-Damgård framework
   4. Collision resistance demonstration
 
-Dependencies: crypto.pa07_merkle_damgard, crypto.pa13_miller_rabin, crypto.utils
-Used by: PA#9 (birthday attack), PA#10 (HMAC), PA#15 (signatures)
+Dependencies: crypto.merkle_damgard, crypto.miller_rabin, crypto.utils
+Used by: (birthday attack), (HMAC), (signatures)
 """
 
 from crypto.utils import (
     mod_exp, random_int, random_bytes, bytes_to_int, int_to_bytes,
     to_hex, int_to_bytes_auto
 )
-from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
-from crypto.pa07_merkle_damgard import MerkleDamgard
+from crypto.miller_rabin import gen_safe_prime, find_generator
+from crypto.merkle_damgard import MerkleDamgard
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ def brute_force_collision_demo(output_bits: int = 16) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Interface (for PA#10, PA#15)
+# Interface
 # ---------------------------------------------------------------------------
 
 _default_crhf = None
@@ -253,7 +253,7 @@ def get_crhf(bits: int = 64) -> DLP_CRHF:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#8: DLP-Based Collision-Resistant Hash Function")
+    print("DLP-Based Collision-Resistant Hash Function")
     print("=" * 60)
 
     # Create CRHF with small parameters

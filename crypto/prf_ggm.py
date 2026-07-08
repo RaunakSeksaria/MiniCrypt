@@ -1,15 +1,15 @@
 """
-crypto/pa02_prf_ggm.py — PA#2: Pseudorandom Functions via GGM Tree
+crypto/prf_ggm.py — Pseudorandom Functions via GGM Tree
 
 Implements:
   1. GGM Tree PRF: F_k(x) = G_{x_n}(... G_{x_1}(k) ...)
-     using a length-doubling PRG from PA#1.
+     using a length-doubling PRG from .
   2. AES-based PRF plug-in: F_k(x) = AES_k(x)
   3. Backward direction (PRF ⇒ PRG): G(s) = F_s(0^n) ‖ F_s(1^n)
   4. PRF distinguishing game (100-query test)
 
-Dependencies: crypto.pa01_owf_prg, crypto.aes, crypto.utils
-Used by: PA#3, PA#4, PA#5 (and transitively by all later PAs)
+Dependencies: crypto.owf_prg, crypto.aes, crypto.utils
+Used by: cpa_enc, mac, and transitively by later modules in the chain
 
 Bidirectional: PRG ⇔ PRF
   Forward:  PRG ⇒ PRF via GGM tree
@@ -21,7 +21,7 @@ from crypto.utils import (
     to_hex, get_bit, bytes_to_bits
 )
 from crypto.aes import aes_encrypt_block, aes_decrypt_block, BLOCK_SIZE
-from crypto.pa01_owf_prg import PRG_from_AES, run_statistical_tests
+from crypto.owf_prg import PRG_from_AES, run_statistical_tests
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ class PRF:
     def F(self, key: bytes, x: bytes) -> bytes:
         """
         Evaluate the PRF: F_k(x).
-        This is the primary interface used by PA#3, PA#4, PA#5.
+        This is the primary interface used across the library.
         """
         return self._impl.evaluate(key, x)
 
@@ -346,7 +346,7 @@ def distinguishing_game(prf: PRF, num_queries: int = 100) -> dict:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#2: Pseudorandom Functions via GGM Tree")
+    print("Pseudorandom Functions via GGM Tree")
     print("=" * 60)
 
     # --- AES PRF ---

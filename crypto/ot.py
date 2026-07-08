@@ -1,5 +1,5 @@
 """
-crypto/pa18_ot.py — PA#18: Oblivious Transfer (OT)
+crypto/ot.py — Oblivious Transfer (OT)
 
 Implements:
   1. 1-out-of-2 OT using ElGamal (Bellare-Micali protocol)
@@ -8,15 +8,15 @@ Implements:
   4. Sender privacy demo (receiver can't decrypt C_{1-b})
   5. 100-trial correctness test
 
-Dependencies: crypto.pa16_elgamal (ElGamal PKC)
-Used by: PA#19 (Secure AND), PA#20 (MPC)
+Dependencies: crypto.elgamal (ElGamal PKC)
+Used by: (Secure AND), (MPC)
 
-Lineage: PA#18 → PA#16 → PA#11 → PA#13
+Lineage: → → → 
 """
 
 from crypto.utils import mod_exp, mod_inverse, random_int, random_bytes, to_hex
-from crypto.pa16_elgamal import elgamal_keygen, elgamal_encrypt, elgamal_decrypt
-from crypto.pa11_diffie_hellman import DHGroup
+from crypto.elgamal import elgamal_keygen, elgamal_encrypt, elgamal_decrypt
+from crypto.diffie_hellman import DHGroup
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ def correctness_test(bits: int = 32, trials: int = 100) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Interface (for PA#19)
+# Interface
 # ---------------------------------------------------------------------------
 
 _default_ot = None
@@ -296,7 +296,7 @@ def get_ot(bits: int = 32) -> OTProtocol:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#18: Oblivious Transfer (OT)")
+    print("Oblivious Transfer (OT)")
     print("=" * 60)
 
     # Basic OT

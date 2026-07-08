@@ -1,22 +1,22 @@
 """
-crypto/pa12_rsa.py — PA#12: Textbook RSA + PKCS#1 v1.5
+crypto/rsa.py — Textbook RSA + PKCS#1 v1.5
 
 Implements:
-  1. RSA key generation using PA#13 Miller-Rabin
+  1. RSA key generation using Miller-Rabin
   2. Textbook RSA encryption/decryption (square-and-multiply)
   3. PKCS#1 v1.5 padding (0x00 0x02 PS 0x00 M)
   4. Determinism attack demo
   5. Simplified Bleichenbacher oracle demo
 
-Dependencies: crypto.pa13_miller_rabin, crypto.utils
-Used by: PA#14 (CRT), PA#15 (signatures), PA#18 (OT)
+Dependencies: crypto.miller_rabin, crypto.utils
+Used by: (CRT), (signatures), (OT)
 """
 
 from crypto.utils import (
     mod_exp, mod_inverse, random_bytes, bytes_to_int, int_to_bytes,
     to_hex, random_int
 )
-from crypto.pa13_miller_rabin import gen_prime
+from crypto.miller_rabin import gen_prime
 
 
 # ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ class RSAKeyPair:
         self.q = q
         self.bits = n.bit_length()
 
-        # CRT components for PA#14
+        # CRT components for 
         if p and q:
             self.dp = d % (p - 1)
             self.dq = d % (q - 1)
@@ -299,7 +299,7 @@ def bleichenbacher_oracle_demo(bits: int = 256) -> dict:
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#12: Textbook RSA + PKCS#1 v1.5")
+    print("Textbook RSA + PKCS#1 v1.5")
     print("=" * 60)
 
     # Key generation

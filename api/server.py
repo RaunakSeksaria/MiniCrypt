@@ -28,7 +28,7 @@ class ReduceRequest(BaseModel):
     query: str       # hex query for target
 
 class DemoRequest(BaseModel):
-    pa: int
+    pa: str
     params: Optional[dict] = {}
 
 # ── Helpers ──
@@ -109,8 +109,8 @@ class PrimitiveFactory:
         Leg 2 should not know if this is AES-based or DLP-based.
         """
         if foundation == "AES":
-            from crypto.pa01_owf_prg import AES_OWF, PRG_from_AES, PRG_from_OWF
-            from crypto.pa02_prf_ggm import PRF
+            from crypto.owf_prg import AES_OWF, PRG_from_AES, PRG_from_OWF
+            from crypto.prf_ggm import PRF
             
             if p_type == "OWF":
                 return PrimitiveWrapper(AES_OWF())
@@ -132,7 +132,7 @@ class PrimitiveFactory:
                     return PRG_from_AES().generate(seed[:16], 16)
             return PRG_Practical()
         else: # DLP
-            from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
+            from crypto.miller_rabin import gen_safe_prime, find_generator
             from crypto.utils import bytes_to_int, mod_exp
             
             global _CACHED_DLP
@@ -143,7 +143,7 @@ class PrimitiveFactory:
             else:
                 p, q, g = globals()['_CACHED_DLP']
 
-            from crypto.pa01_owf_prg import DLP_OWF, PRG_from_OWF
+            from crypto.owf_prg import DLP_OWF, PRG_from_OWF
             
             if p_type == "OWF":
                 return PrimitiveWrapper(DLP_OWF(32))
@@ -193,7 +193,7 @@ def build_primitive(req: BuildRequest):
                 steps.append({"fn":f"AES → {req.source}","input":key.hex(),"output":"Ready"})
                 result_hex = key.hex()
         else: # DLP
-            from crypto.pa13_miller_rabin import gen_safe_prime, find_generator
+            from crypto.miller_rabin import gen_safe_prime, find_generator
             from crypto.utils import bytes_to_int, mod_exp
             
             # Use cached params for speed in Explorer
@@ -236,9 +236,9 @@ def reduce_primitive(req: ReduceRequest):
             proof = PROOF_DB.get(label, {"theorem":"","security":"","pa":""})
             proofs.append({"step":label,"description":desc,**proof})
             
-            # Special case for HILL (PA#1) iterations display
+            # Special case for HILL () iterations display
             if label == "OWF→PRG":
-                from crypto.pa01_owf_prg import PRG_from_OWF, AES_OWF
+                from crypto.owf_prg import PRG_from_OWF, AES_OWF
                 from crypto.utils import bytes_to_bits
                 prg_impl = PRG_from_OWF(AES_OWF(), 128) if req.foundation == "AES" else PRG_from_OWF(None, 32)
                 res_bytes = prg_impl.generate_bytes(int.from_bytes(current_state, 'big'), 16)
@@ -254,7 +254,7 @@ def reduce_primitive(req: ReduceRequest):
                 
             elif label == "PRG→PRF":
                 # GGM Tree Trace: Show tree walking using CURRENT_STATE as Root Key
-                from crypto.pa02_prf_ggm import GGM_PRF
+                from crypto.prf_ggm import GGM_PRF
                 from crypto.utils import bytes_to_bits
                 ggm = GGM_PRF()
                 x_bits = bytes_to_bits(query_bytes)
@@ -291,12 +291,12 @@ def reduce_primitive(req: ReduceRequest):
     except Exception as e:
         raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
 
-# ── PA Demo endpoints ──
+# ── Demo endpoints ──
 @app.post("/api/demo")
 def run_demo(req: DemoRequest):
     try:
-        if req.pa == 1:
-            from crypto.pa01_owf_prg import AES_OWF, PRG_from_AES, run_statistical_tests, demonstrate_prg_inversion_v2
+        if req.pa == "owf_prg":
+            from crypto.owf_prg import AES_OWF, PRG_from_AES, run_statistical_tests, demonstrate_prg_inversion_v2
             from crypto.utils import bytes_to_bits, to_hex
             seed_hex = req.params.get("seed", "2b7e151628aed2a6abf7158809cf4f3c")
             length = int(req.params.get("length", 32))
@@ -326,7 +326,7 @@ def run_demo(req: DemoRequest):
                 # Only run expensive brute-force demo when requested
                 response["inversion"] = demonstrate_prg_inversion_v2(prg)
             return response
-        elif req.pa == 2:
+        elif req.pa == "prf_ggm":
             from crypto.utils import to_hex, bytes_to_bits
             key_hex = req.params.get("key", "2b7e151628aed2a6abf7158809cf4f3c")
             query_hex = req.params.get("query", "00000000000000000000000000000001")
@@ -335,7 +335,7 @@ def run_demo(req: DemoRequest):
             key = bytes.fromhex(key_hex)
             key = (key + b'\x00' * 16)[:16]
             
-            # Interpret 'query' as a bit string (0101...) for PA#2
+            # Interpret 'query' as a bit string (0101...) for 
             query_str = req.params.get("query", "0000")
             query_bits = []
             for bit in query_str:
@@ -346,18 +346,18 @@ def run_demo(req: DemoRequest):
             query_bits = (query_bits + [0] * depth)[:depth]
             
             # Use the unified PRF wrapper with GGM mode
-            from crypto.pa02_prf_ggm import PRF
+            from crypto.prf_ggm import PRF
             ggm = PRF(mode='ggm')
             task = req.params.get("task")
             
             if task == "game":
-                from crypto.pa02_prf_ggm import distinguishing_game
+                from crypto.prf_ggm import distinguishing_game
                 game_result = distinguishing_game(ggm, 100)
                 return {"game": game_result}
             
             if task == "randomness":
-                from crypto.pa02_prf_ggm import PRG_from_PRF
-                from crypto.pa01_owf_prg import run_statistical_tests
+                from crypto.prf_ggm import PRG_from_PRF
+                from crypto.owf_prg import run_statistical_tests
                 prg = PRG_from_PRF(ggm)
                 test_bits = prg.next_bits(key, 2048)
                 return {
@@ -377,9 +377,9 @@ def run_demo(req: DemoRequest):
                 "trace": trace,
                 "output": trace['output']
             }
-        elif req.pa == 3:
-            from crypto.pa03_cpa_enc import CPAEncryption, ind_cpa_game
-            from crypto.pa02_prf_ggm import PRF
+        elif req.pa == "cpa_enc":
+            from crypto.cpa_enc import CPAEncryption, ind_cpa_game
+            from crypto.prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
             prf_mode = 'ggm' if req.params.get('foundation') == 'DLP' else 'aes'
             enc = CPAEncryption(prf=PRF(mode=prf_mode)); k = random_bytes(16)
@@ -388,8 +388,8 @@ def run_demo(req: DemoRequest):
             pt = enc.decrypt(k, r, ct)
             game = ind_cpa_game(enc, 50)
             return {"plaintext":msg.decode(),"nonce":to_hex(r),"ciphertext":to_hex(ct),"decrypted":pt.decode(),"match":pt==msg,"game":game,"prf_mode":prf_mode}
-        elif req.pa == 4:
-            from crypto.pa04_modes import encrypt, decrypt
+        elif req.pa == "modes":
+            from crypto.modes import encrypt, decrypt
             from crypto.utils import random_bytes, to_hex
             k = random_bytes(16)
             msg = req.params.get("message","Modes of Operation test!").encode()
@@ -399,9 +399,9 @@ def run_demo(req: DemoRequest):
                 pt = decrypt(mode, k, iv, ct)
                 results[mode] = {"iv":to_hex(iv),"ciphertext":to_hex(ct),"decrypted":pt.decode(),"match":pt==msg}
             return results
-        elif req.pa == 5:
-            from crypto.pa05_mac import MAC, euf_cma_game
-            from crypto.pa02_prf_ggm import PRF
+        elif req.pa == "mac":
+            from crypto.mac import MAC, euf_cma_game
+            from crypto.prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
             prf_mode = 'ggm' if req.params.get('foundation') == 'DLP' else 'aes'
             mac = MAC(mode='cbc', prf=PRF(mode=prf_mode)); k = random_bytes(16)
@@ -409,11 +409,11 @@ def run_demo(req: DemoRequest):
             tag = mac.Mac(k, msg)
             game = euf_cma_game(mac, 30, 10)
             return {"message":msg.decode(),"tag":to_hex(tag),"verify":mac.Vrfy(k,msg,tag),"game":game,"prf_mode":prf_mode}
-        elif req.pa == 6:
-            from crypto.pa06_cca_enc import CCAEncryption, malleability_attack_demo, key_separation_demo
-            from crypto.pa03_cpa_enc import CPAEncryption
-            from crypto.pa05_mac import MAC
-            from crypto.pa02_prf_ggm import PRF
+        elif req.pa == "cca_enc":
+            from crypto.cca_enc import CCAEncryption, malleability_attack_demo, key_separation_demo
+            from crypto.cpa_enc import CPAEncryption
+            from crypto.mac import MAC
+            from crypto.prf_ggm import PRF
             from crypto.utils import random_bytes, to_hex
             prf_mode = 'ggm' if req.params.get('foundation') == 'DLP' else 'aes'
             cca = CCAEncryption(enc=CPAEncryption(prf=PRF(mode=prf_mode)), mac=MAC(mode='cbc', prf=PRF(mode=prf_mode)))
@@ -424,8 +424,8 @@ def run_demo(req: DemoRequest):
             attack = malleability_attack_demo()
             key_sep = key_separation_demo()
             return {"plaintext":msg.decode(),"decrypted":pt.decode(),"match":pt==msg,"tamper_rejected":cca.decrypt(ke,km,r,bytes([ct[0]^1])+ct[1:],tag) is None,"attack":{"cpa_malleable":attack['cpa_only']['malleable'],"cca_rejected":attack['cca_secure']['rejected']},"key_separation":key_sep,"prf_mode":prf_mode}
-        elif req.pa == 7:
-            from crypto.pa07_merkle_damgard import create_toy_hash, collision_propagation_demo
+        elif req.pa == "merkle_damgard":
+            from crypto.merkle_damgard import create_toy_hash, collision_propagation_demo
             msg_str = req.params.get('message', 'Hello Hash!')
             is_hex = req.params.get('is_hex', False)
             output_size = int(req.params.get('output_size', 4))
@@ -442,15 +442,15 @@ def run_demo(req: DemoRequest):
             trace = toy.hash_with_trace(msg)
             trace["collision_propagation"] = collision_propagation_demo()
             return trace
-        elif req.pa == 8:
-            from crypto.pa08_dlp_crhf import DLP_CRHF
+        elif req.pa == "dlp_crhf":
+            from crypto.dlp_crhf import DLP_CRHF
             from crypto.utils import to_hex
             crhf = DLP_CRHF(bits=32)
             msg = req.params.get("message","Test DLP Hash").encode()
             h = crhf.hash(msg)
             return {"message":msg.decode(),"hash":to_hex(h),"p":crhf.dlp.p,"g":crhf.dlp.g,"h_pub":crhf.dlp.h}
-        elif req.pa == 9:
-            from crypto.pa09_birthday import attack_toy_hash, practical_context, make_toy_hash, birthday_attack_naive
+        elif req.pa == "birthday":
+            from crypto.birthday import attack_toy_hash, practical_context, make_toy_hash, birthday_attack_naive
             n_bits = int(req.params.get("n_bits", 12))
             hash_fn = make_toy_hash(n_bits)
             res = birthday_attack_naive(hash_fn, n_bits)
@@ -466,22 +466,22 @@ def run_demo(req: DemoRequest):
                 "hash_value": res.get("hash_value"),
                 "context": ctx,
             }
-        elif req.pa == 10:
-            from crypto.pa10_hmac import HMAC
+        elif req.pa == "hmac":
+            from crypto.hmac import HMAC
             from crypto.utils import random_bytes, to_hex
             hmac = HMAC(bits=32); k = random_bytes(hmac.block_size)
             msg = b"HMAC test message"
             tag = hmac.mac(k, msg)
             return {"message":msg.decode(),"tag":to_hex(tag),"verify":hmac.verify(k,msg,tag),"tamper":not hmac.verify(k,b"wrong",tag)}
-        elif req.pa == 11:
-            from crypto.pa11_diffie_hellman import DiffieHellman, mitm_attack, cdh_hardness_demo
+        elif req.pa == "diffie_hellman":
+            from crypto.diffie_hellman import DiffieHellman, mitm_attack, cdh_hardness_demo
             dh = DiffieHellman(bits=32)
             exch = dh.key_exchange()
             mitm = mitm_attack(dh)
             cdh = cdh_hardness_demo(dh, tiny_bits=20)
             return {"exchange":{"p":exch['p'],"g":exch['g'],"A":exch['A'],"B":exch['B'],"K_alice":exch['K_alice'],"K_bob":exch['K_bob'],"match":exch['keys_match']},"mitm":{"eve_has_alice_key":mitm['eve_has_alice_key'],"eve_has_bob_key":mitm['eve_has_bob_key'],"alice_bob_same":mitm['alice_bob_same']}, "cdh": cdh}
-        elif req.pa == 12:
-            from crypto.pa12_rsa import rsa_keygen, rsa_encrypt, rsa_decrypt, pkcs15_encrypt, pkcs15_decrypt, determinism_attack_demo, multiplicative_homomorphism_demo, bleichenbacher_oracle_demo
+        elif req.pa == "rsa":
+            from crypto.rsa import rsa_keygen, rsa_encrypt, rsa_decrypt, pkcs15_encrypt, pkcs15_decrypt, determinism_attack_demo, multiplicative_homomorphism_demo, bleichenbacher_oracle_demo
             kp = rsa_keygen(256); m = int(req.params.get("message_int", 42))
             c = rsa_encrypt(kp.n, kp.e, m)
             d = rsa_decrypt(kp.d, kp.n, c)
@@ -489,8 +489,8 @@ def run_demo(req: DemoRequest):
             c2 = pkcs15_encrypt(kp.n, kp.e, msg)
             d2 = pkcs15_decrypt(kp.d, kp.n, c2)
             return {"textbook":{"m":m,"c":str(c),"d":d,"match":d==m},"pkcs":{"message":msg.decode(),"decrypted":d2.decode(),"match":d2==msg},"n":str(kp.n),"e":kp.e,"bits":kp.bits, "determinism": determinism_attack_demo(256), "homomorphism": multiplicative_homomorphism_demo(256), "bleichenbacher": bleichenbacher_oracle_demo(256)}
-        elif req.pa == 13:
-            from crypto.pa13_miller_rabin import is_prime, gen_prime, miller_rabin_with_trace, carmichael_demo, benchmark_prime_generation
+        elif req.pa == "miller_rabin":
+            from crypto.miller_rabin import is_prime, gen_prime, miller_rabin_with_trace, carmichael_demo, benchmark_prime_generation
             task = req.params.get("task", "test")
             rounds = int(req.params.get("rounds", 10))
             
@@ -517,8 +517,8 @@ def run_demo(req: DemoRequest):
                 return {"p512": str(p512), "composite": "12345678901234567891"}
             else:
                 return {"error": "Unknown task"}
-        elif req.pa == 14:
-            from crypto.pa14_crt import crt, hastad_attack_demo
+        elif req.pa == "crt":
+            from crypto.crt import crt, hastad_attack_demo
             res_str = req.params.get("residues", "2,3,2")
             mod_str = req.params.get("moduli", "3,5,7")
             res = [int(x) for x in res_str.split(",")]
@@ -526,29 +526,29 @@ def run_demo(req: DemoRequest):
             x = crt(res, mods)
             attack = hastad_attack_demo(bits=128, e=3)
             return {"crt_result":{"residues":res,"moduli":mods,"solution":x},"hastad":{"success":attack['success'],"bits":attack['bits']}}
-        elif req.pa == 15:
-            from crypto.pa15_signatures import DigitalSignature, homomorphism_attack_demo
+        elif req.pa == "signatures":
+            from crypto.signatures import DigitalSignature, homomorphism_attack_demo
             ds = DigitalSignature(bits=256)
             msg = req.params.get("message", "Sign this!").encode()
             sigma = ds.sign(msg)
             attack = homomorphism_attack_demo(256)
             return {"message":msg.decode(),"signature":str(sigma),"verify":ds.verify(msg,sigma),"wrong":not ds.verify(b"wrong",sigma),"attack":{"raw_works":attack['raw_attack_works'],"hash_works":attack['hash_then_sign_attack_works']}}
-        elif req.pa == 16:
-            from crypto.pa16_elgamal import elgamal_keygen, elgamal_encrypt, elgamal_decrypt, malleability_attack
+        elif req.pa == "elgamal":
+            from crypto.elgamal import elgamal_keygen, elgamal_encrypt, elgamal_decrypt, malleability_attack
             key = elgamal_keygen(bits=32); m = int(req.params.get("message_int", 42))
             c1,c2 = elgamal_encrypt(key.pk, m)
             d = elgamal_decrypt(key.sk, key.p, c1, c2)
             att = malleability_attack(key, m)
             return {"m":m,"c1":c1,"c2":c2,"decrypted":d,"match":d==m,"malleability":att['attack_works'],"p":key.p,"g":key.g}
-        elif req.pa == 17:
-            from crypto.pa17_cca_pkc import CCA_PKC, contrast_demo
+        elif req.pa == "cca_pkc":
+            from crypto.cca_pkc import CCA_PKC, contrast_demo
             cca = CCA_PKC(eg_bits=32, rsa_bits=256)
             m = int(req.params.get("message_int", 42)); ct=cca.encrypt(m)
             pt=cca.decrypt(ct['c1'],ct['c2'],ct['sigma'])
             bad=cca.decrypt(ct['c1'],(ct['c2']*2)%cca.eg_key.p,ct['sigma'])
             return {"m":m,"decrypted":pt,"match":pt==m,"tamper_rejected":bad is None, "contrast": contrast_demo(cca)}
-        elif req.pa == 18:
-            from crypto.pa18_ot import run_ot, receiver_privacy_demo, sender_privacy_demo
+        elif req.pa == "ot":
+            from crypto.ot import run_ot, receiver_privacy_demo, sender_privacy_demo
             m0 = int(req.params.get("m0", 42))
             m1 = int(req.params.get("m1", 99))
             b = int(req.params.get("b", 0))
@@ -556,15 +556,15 @@ def run_demo(req: DemoRequest):
             return {"m0": m0, "m1": m1, "b": b, "received": r['received'], "correct": r['correct'], "receiver_privacy": receiver_privacy_demo(32), "sender_privacy": sender_privacy_demo(32)}
             
             
-        elif req.pa == 19:
-            from crypto.pa19_secure_and import SecureGates
+        elif req.pa == "secure_and":
+            from crypto.secure_and import SecureGates
             gates = SecureGates(bits=32)
             a = int(req.params.get("a", 1))
             b = int(req.params.get("b", 1))
             r = gates.secure_and(a, b)
             return {"input":{"a":a,"b":b},"result":r['result'],"correct":r['correct'],"all_gates": "Check server logs for other gate tests"}
-        elif req.pa == 20:
-            from crypto.pa20_mpc import build_comparator, build_equality, build_adder, int_to_bits, bits_to_int
+        elif req.pa == "mpc":
+            from crypto.mpc import build_comparator, build_equality, build_adder, int_to_bits, bits_to_int
             results = {}
             alice_val = int(req.params.get("alice_val", 7))
             bob_val = int(req.params.get("bob_val", 3))
@@ -584,17 +584,17 @@ def run_demo(req: DemoRequest):
         raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
 
 
-# ── PA#9 dedicated birthday-attack endpoints ──
+# ── dedicated birthday-attack endpoints ──
 
 _pa9_hunts: dict = {}
 
 
-class PA9StartRequest(BaseModel):
+class BirthdayStartRequest(BaseModel):
     n_bits: int = 12
 
 
-@app.post("/api/pa9/birthday/start")
-def pa9_birthday_start(req: PA9StartRequest):
+@app.post("/api/birthday/start")
+def birthday_start(req: BirthdayStartRequest):
     """Launch a background birthday-attack thread on the toy hash. Returns hunt_id."""
     n_bits = max(4, min(20, req.n_bits))  # clamp to sane range
     hunt_id = str(uuid.uuid4())
@@ -613,7 +613,7 @@ def pa9_birthday_start(req: PA9StartRequest):
     _pa9_hunts[hunt_id] = state
 
     def _hunt(state):
-        from crypto.pa09_birthday import make_toy_hash
+        from crypto.birthday import make_toy_hash
         import math as _math
         try:
             n = state["n_bits"]
@@ -657,9 +657,9 @@ def pa9_birthday_start(req: PA9StartRequest):
     }
 
 
-@app.get("/api/pa9/birthday/status/{hunt_id}")
-def pa9_birthday_status(hunt_id: str):
-    """Poll current state of a PA9 birthday hunt."""
+@app.get("/api/birthday/status/{hunt_id}")
+def birthday_status(hunt_id: str):
+    """Poll current state of a birthday hunt."""
     state = _pa9_hunts.get(hunt_id)
     if state is None:
         raise HTTPException(404, "Hunt not found")
@@ -680,9 +680,9 @@ def pa9_birthday_status(hunt_id: str):
     }
 
 
-@app.post("/api/pa9/birthday/stop/{hunt_id}")
-def pa9_birthday_stop(hunt_id: str):
-    """Abort a running PA9 birthday hunt."""
+@app.post("/api/birthday/stop/{hunt_id}")
+def birthday_stop(hunt_id: str):
+    """Abort a running birthday hunt."""
     state = _pa9_hunts.get(hunt_id)
     if state is None:
         raise HTTPException(404, "Hunt not found")
@@ -691,30 +691,30 @@ def pa9_birthday_stop(hunt_id: str):
     return {"status": state["status"]}
 
 
-# ── PA#8 dedicated endpoints ──
+# ── dedicated endpoints ──
 
 # Shared state for collision hunts  {hunt_id -> dict}
 _pa8_hunts: dict = {}
 _pa8_crhf_cache = None   # lazily initialised once
 
-def _get_pa8_crhf():
+def _get_dlp_crhf():
     global _pa8_crhf_cache
     if _pa8_crhf_cache is None:
-        from crypto.pa08_dlp_crhf import DLP_CRHF
+        from crypto.dlp_crhf import DLP_CRHF
         _pa8_crhf_cache = DLP_CRHF(bits=32)  # small group, fast
     return _pa8_crhf_cache
 
 
-class PA8HashRequest(BaseModel):
+class DlpCrhfHashRequest(BaseModel):
     message: str
 
 
-@app.post("/api/pa8/hash")
-def pa8_live_hash(req: PA8HashRequest):
+@app.post("/api/dlp_crhf/hash")
+def dlp_crhf_live_hash(req: DlpCrhfHashRequest):
     """Hash a message and return the group element as hex (live, on every keystroke)."""
     try:
         from crypto.utils import to_hex
-        crhf = _get_pa8_crhf()
+        crhf = _get_dlp_crhf()
         msg = req.message.encode()
         h = crhf.hash(msg)
         full_hex = to_hex(h)
@@ -735,8 +735,8 @@ def pa8_live_hash(req: PA8HashRequest):
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
-@app.post("/api/pa8/collision/start")
-def pa8_collision_start():
+@app.post("/api/dlp_crhf/collision/start")
+def dlp_crhf_collision_start():
     """Launch a background birthday-attack thread (16-bit truncated output). Returns hunt_id."""
     hunt_id = str(uuid.uuid4())
     state = {
@@ -752,7 +752,7 @@ def pa8_collision_start():
 
     def _hunt(state):
         try:
-            crhf = _get_pa8_crhf()
+            crhf = _get_dlp_crhf()
             seen = {}     # truncated_hash -> message bytes
             MAX_EVALS = 2 ** 18  # safety cap
             mask = (1 << 16) - 1
@@ -785,8 +785,8 @@ def pa8_collision_start():
     return {"hunt_id": hunt_id, "birthday_bound": 256, "output_bits": 16}
 
 
-@app.get("/api/pa8/collision/status/{hunt_id}")
-def pa8_collision_status(hunt_id: str):
+@app.get("/api/dlp_crhf/collision/status/{hunt_id}")
+def dlp_crhf_collision_status(hunt_id: str):
     """Poll the state of a running collision hunt."""
     state = _pa8_hunts.get(hunt_id)
     if state is None:
@@ -802,8 +802,8 @@ def pa8_collision_status(hunt_id: str):
     }
 
 
-@app.post("/api/pa8/collision/stop/{hunt_id}")
-def pa8_collision_stop(hunt_id: str):
+@app.post("/api/dlp_crhf/collision/stop/{hunt_id}")
+def dlp_crhf_collision_stop(hunt_id: str):
     """Abort a running collision hunt."""
     state = _pa8_hunts.get(hunt_id)
     if state is None:
@@ -813,42 +813,42 @@ def pa8_collision_stop(hunt_id: str):
     return {"status": state["status"]}
 
 
-# ── PA#10 dedicated endpoints ──
+# ── dedicated endpoints ──
 
 # Shared HMAC instance (lazy init)
-_pa10_hmac = None
-_pa10_eth = None
+_hmac_singleton = None
+_eth_singleton = None
 
-def _get_pa10_hmac():
-    global _pa10_hmac
-    if _pa10_hmac is None:
-        from crypto.pa10_hmac import HMAC as _HMAC
-        _pa10_hmac = _HMAC(bits=32)
-    return _pa10_hmac
+def _get_hmac():
+    global _hmac_singleton
+    if _hmac_singleton is None:
+        from crypto.hmac import HMAC as _HMAC
+        _hmac_singleton = _HMAC(bits=32)
+    return _hmac_singleton
 
-def _get_pa10_eth():
-    global _pa10_eth
-    if _pa10_eth is None:
-        from crypto.pa10_hmac import EncryptThenHMAC
-        _pa10_eth = EncryptThenHMAC(hmac=_get_pa10_hmac())
-    return _pa10_eth
+def _get_hmac_eth():
+    global _eth_singleton
+    if _eth_singleton is None:
+        from crypto.hmac import EncryptThenHMAC
+        _eth_singleton = EncryptThenHMAC(hmac=_get_hmac())
+    return _eth_singleton
 
 
-class PA10LengthExtRequest(BaseModel):
+class HmacLengthExtRequest(BaseModel):
     suffix: str = "evil suffix"
     hash_mode: str = "dlp"   # "dlp" or "sha256"
 
 
-@app.post("/api/pa10/length_extension")
-def pa10_length_extension(req: PA10LengthExtRequest):
+@app.post("/api/hmac/length_extension")
+def hmac_length_extension(req: HmacLengthExtRequest):
     """Interactive length-extension demo: left panel (broken) + right panel (HMAC)."""
     try:
-        from crypto.pa10_hmac import length_extension_attack, HMAC as _HMAC
+        from crypto.hmac import length_extension_attack, HMAC as _HMAC
         from crypto.utils import random_bytes, to_hex
         import hashlib
 
         suffix_bytes = req.suffix.encode()
-        hmac_obj = _get_pa10_hmac()
+        hmac_obj = _get_hmac()
 
         if req.hash_mode == "sha256":
             # SHA-256 path (for the toggle comparison)
@@ -900,7 +900,7 @@ def pa10_length_extension(req: PA10LengthExtRequest):
             }
 
         # DLP hash path (default)
-        result = __import__('crypto.pa10_hmac', fromlist=['length_extension_demo']).length_extension_demo(
+        result = __import__('crypto.hmac', fromlist=['length_extension_demo']).length_extension_demo(
             hmac_obj, suffix=suffix_bytes
         )
         result["mode"] = "dlp"
@@ -910,31 +910,31 @@ def pa10_length_extension(req: PA10LengthExtRequest):
 
 
 
-# ── PA#11 Diffie-Hellman dedicated endpoints ──
+# ── Diffie-Hellman dedicated endpoints ──
 
 # Cached DH group (32-bit safe prime) so every request reuses the same p/g/q
-_pa11_dh = None
+_dh_singleton = None
 
-def _get_pa11_dh():
-    global _pa11_dh
-    if _pa11_dh is None:
-        from crypto.pa11_diffie_hellman import DiffieHellman
-        _pa11_dh = DiffieHellman(bits=32)
-    return _pa11_dh
+def _get_dh():
+    global _dh_singleton
+    if _dh_singleton is None:
+        from crypto.diffie_hellman import DiffieHellman
+        _dh_singleton = DiffieHellman(bits=32)
+    return _dh_singleton
 
 
-class PA11ExchangeRequest(BaseModel):
+class DhExchangeRequest(BaseModel):
     a: Optional[int] = None   # Alice's private exponent (None → random)
     b: Optional[int] = None   # Bob's private exponent   (None → random)
 
 
-@app.post("/api/pa11/exchange")
-def pa11_exchange(req: PA11ExchangeRequest):
+@app.post("/api/diffie_hellman/exchange")
+def dh_exchange(req: DhExchangeRequest):
     """Full DH key exchange. Accepts optional private exponents; randomises if omitted."""
     try:
-        from crypto.pa11_diffie_hellman import DiffieHellman
+        from crypto.diffie_hellman import DiffieHellman
         from crypto.utils import mod_exp, random_int
-        dh = _get_pa11_dh()
+        dh = _get_dh()
 
         a = req.a if req.a is not None else random_int(2, dh.q - 1)
         b = req.b if req.b is not None else random_int(2, dh.q - 1)
@@ -960,17 +960,17 @@ def pa11_exchange(req: PA11ExchangeRequest):
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
-class PA11MitmRequest(BaseModel):
+class DhMitmRequest(BaseModel):
     a: Optional[int] = None
     b: Optional[int] = None
 
 
-@app.post("/api/pa11/mitm")
-def pa11_mitm(req: PA11MitmRequest):
+@app.post("/api/diffie_hellman/mitm")
+def dh_mitm(req: DhMitmRequest):
     """MITM demo. Eve intercepts A and B, substitutes A'=g^e1 and B'=g^e2."""
     try:
         from crypto.utils import mod_exp, random_int
-        dh = _get_pa11_dh()
+        dh = _get_dh()
 
         a  = req.a if req.a is not None else random_int(2, dh.q - 1)
         b  = req.b if req.b is not None else random_int(2, dh.q - 1)
@@ -1022,15 +1022,15 @@ def pa11_mitm(req: PA11MitmRequest):
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
-class PA11CdhRequest(BaseModel):
+class DhCdhRequest(BaseModel):
     bits: int = 20
 
 
-@app.post("/api/pa11/cdh")
-def pa11_cdh(req: PA11CdhRequest):
+@app.post("/api/diffie_hellman/cdh")
+def dh_cdh(req: DhCdhRequest):
     """CDH hardness demo: brute-force DL at tiny bit-size, report time taken."""
     try:
-        from crypto.pa11_diffie_hellman import cdh_hardness_demo, DiffieHellman
+        from crypto.diffie_hellman import cdh_hardness_demo, DiffieHellman
         bits = max(8, min(24, req.bits))
         dh   = DiffieHellman(bits=bits)
         res  = cdh_hardness_demo(dh=dh, tiny_bits=bits)
@@ -1048,19 +1048,19 @@ def pa11_cdh(req: PA11CdhRequest):
 
 
 
-# ── PA#18 Oblivious Transfer dedicated endpoints ──
+# ── Oblivious Transfer dedicated endpoints ──
 
-class PA18PlayRequest(BaseModel):
+class OtPlayRequest(BaseModel):
     b: int = 0      # Bob's choice bit (0 or 1)
     m0: int = 42    # Alice's message 0
     m1: int = 99    # Alice's message 1
 
-@app.post("/api/pa18/ot/play")
-def pa18_ot_play(req: PA18PlayRequest):
+@app.post("/api/ot/play")
+def ot_play(req: OtPlayRequest):
     """Run full OT protocol and return step-by-step trace + cheat attempt result."""
     try:
-        from crypto.pa18_ot import OTProtocol
-        from crypto.pa16_elgamal import elgamal_decrypt
+        from crypto.ot import OTProtocol
+        from crypto.elgamal import elgamal_decrypt
         if req.b not in (0, 1):
             raise HTTPException(400, "Choice bit b must be 0 or 1")
 
@@ -1118,41 +1118,41 @@ def pa18_ot_play(req: PA18PlayRequest):
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
-@app.post("/api/pa18/ot/correctness")
-def pa18_correctness():
+@app.post("/api/ot/correctness")
+def ot_correctness():
     """Run 100 OT trials with random b, m0, m1 and verify correctness."""
     try:
-        from crypto.pa18_ot import correctness_test
+        from crypto.ot import correctness_test
         return correctness_test(bits=32, trials=100)
     except Exception as e:
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
-@app.post("/api/pa18/ot/privacy")
-def pa18_privacy():
+@app.post("/api/ot/privacy")
+def ot_privacy():
     """Run receiver-privacy and sender-privacy demos."""
     try:
-        from crypto.pa18_ot import receiver_privacy_demo, sender_privacy_demo
+        from crypto.ot import receiver_privacy_demo, sender_privacy_demo
         rp = receiver_privacy_demo(bits=32, trials=100)
         sp = sender_privacy_demo(bits=32)
         return {'receiver': rp, 'sender': sp}
     except Exception as e:
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
-# ── PA#3 Interactive IND-CPA Game endpoints ──
+# ── Interactive IND-CPA Game endpoints ──
 
 _pa3_sessions: dict = {}
 
 
-class PA3InitRequest(BaseModel):
+class CpaInitRequest(BaseModel):
     broken: bool = False  # If True, use deterministic (nonce-reuse) encryption
 
 
-@app.post("/api/pa3/init")
-def pa3_init(req: PA3InitRequest):
+@app.post("/api/cpa_enc/init")
+def cpa_init(req: CpaInitRequest):
     """Start a new IND-CPA game session. Returns session_id and optionally the fixed nonce (broken mode)."""
     from crypto.utils import random_bytes, to_hex
-    from crypto.pa03_cpa_enc import CPAEncryption
+    from crypto.cpa_enc import CPAEncryption
     import random as _random
 
     session_id = str(uuid.uuid4())
@@ -1180,15 +1180,15 @@ def pa3_init(req: PA3InitRequest):
     }
 
 
-class PA3OracleRequest(BaseModel):
+class CpaOracleRequest(BaseModel):
     session_id: str
     message: str   # plaintext string
 
 
-@app.post("/api/pa3/oracle")
-def pa3_oracle(req: PA3OracleRequest):
+@app.post("/api/cpa_enc/oracle")
+def cpa_oracle(req: CpaOracleRequest):
     """Encryption oracle: adversary can request encryptions of arbitrary messages."""
-    from crypto.pa03_cpa_enc import CPAEncryption
+    from crypto.cpa_enc import CPAEncryption
     from crypto.utils import to_hex
 
     state = _pa3_sessions.get(req.session_id)
@@ -1213,17 +1213,17 @@ def pa3_oracle(req: PA3OracleRequest):
     return entry
 
 
-class PA3ChallengeRequest(BaseModel):
+class CpaChallengeRequest(BaseModel):
     session_id: str
     m0: str   # message 0 (must equal length of m1 when encoded)
     m1: str   # message 1
 
 
-@app.post("/api/pa3/challenge")
-def pa3_challenge(req: PA3ChallengeRequest):
+@app.post("/api/cpa_enc/challenge")
+def cpa_challenge(req: CpaChallengeRequest):
     """Submit m0, m1. Challenger picks random b and returns C* = Enc_k(m_b)."""
     import random as _random
-    from crypto.pa03_cpa_enc import CPAEncryption
+    from crypto.cpa_enc import CPAEncryption
     from crypto.utils import to_hex
 
     state = _pa3_sessions.get(req.session_id)
@@ -1256,19 +1256,19 @@ def pa3_challenge(req: PA3ChallengeRequest):
     }
 
 
-class PA3GuessRequest(BaseModel):
+class CpaGuessRequest(BaseModel):
     session_id: str
     guess: int   # 0 or 1
 
 
-@app.post("/api/pa3/guess")
-def pa3_guess(req: PA3GuessRequest):
+@app.post("/api/cpa_enc/guess")
+def cpa_guess(req: CpaGuessRequest):
     """Adversary submits guess b'. Reveal b and update running advantage."""
     state = _pa3_sessions.get(req.session_id)
     if state is None:
         raise HTTPException(404, "Session not found")
     if state["challenge_b"] is None:
-        raise HTTPException(400, "No active challenge — call /pa3/challenge first")
+        raise HTTPException(400, "No active challenge — call /cpa_enc/challenge first")
 
     b = state["challenge_b"]
     correct = (req.guess == b)
@@ -1307,15 +1307,15 @@ def pa3_guess(req: PA3GuessRequest):
     }
 
 
-class PA3SimRequest(BaseModel):
+class CpaSimRequest(BaseModel):
     rounds: int = 20
     broken: bool = False
 
 
-@app.post("/api/pa3/simulate")
-def pa3_simulate(req: PA3SimRequest):
+@app.post("/api/cpa_enc/simulate")
+def cpa_simulate(req: CpaSimRequest):
     """Run automated IND-CPA simulation (dummy adversary) and return advantage."""
-    from crypto.pa03_cpa_enc import CPAEncryption, ind_cpa_game, demonstrate_deterministic_attack
+    from crypto.cpa_enc import CPAEncryption, ind_cpa_game, demonstrate_deterministic_attack
     from crypto.utils import random_bytes
 
     rounds = max(5, min(100, req.rounds))
@@ -1345,15 +1345,15 @@ def pa3_simulate(req: PA3SimRequest):
         return result
 
 
-# ── PA#6 Malleability Attack Workbench ──
+# ── Malleability Attack Workbench ──
 
-class PA6InitRequest(BaseModel):
+class CcaEncInitRequest(BaseModel):
     message: str
 
-@app.post("/api/pa6/malleability_init")
-def pa6_malleability_init(req: PA6InitRequest):
-    from crypto.pa03_cpa_enc import CPAEncryption
-    from crypto.pa06_cca_enc import CCAEncryption
+@app.post("/api/cca_enc/malleability_init")
+def cca_enc_malleability_init(req: CcaEncInitRequest):
+    from crypto.cpa_enc import CPAEncryption
+    from crypto.cca_enc import CCAEncryption
     from crypto.utils import random_bytes, to_hex
     
     msg_bytes = req.message.encode()
@@ -1376,7 +1376,7 @@ def pa6_malleability_init(req: PA6InitRequest):
         "cca_tag": to_hex(cca_tag),
     }
 
-class PA6FlipRequest(BaseModel):
+class CcaEncFlipRequest(BaseModel):
     key_enc: str
     key_mac: str
     cpa_r: str
@@ -1385,10 +1385,10 @@ class PA6FlipRequest(BaseModel):
     cca_ct: str
     cca_tag: str
 
-@app.post("/api/pa6/malleability_flip")
-def pa6_malleability_flip(req: PA6FlipRequest):
-    from crypto.pa03_cpa_enc import CPAEncryption
-    from crypto.pa06_cca_enc import CCAEncryption
+@app.post("/api/cca_enc/malleability_flip")
+def cca_enc_malleability_flip(req: CcaEncFlipRequest):
+    from crypto.cpa_enc import CPAEncryption
+    from crypto.cca_enc import CCAEncryption
     
     key_e = bytes.fromhex(req.key_enc)
     key_m = bytes.fromhex(req.key_mac)
@@ -1423,30 +1423,30 @@ def pa6_malleability_flip(req: PA6FlipRequest):
         "cca_error": cca_err,
     }
 
-# ── PA#17 Malleability Attack Workbench ──
+# ── Malleability Attack Workbench ──
 
 # Global CCA_PKC instance to avoid generating keys repeatedly
-_pa17_cca_pkc = None
+_cca_pkc_singleton = None
 
-def get_pa17_cca_pkc():
-    global _pa17_cca_pkc
-    if _pa17_cca_pkc is None:
-        from crypto.pa17_cca_pkc import CCA_PKC
-        _pa17_cca_pkc = CCA_PKC(eg_bits=128, rsa_bits=256)
-    return _pa17_cca_pkc
+def _get_cca_pkc():
+    global _cca_pkc_singleton
+    if _cca_pkc_singleton is None:
+        from crypto.cca_pkc import CCA_PKC
+        _cca_pkc_singleton = CCA_PKC(eg_bits=128, rsa_bits=256)
+    return _cca_pkc_singleton
 
-class PA17InitRequest(BaseModel):
+class CcaPkcInitRequest(BaseModel):
     message: int
 
-@app.post("/api/pa17/malleability_init")
-def pa17_malleability_init(req: PA17InitRequest):
-    cca = get_pa17_cca_pkc()
+@app.post("/api/cca_pkc/malleability_init")
+def cca_pkc_malleability_init(req: CcaPkcInitRequest):
+    cca = _get_cca_pkc()
     m = req.message % cca.eg_key.p
     if m == 0:
         m = 1
     
     # CPA (ElGamal only)
-    from crypto.pa16_elgamal import elgamal_encrypt
+    from crypto.elgamal import elgamal_encrypt
     c1_cpa, c2_cpa = elgamal_encrypt(cca.eg_key.pk, m)
     
     # CCA (Encrypt-then-Sign)
@@ -1466,19 +1466,19 @@ def pa17_malleability_init(req: PA17InitRequest):
         }
     }
 
-class PA17FlipRequest(BaseModel):
+class CcaPkcFlipRequest(BaseModel):
     cpa_c1: str
     cpa_c2: str
     cca_c1: str
     cca_c2: str
     cca_sigma: str
 
-@app.post("/api/pa17/malleability_flip")
-def pa17_malleability_flip(req: PA17FlipRequest):
-    cca = get_pa17_cca_pkc()
+@app.post("/api/cca_pkc/malleability_flip")
+def cca_pkc_malleability_flip(req: CcaPkcFlipRequest):
+    cca = _get_cca_pkc()
     
     # Decrypt CPA (ElGamal)
-    from crypto.pa16_elgamal import elgamal_decrypt
+    from crypto.elgamal import elgamal_decrypt
     cpa_dec = elgamal_decrypt(cca.eg_key.sk, cca.eg_key.p, int(req.cpa_c1), int(req.cpa_c2))
     
     # Decrypt CCA (Encrypt-then-Sign)
@@ -1491,22 +1491,22 @@ def pa17_malleability_flip(req: PA17FlipRequest):
     }
 
 
-# ── PA#19 Secure AND Gate ──
+# ── Secure AND Gate ──
 
-class PA19GateRequest(BaseModel):
+class SecureAndGateRequest(BaseModel):
     a: int
     b: int
 
-@app.post("/api/pa19/secure_and")
-def pa19_secure_and(req: PA19GateRequest):
-    from crypto.pa19_secure_and import SecureGates
+@app.post("/api/secure_and/gate")
+def secure_and_gate(req: SecureAndGateRequest):
+    from crypto.secure_and import SecureGates
     gates = SecureGates(bits=64)
     res = gates.secure_and(req.a, req.b)
     return res
 
-@app.post("/api/pa19/truth_table")
-def pa19_truth_table():
-    from crypto.pa19_secure_and import truth_table_test
+@app.post("/api/secure_and/truth_table")
+def secure_and_truth_table():
+    from crypto.secure_and import truth_table_test
     # 1 run per combo is enough for the UI truth table (just to show it works)
     res = truth_table_test(runs_per_combo=1)
     
@@ -1519,18 +1519,18 @@ def pa19_truth_table():
     }
     return formatted_res
 
-# ── PA#20 All 2-Party Secure Computation ──
+# ── All 2-Party Secure Computation ──
 
-class PA20EvalRequest(BaseModel):
+class MpcEvalRequest(BaseModel):
     alice_val: int
     bob_val: int
     bits: int = 4
     mode: str = "comparator"
 
-@app.post("/api/pa20/evaluate")
-def pa20_evaluate(req: PA20EvalRequest):
-    from crypto.pa20_mpc import build_comparator, build_equality, build_adder, secure_eval, int_to_bits, bits_to_int
-    from crypto.pa19_secure_and import SecureGates
+@app.post("/api/mpc/evaluate")
+def mpc_evaluate(req: MpcEvalRequest):
+    from crypto.mpc import build_comparator, build_equality, build_adder, secure_eval, int_to_bits, bits_to_int
+    from crypto.secure_and import SecureGates
     
     if req.mode == "equality":
         circ = build_equality(req.bits)
@@ -1565,17 +1565,17 @@ def pa20_evaluate(req: PA20EvalRequest):
 
 
 
-# ── PA#4 Visual Animation endpoints ──
+# ── Visual Animation endpoints ──
 
-class PA4AnimateRequest(BaseModel):
+class ModesAnimateRequest(BaseModel):
     mode: str = "CBC"          # CBC | OFB | CTR
     message: str = "Block 0 here!!!!Block 1 here!!!!Block 2 here!!!!"
     key_hex: str = ""          # leave empty to auto-generate
     iv_hex: str = ""           # leave empty to auto-generate
 
 
-@app.post("/api/pa4/animate")
-def pa4_animate(req: PA4AnimateRequest):
+@app.post("/api/modes/animate")
+def modes_animate(req: ModesAnimateRequest):
     """
     Return a block-by-block encryption trace for the given mode.
     Each entry in 'blocks' contains:
@@ -1583,7 +1583,7 @@ def pa4_animate(req: PA4AnimateRequest):
       xor_intermediate_hex (CBC only), ciphertext_hex
     """
     try:
-        from crypto.pa04_modes import (
+        from crypto.modes import (
             cbc_encrypt, ofb_encrypt, ctr_encrypt,
             ofb_keystream, split_blocks as _split
         )
@@ -1683,7 +1683,7 @@ def pa4_animate(req: PA4AnimateRequest):
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
-class PA4FlipRequest(BaseModel):
+class ModesFlipRequest(BaseModel):
     mode: str
     key_hex: str
     iv_hex: str            # IV for CBC/OFB, nonce for CTR
@@ -1691,14 +1691,14 @@ class PA4FlipRequest(BaseModel):
     flip_block: int = 1    # which ciphertext block to flip (0-indexed)
 
 
-@app.post("/api/pa4/flip")
-def pa4_flip(req: PA4FlipRequest):
+@app.post("/api/modes/flip")
+def modes_flip(req: ModesFlipRequest):
     """
     Flip bit 0 of the chosen ciphertext block and re-decrypt.
     Returns which plaintext blocks changed — demonstrating error propagation.
     """
     try:
-        from crypto.pa04_modes import cbc_decrypt, ofb_decrypt, ctr_decrypt
+        from crypto.modes import cbc_decrypt, ofb_decrypt, ctr_decrypt
         from crypto.aes import BLOCK_SIZE
         from crypto.utils import to_hex, split_blocks
 
@@ -1761,21 +1761,21 @@ def pa4_flip(req: PA4FlipRequest):
         raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
 
 
-class PA4IvReuseRequest(BaseModel):
+class ModesIvReuseRequest(BaseModel):
     message1: str = "Block0 same here!Block1 diff AAAA"
     message2: str = "Block0 same here!Block1 diff BBBB"
     key_hex: str = ""
     iv_hex: str = ""
 
 
-@app.post("/api/pa4/iv_reuse")
-def pa4_iv_reuse(req: PA4IvReuseRequest):
+@app.post("/api/modes/iv_reuse")
+def modes_iv_reuse(req: ModesIvReuseRequest):
     """
     CBC IV-reuse demo: encrypt two messages with the same IV.
     Returns per-block ciphertext comparison; matching blocks are highlighted.
     """
     try:
-        from crypto.pa04_modes import cbc_encrypt
+        from crypto.modes import cbc_encrypt
         from crypto.aes import BLOCK_SIZE
         from crypto.utils import random_bytes, to_hex, pad_pkcs7, split_blocks
 
@@ -1817,20 +1817,20 @@ def pa4_iv_reuse(req: PA4IvReuseRequest):
 
 
 # ==============================================================================
-# PA#5 Endpoints (Interactive MACs)
+# Endpoints (Interactive MACs)
 # ==============================================================================
 
 import uuid
-pa5_sessions = {}
+mac_sessions = {}
 
-@app.get("/api/pa5/euf_init")
-def pa5_euf_init():
-    from crypto.pa05_mac import MAC
+@app.get("/api/mac/euf_init")
+def mac_euf_init():
+    from crypto.mac import MAC
     from crypto.utils import random_bytes, to_hex
     
     session_id = str(uuid.uuid4())
     key = random_bytes(16)
-    pa5_sessions[session_id] = key
+    mac_sessions[session_id] = key
     mac = MAC(mode='cbc')
     
     messages = []
@@ -1841,16 +1841,16 @@ def pa5_euf_init():
         
     return {"session_id": session_id, "messages": messages}
 
-class PA5VerifyRequest(BaseModel):
+class MacVerifyRequest(BaseModel):
     session_id: str
     message_hex: str
     tag_hex: str
 
-@app.post("/api/pa5/euf_verify")
-def pa5_euf_verify(req: PA5VerifyRequest):
-    from crypto.pa05_mac import MAC
+@app.post("/api/mac/euf_verify")
+def mac_euf_verify(req: MacVerifyRequest):
+    from crypto.mac import MAC
     
-    key = pa5_sessions.get(req.session_id)
+    key = mac_sessions.get(req.session_id)
     if not key:
         raise HTTPException(400, "Invalid session")
     
@@ -1865,15 +1865,15 @@ def pa5_euf_verify(req: PA5VerifyRequest):
     except Exception:
         return {"valid": False}
 
-class PA5CheatRequest(BaseModel):
+class MacCheatRequest(BaseModel):
     session_id: str
 
-@app.post("/api/pa5/euf_cheat")
-def pa5_euf_cheat(req: PA5CheatRequest):
-    from crypto.pa05_mac import MAC
+@app.post("/api/mac/euf_cheat")
+def mac_euf_cheat(req: MacCheatRequest):
+    from crypto.mac import MAC
     from crypto.utils import to_hex
     
-    key = pa5_sessions.get(req.session_id)
+    key = mac_sessions.get(req.session_id)
     if not key:
         raise HTTPException(400, "Invalid session")
     
@@ -1888,12 +1888,12 @@ def pa5_euf_cheat(req: PA5CheatRequest):
         "explanation": "This CBC-MAC implementation prepends the message length, making it mathematically secure against length-extension and splicing attacks. Therefore, a real forgery is computationally infeasible. To let you see the 'Forgery accepted' UI, this cheat button secretly asks the backend oracle to sign a brand new message using the hidden key."
     }
 
-class PA5LengthExtensionRequest(BaseModel):
+class MacLengthExtensionRequest(BaseModel):
     suffix: str
 
-@app.post("/api/pa5/length_extension")
-def pa5_length_extension(req: PA5LengthExtensionRequest):
-    from crypto.pa10_hmac import length_extension_demo
+@app.post("/api/mac/length_extension")
+def mac_length_extension(req: MacLengthExtensionRequest):
+    from crypto.hmac import length_extension_demo
     try:
         suffix_bytes = req.suffix.encode()
         res = length_extension_demo(suffix=suffix_bytes)

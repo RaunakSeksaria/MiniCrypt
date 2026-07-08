@@ -1,5 +1,5 @@
 """
-crypto/pa13_miller_rabin.py — PA#13: Miller-Rabin Primality Testing
+crypto/miller_rabin.py — Miller-Rabin Primality Testing
 
 Implements:
   1. Miller-Rabin probabilistic primality test
@@ -9,7 +9,7 @@ Implements:
   5. Performance benchmarking
 
 Dependencies: crypto.utils (mod_exp, random_int, random_bits)
-Used by: PA#11 (DH), PA#12 (RSA), PA#8 (DLP-CRHF)
+Used by: (DH), (RSA), (DLP-CRHF)
 """
 
 import time
@@ -299,7 +299,7 @@ def benchmark_prime_generation(bit_sizes=None):
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#13: Miller-Rabin Primality Testing")
+    print("Miller-Rabin Primality Testing")
     print("=" * 60)
 
     # 1. Carmichael number demo

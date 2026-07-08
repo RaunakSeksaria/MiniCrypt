@@ -1,5 +1,5 @@
 """
-crypto/pa06_cca_enc.py — PA#6: CCA-Secure Symmetric Encryption
+crypto/cca_enc.py — CCA-Secure Symmetric Encryption
 
 Implements:
   1. Encrypt-then-MAC: CCA_Enc(kE, kM, m) → (c, t)
@@ -7,12 +7,12 @@ Implements:
   3. IND-CCA2 game simulation
   4. Malleability attack demo (CPA-only vs CCA)
 
-Dependencies: crypto.pa03_cpa_enc (CPA-Enc), crypto.pa05_mac (MAC)
+Dependencies: crypto.cpa_enc (CPA-Enc), crypto.mac (MAC)
 """
 
 from crypto.utils import random_bytes, to_hex, xor_bytes
-from crypto.pa03_cpa_enc import CPAEncryption
-from crypto.pa05_mac import MAC, CBCMAC
+from crypto.cpa_enc import CPAEncryption
+from crypto.mac import MAC, CBCMAC
 from crypto.aes import BLOCK_SIZE
 
 
@@ -244,7 +244,7 @@ def CCA_Dec(key_enc: bytes, key_mac: bytes, r: bytes,
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("PA#6: CCA-Secure Symmetric Encryption")
+    print("CCA-Secure Symmetric Encryption")
     print("=" * 60)
 
     cca = CCAEncryption()
