@@ -18,7 +18,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 app = FastAPI(title="MiniCrypt Explorer API")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+# Local development only: the Vite dev server (5173) proxies /api here.
+# Not a wildcard — this is a localhost tool, not a public API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("minicrypt")
@@ -1267,10 +1274,8 @@ class CpaChallengeRequest(BaseModel):
 @app.post("/api/cpa_enc/challenge")
 def cpa_challenge(req: CpaChallengeRequest):
     """Submit m0, m1. Challenger picks random b and returns C* = Enc_k(m_b)."""
-    import random as _random
-
     from crypto.cpa_enc import CPAEncryption
-    from crypto.utils import to_hex
+    from crypto.utils import random_int, to_hex
 
     state = _pa3_sessions.get(req.session_id)
     if state is None:
@@ -1283,7 +1288,7 @@ def cpa_challenge(req: CpaChallengeRequest):
 
     enc = CPAEncryption()
     key = state["key"]
-    b = _random.randint(0, 1)
+    b = random_int(0, 1)
     chosen = m0 if b == 0 else m1
 
     if state["broken"] and state["fixed_r"] is not None:

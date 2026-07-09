@@ -200,7 +200,6 @@ def ind_cpa_game(key: ElGamalKey = None, num_rounds: int = 100,
     Adversary tries to distinguish Enc(m0) from Enc(m1).
     Under DDH, advantage should be ≈ 0.
     """
-    import random
 
     if key is None:
         key = elgamal_keygen(bits=bits)
@@ -212,12 +211,12 @@ def ind_cpa_game(key: ElGamalKey = None, num_rounds: int = 100,
         while m1 == m0:
             m1 = random_int(1, key.p - 2)
 
-        b = random.randint(0, 1)
+        b = random_int(0, 1)
         chosen = m0 if b == 0 else m1
         c1, c2 = elgamal_encrypt(key.pk, chosen)
 
         # Random guess (best strategy against CPA-secure scheme)
-        b_guess = random.randint(0, 1)
+        b_guess = random_int(0, 1)
         if b_guess == b:
             correct += 1
 
@@ -252,10 +251,9 @@ def small_group_distinguisher(q_bits: int = 10) -> dict:
     correct = 0
     trials = 100
     for _ in range(trials):
-        import random
         m0 = random_int(1, key.p - 2)
         m1 = random_int(1, key.p - 2)
-        b = random.randint(0, 1)
+        b = random_int(0, 1)
         chosen = m0 if b == 0 else m1
         c1, c2 = elgamal_encrypt(key.pk, chosen)
 

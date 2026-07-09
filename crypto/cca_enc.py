@@ -13,7 +13,7 @@ Dependencies: crypto.cpa_enc (CPA-Enc), crypto.mac (MAC)
 from crypto.aes import BLOCK_SIZE
 from crypto.cpa_enc import CPAEncryption
 from crypto.mac import MAC
-from crypto.utils import random_bytes, to_hex
+from crypto.utils import random_bytes, random_int, to_hex
 
 # ---------------------------------------------------------------------------
 # CCA-Secure Encryption (Encrypt-then-MAC)
@@ -91,7 +91,6 @@ def ind_cca2_game(num_rounds: int = 50) -> dict:
 
     A secure CCA scheme should have advantage ≈ 0.
     """
-    import random
 
     cca = CCAEncryption()
     key_enc = random_bytes(BLOCK_SIZE)
@@ -102,12 +101,12 @@ def ind_cca2_game(num_rounds: int = 50) -> dict:
 
     for _ in range(num_rounds):
         # Adversary picks two messages
-        msg_len = random.randint(1, 32)
+        msg_len = random_int(1, 32)
         m0 = random_bytes(msg_len)
         m1 = random_bytes(msg_len)
 
         # Challenger encrypts m_b
-        b = random.randint(0, 1)
+        b = random_int(0, 1)
         chosen = m0 if b == 0 else m1
         r_star, ct_star, tag_star = cca.encrypt(key_enc, key_mac, chosen)
 
@@ -119,7 +118,7 @@ def ind_cca2_game(num_rounds: int = 50) -> dict:
             oracle_rejects += 1  # Good — CCA properly rejects
 
         # Adversary guesses randomly
-        b_guess = random.randint(0, 1)
+        b_guess = random_int(0, 1)
         if b_guess == b:
             correct += 1
 

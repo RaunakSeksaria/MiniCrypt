@@ -18,6 +18,7 @@ from crypto.utils import (
     int_to_bytes,
     pad_pkcs7,
     random_bytes,
+    random_int,
     split_blocks,
     to_hex,
     unpad_pkcs7,
@@ -154,23 +155,22 @@ def ind_cpa_game(enc: CPAEncryption, num_rounds: int = 50) -> dict:
 
     A secure scheme should have advantage ≈ 0.
     """
-    import random
     key = random_bytes(BLOCK_SIZE)
     correct = 0
 
     for _ in range(num_rounds):
         # Adversary picks two messages of equal length
-        msg_len = random.randint(1, 48)
+        msg_len = random_int(1, 48)
         m0 = random_bytes(msg_len)
         m1 = random_bytes(msg_len)
 
         # Challenger picks b and encrypts
-        b = random.randint(0, 1)
+        b = random_int(0, 1)
         chosen = m0 if b == 0 else m1
         r, ct = enc.encrypt(key, chosen)
 
         # Adversary guesses randomly (best strategy against CPA-secure scheme)
-        b_guess = random.randint(0, 1)
+        b_guess = random_int(0, 1)
         if b_guess == b:
             correct += 1
 

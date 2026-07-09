@@ -93,7 +93,6 @@ def ind_cca2_game(cca: CCA_PKC = None, num_rounds: int = 50) -> dict:
     Adversary has decryption oracle but cannot submit the challenge ciphertext.
     Modified ciphertexts should be rejected (signature fails).
     """
-    import random
 
     if cca is None:
         cca = CCA_PKC(eg_bits=64, rsa_bits=256)
@@ -105,7 +104,7 @@ def ind_cca2_game(cca: CCA_PKC = None, num_rounds: int = 50) -> dict:
         m0 = random_int(1, cca.eg_key.p - 2)
         m1 = random_int(1, cca.eg_key.p - 2)
 
-        b = random.randint(0, 1)
+        b = random_int(0, 1)
         chosen = m0 if b == 0 else m1
 
         ct = cca.encrypt(chosen)
@@ -116,7 +115,7 @@ def ind_cca2_game(cca: CCA_PKC = None, num_rounds: int = 50) -> dict:
         if result is None:
             oracle_rejects += 1
 
-        b_guess = random.randint(0, 1)
+        b_guess = random_int(0, 1)
         if b_guess == b:
             correct += 1
 
