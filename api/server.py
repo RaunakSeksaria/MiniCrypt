@@ -309,6 +309,7 @@ def reduce_primitive(req: ReduceRequest):
 @app.post("/api/demo")
 def run_demo(req: DemoRequest):
     try:
+        # HIDDEN(rework): "owf_prg" demo card disabled in Demos.jsx
         if req.pa == "owf_prg":
             from crypto.owf_prg import (
                 PRG_from_AES,
@@ -441,6 +442,7 @@ def run_demo(req: DemoRequest):
             attack = malleability_attack_demo()
             key_sep = key_separation_demo()
             return {"plaintext":msg.decode(),"decrypted":pt.decode(),"match":pt==msg,"tamper_rejected":cca.decrypt(ke,km,r,bytes([ct[0]^1])+ct[1:],tag) is None,"attack":{"cpa_malleable":attack['cpa_only']['malleable'],"cca_rejected":attack['cca_secure']['rejected']},"key_separation":key_sep,"prf_mode":prf_mode}
+        # HIDDEN(rework): "merkle_damgard" demo card disabled in Demos.jsx
         elif req.pa == "merkle_damgard":
             from crypto.merkle_damgard import collision_propagation_demo, create_toy_hash
             msg_str = req.params.get('message', 'Hello Hash!')
@@ -501,6 +503,7 @@ def run_demo(req: DemoRequest):
             mitm = mitm_attack(dh)
             cdh = cdh_hardness_demo(dh, tiny_bits=20)
             return {"exchange":{"p":exch['p'],"g":exch['g'],"A":exch['A'],"B":exch['B'],"K_alice":exch['K_alice'],"K_bob":exch['K_bob'],"match":exch['keys_match']},"mitm":{"eve_has_alice_key":mitm['eve_has_alice_key'],"eve_has_bob_key":mitm['eve_has_bob_key'],"alice_bob_same":mitm['alice_bob_same']}, "cdh": cdh}
+        # HIDDEN(rework): "rsa" demo card disabled in Demos.jsx
         elif req.pa == "rsa":
             from crypto.rsa import (
                 bleichenbacher_oracle_demo,
@@ -551,6 +554,7 @@ def run_demo(req: DemoRequest):
                 return {"p512": str(p512), "composite": "12345678901234567891"}
             else:
                 return {"error": "Unknown task"}
+        # HIDDEN(rework): "crt" demo card disabled in Demos.jsx
         elif req.pa == "crt":
             from crypto.crt import crt, hastad_attack_demo
             res_str = req.params.get("residues", "2,3,2")
@@ -560,6 +564,7 @@ def run_demo(req: DemoRequest):
             x = crt(res, mods)
             attack = hastad_attack_demo(bits=128, e=3)
             return {"crt_result":{"residues":res,"moduli":mods,"solution":x},"hastad":{"success":attack['success'],"bits":attack['bits']}}
+        # HIDDEN(rework): "signatures" demo card disabled in Demos.jsx
         elif req.pa == "signatures":
             from crypto.signatures import DigitalSignature, homomorphism_attack_demo
             ds = DigitalSignature(bits=256)
@@ -567,6 +572,7 @@ def run_demo(req: DemoRequest):
             sigma = ds.sign(msg)
             attack = homomorphism_attack_demo(256)
             return {"message":msg.decode(),"signature":str(sigma),"verify":ds.verify(msg,sigma),"wrong":not ds.verify(b"wrong",sigma),"attack":{"raw_works":attack['raw_attack_works'],"hash_works":attack['hash_then_sign_attack_works']}}
+        # HIDDEN(rework): "elgamal" demo card disabled in Demos.jsx
         elif req.pa == "elgamal":
             from crypto.elgamal import (
                 elgamal_decrypt,

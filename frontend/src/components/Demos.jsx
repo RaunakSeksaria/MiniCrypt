@@ -1,21 +1,24 @@
 
+// Interactive demo catalog. Entries marked HIDDEN(rework) are the thin
+// result-dump demos, temporarily hidden from the UI pending a richer rebuild;
+// their crypto modules, renderers, and endpoints all remain in place.
 const PAS = [
-  {pa:"owf_prg",title:"OWF & PRG",desc:"DLP/AES OWFs, HILL PRG construction",phase:1},
+  // HIDDEN(rework): {pa:"owf_prg",title:"OWF & PRG",desc:"DLP/AES OWFs, HILL PRG construction",phase:1},
   {pa:"prf_ggm",title:"PRF (GGM Tree)",desc:"GGM tree PRF, distinguishing game",phase:1},
   {pa:"cpa_enc",title:"CPA-Secure Encryption",desc:"Randomized encryption, IND-CPA game",phase:2},
   {pa:"modes",title:"Modes of Operation",desc:"CBC, OFB, CTR modes with attack demos",phase:2},
   {pa:"mac",title:"MACs",desc:"PRF-MAC, CBC-MAC, EUF-CMA game",phase:2},
   {pa:"cca_enc",title:"CCA-Secure Encryption",desc:"Encrypt-then-MAC, malleability demo",phase:2},
-  {pa:"merkle_damgard",title:"Merkle-Damgård",desc:"Generic hash framework with trace",phase:3},
+  // HIDDEN(rework): {pa:"merkle_damgard",title:"Merkle-Damgård",desc:"Generic hash framework with trace",phase:3},
   {pa:"dlp_crhf",title:"DLP-CRHF",desc:"g^x·h^y mod p hash function",phase:3},
   {pa:"birthday",title:"Birthday Attack",desc:"Collision finding on toy hashes",phase:3},
   {pa:"hmac",title:"HMAC",desc:"HMAC, Encrypt-then-HMAC, timing demo",phase:3},
   {pa:"diffie_hellman",title:"Diffie-Hellman",desc:"Key exchange, MITM attack",phase:4},
-  {pa:"rsa",title:"RSA",desc:"Textbook RSA, PKCS#1 v1.5, Bleichenbacher",phase:4},
+  // HIDDEN(rework): {pa:"rsa",title:"RSA",desc:"Textbook RSA, PKCS#1 v1.5, Bleichenbacher",phase:4},
   {pa:"miller_rabin",title:"Miller-Rabin",desc:"Primality testing, prime generation",phase:4},
-  {pa:"crt",title:"CRT & Håstad",desc:"CRT, RSA CRT speedup, broadcast attack",phase:4},
-  {pa:"signatures",title:"Digital Signatures",desc:"RSA signatures, homomorphism attack",phase:4},
-  {pa:"elgamal",title:"ElGamal",desc:"PKC, malleability attack",phase:4},
+  // HIDDEN(rework): {pa:"crt",title:"CRT & Håstad",desc:"CRT, RSA CRT speedup, broadcast attack",phase:4},
+  // HIDDEN(rework): {pa:"signatures",title:"Digital Signatures",desc:"RSA signatures, homomorphism attack",phase:4},
+  // HIDDEN(rework): {pa:"elgamal",title:"ElGamal",desc:"PKC, malleability attack",phase:4},
   {pa:"cca_pkc",title:"CCA-Secure PKC",desc:"Encrypt-then-Sign, IND-CCA2",phase:5},
   {pa:"ot",title:"Oblivious Transfer",desc:"1-out-of-2 OT (Bellare-Micali)",phase:5},
   {pa:"secure_and",title:"Secure AND",desc:"AND/XOR/NOT gates via OT",phase:5},

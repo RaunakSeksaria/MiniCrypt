@@ -337,6 +337,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  // HIDDEN(rework): reached only by the "owf_prg" demo, currently disabled in Demos.jsx
   const renderPA1Special = () => {
     if (!result) return null;
     return (
@@ -482,6 +483,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   };
 
 
+  // HIDDEN(rework): reached only by the "merkle_damgard" demo, currently disabled in Demos.jsx
   const renderPA7Special = () => {
     if (isLoading && (!result || !result.steps)) {
       return <div style={{ textAlign: 'center', padding: '40px' }}><div className="spinner"></div><p style={{ marginTop: '12px', color: 'var(--text3)' }}>Building MD-Chain...</p></div>;
@@ -3824,6 +3826,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  // HIDDEN(rework): reached only by the "rsa" demo, currently disabled in Demos.jsx
   const renderPA12Special = () => {
     const runPA12 = async () => {
       setPa12Loading(true);
@@ -3882,6 +3885,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  // HIDDEN(rework): reached only by the "crt" demo, currently disabled in Demos.jsx
   const renderPA14Special = () => {
     const runPA14 = async () => {
       setPa14Loading(true);
@@ -3928,6 +3932,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  // HIDDEN(rework): reached only by the "signatures" demo, currently disabled in Demos.jsx
   const renderPA15Special = () => {
     const runPA15 = async () => {
       setPa15Loading(true);
@@ -3972,6 +3977,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     );
   };
 
+  // HIDDEN(rework): reached only by the "elgamal" demo, currently disabled in Demos.jsx
   const renderPA16Special = () => {
     const runPA16 = async () => {
       setPa16Loading(true);
