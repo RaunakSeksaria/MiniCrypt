@@ -179,15 +179,15 @@ def lineage_trace() -> str:
     """Return the dependency chain as a string for the README."""
     return """
     (CCA-PKC)
-    ├── (ElGamal) → encrypt/decrypt
-    │   └── (Diffie-Hellman) → group parameters
-    │       └── (Miller-Rabin) → safe prime generation
-    └── (Digital Signatures) → sign/verify
-        ├── (RSA) → signing key
-        │   └── (Miller-Rabin) → prime generation
-        └── (DLP-CRHF) → hash function for hash-then-sign
-            ├── (Merkle-Damgård) → hash framework
-            └── (Miller-Rabin) → DLP group setup
+    +-- (ElGamal) → encrypt/decrypt
+    |   `-- (Diffie-Hellman) → group parameters
+    |       `-- (Miller-Rabin) → safe prime generation
+    `-- (Digital Signatures) → sign/verify
+        +-- (RSA) → signing key
+        |   `-- (Miller-Rabin) → prime generation
+        `-- (DLP-CRHF) → hash function for hash-then-sign
+            +-- (Merkle-Damgård) → hash framework
+            `-- (Miller-Rabin) → DLP group setup
     """
 
 

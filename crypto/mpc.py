@@ -407,32 +407,31 @@ def verify_circuit(circuit: Circuit, test_cases: list) -> dict:
 def end_to_end_lineage_trace():
     """
     Return the full lineage trace for one AND gate evaluation.
-    → → → → →
     """
     return """
     END-TO-END LINEAGE TRACE (one AND gate)
-    ═══════════════════════════════════════
+    =======================================
     Secure_Eval: encounters AND gate
-    │
-    ├── Secure_AND(a, b):
-    │   ├── Alice prepares OT messages (0, a)
-    │   ├── Bob prepares choice bit b
-    │   │
-    │   └── OT (Bellare-Micali):
-    │       ├── Receiver_Step1(b):
-    │       │   └── ElGamal: generate key pair (pk_b, sk_b)
-    │       │       └── DH: safe-prime subgroup (p, g, q)
-    │       │           └── Miller-Rabin: generate safe prime p = 2q+1
-    │       │
-    │       ├── Sender_Step(pk0, pk1, m0, m1):
-    │       │   └── ElGamal.Enc(pk_0, m_0) and ElGamal.Enc(pk_1, m_1)
-    │       │       └── mod_exp via crypto.utils (square-and-multiply)
-    │       │
-    │       └── Receiver_Step2(state, C0, C1):
-    │           └── ElGamal.Dec(sk_b, C_b)
-    │               └── mod_exp + mod_inverse via crypto.utils
-    │
-    └── Bob receives m_b = a ∧ b
+    |
+    +-- Secure_AND(a, b):
+    |   +-- Alice prepares OT messages (0, a)
+    |   +-- Bob prepares choice bit b
+    |   |
+    |   `-- OT (Bellare-Micali):
+    |       +-- Receiver_Step1(b):
+    |       |   `-- ElGamal: generate key pair (pk_b, sk_b)
+    |       |       `-- DH: safe-prime subgroup (p, g, q)
+    |       |           `-- Miller-Rabin: generate safe prime p = 2q+1
+    |       |
+    |       +-- Sender_Step(pk0, pk1, m0, m1):
+    |       |   `-- ElGamal.Enc(pk_0, m_0) and ElGamal.Enc(pk_1, m_1)
+    |       |       `-- mod_exp via crypto.utils (square-and-multiply)
+    |       |
+    |       `-- Receiver_Step2(state, C0, C1):
+    |           `-- ElGamal.Dec(sk_b, C_b)
+    |               `-- mod_exp + mod_inverse via crypto.utils
+    |
+    `-- Bob receives m_b = a ∧ b
     """
 
 
