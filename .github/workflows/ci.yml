@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    name: Python — tests + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The crypto library has no third-party dependencies — the test suite
+      # runs on the standard library alone, with nothing to install.
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+      # ruff is a dev-only linter, fetched ephemerally here; it is never a
+      # project/runtime dependency.
+      - name: Lint (ruff)
+        run: pipx run ruff check .
+
+  frontend:
+    name: Frontend — lint + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
