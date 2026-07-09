@@ -32,12 +32,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          # Node 24 (npm 11) matches the npm that generated package-lock.json;
-          # npm 10 (Node 20) resolves the wasm optional-deps differently and
-          # would reject the lockfile under `npm ci`.
           node-version: "24"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      # `npm install` (not `npm ci`): the wasm optional-deps (@emnapi/*, pulled
+      # via @napi-rs/wasm-runtime) resolve to different patch versions across npm
+      # releases, so a committed lockfile can't reliably satisfy the strict
+      # `npm ci` check on whatever npm the runner ships. `npm install` reconciles.
+      - run: npm install --no-audit --no-fund
       - run: npm run lint
       - run: npm run build
