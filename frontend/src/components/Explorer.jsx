@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { Fragment, useState } from 'react';
 
 const Explorer = ({ foundation, api }) => {
   const [source, setSource] = useState('PRF');
@@ -57,7 +57,7 @@ const Explorer = ({ foundation, api }) => {
 
   const renderStepList = (steps) => (
     steps.map((s, i) => (
-      <React.Fragment key={i}>
+      <Fragment key={i}>
         <div className="step" style={{ animationDelay: `${i * 0.1}s` }}>
           <div>
             <div className="fn">{s.fn}</div>
@@ -68,7 +68,7 @@ const Explorer = ({ foundation, api }) => {
           </div>
         </div>
         {i < steps.length - 1 && <div className="step-arrow">↓</div>}
-      </React.Fragment>
+      </Fragment>
     ))
   );
 

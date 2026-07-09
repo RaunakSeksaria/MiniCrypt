@@ -1,4 +1,3 @@
-import React from 'react';
 
 const PAS = [
   {pa:"owf_prg",title:"OWF & PRG",desc:"DLP/AES OWFs, HILL PRG construction",phase:1},

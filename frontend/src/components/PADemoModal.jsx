@@ -88,7 +88,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa4IvMsg1, setPa4IvMsg1]       = useState('Same block here!Different block1');
   const [pa4IvMsg2, setPa4IvMsg2]       = useState('Same block here!Different block2');
   const [pa4Loading, setPa4Loading]     = useState({});
-  const [pa4AnimStep, setPa4AnimStep]   = useState(0); // for animation stepping
+  const [, setPa4AnimStep]   = useState(0); // for animation stepping
 
   // state
   const [pa10LeData, setPa10LeData]       = useState(null);  // length-extension
@@ -141,7 +141,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
   const [pa6CpaDec, setPa6CpaDec] = useState(null);
   const [pa6CcaDec, setPa6CcaDec] = useState(null);
   const [pa6CpaErr, setPa6CpaErr] = useState(null);
-  const [pa6CcaErr, setPa6CcaErr] = useState(null);
+  const [, setPa6CcaErr] = useState(null);
   const [pa6CcaRej, setPa6CcaRej] = useState(false);
   const [pa6Loading, setPa6Loading] = useState({});
 
@@ -240,6 +240,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     setPa18CorrectnessData(null); setPa18PrivacyData(null); setPa18CtlLoading({});
 
     return () => { stopHunt(); stopPa9Hunt(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- effects intentionally re-run only when the selected demo (pa) changes
   }, [pa]);
 
   // auto-hash the default message when the modal opens
@@ -248,6 +249,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
     if (pa.pa !== "dlp_crhf") return;
     setParams(p => ({ ...p, message: DLP_HASH_DEFAULT_MSG }));
     api.pa8Hash(DLP_HASH_DEFAULT_MSG).then(data => setPa8Hash(data)).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- effects intentionally re-run only when the selected demo (pa) changes
   }, [pa]);
 
   useEffect(() => {
@@ -259,6 +261,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
       setParams(p => ({ ...p, ...initialParams }));
       runDemo(initialParams);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- effects intentionally re-run only when the selected demo (pa) changes
   }, [pa]);
 
   const runDemo = async (currentParams = params, task = null) => {
@@ -336,7 +339,6 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
   const renderPA1Special = () => {
     if (!result) return null;
-    const seed = params.seed || '';
     return (
       <div className="pa1-special">
         <div className="result-section">
@@ -520,7 +522,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                       for (let i = 0; i < currentHex.length; i += 2) {
                         textStr += String.fromCharCode(parseInt(currentHex.substr(i, 2), 16));
                       }
-                    } catch (e) { textStr = 'Invalid Hex'; }
+                    } catch { textStr = 'Invalid Hex'; }
                     const next = { ...params, is_hex: false, message: textStr };
                     setParams(next);
                     runDemo(next);
@@ -963,7 +965,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               const isFlipped = pa4FlippedBlock === i;
 
               // Row Y positions
-              const ptY = 10, arrowY1 = 45, xorY = 55, arrowY2 = 95, blockY = 105, arrowY3 = 155, ctY = 165;
+              const ptY = 10, xorY = 55, blockY = 105, ctY = 165;
 
               const blockColor = isCorrPt ? '#ef4444' : (isFlipped ? '#f59e0b' : ac);
               const ptColor = isCorrPt ? '#fca5a5' : '#a5b4fc';
@@ -1782,7 +1784,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
                   // If not found, try to find matching keys
                   if (!andRes) {
                     const keys = Object.keys(pa19Table.and_results);
-                    const parsedKey = keyStr.replace(/[\(\)\[\]\s]/g, '').split(',');
+                    const parsedKey = keyStr.replace(/[()[\]\s]/g, '').split(',');
                     const foundKey = keys.find(k => k.includes(parsedKey[0]) && k.includes(parsedKey[1]));
                     if (foundKey) {
                       andRes = pa19Table.and_results[foundKey];
@@ -2054,7 +2056,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               try {
                 const data = await api.pa8Hash(msg);
                 setPa8Hash(data);
-              } catch (_) {}
+              } catch { /* ignore */ }
               setPa8Loading(false);
             }}
           />
@@ -3460,7 +3462,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
               Cheat Attempt — Try Decrypting m_&#123;1-b&#125;
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text2)', lineHeight: 1.6, marginBottom: '12px' }}>
-              Bob tries brute-forcing <code style={{ color: '#fbbf24' }}>sk_&#123;1-b&#125;</code> by trying 5 000 consecutive guesses and decrypting C<sub>&#123;1-b&#125;</sub>. Since sk_&#123;1-b&#125; was chosen uniformly from a ~2³¹ group, the odds of a hit are ≈ 0.00025 %.
+              Bob tries brute-forcing <code style={{ color: '#fbbf24' }}>sk_&#123;1-b&#125;</code> by trying 5 000 consecutive guesses and decrypting C<sub>&#123;1-b&#125;</sub>. Since sk_&#123;1-b&#125; was chosen uniformly from a ~2³¹ group, the odds of a hit are ≈ 0.00025 %.
             </div>
             {pa18PlayData?.cheat && (
               <div style={{
@@ -3491,7 +3493,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             disabled={pa18CtlLoading.correctness}
             onClick={async () => {
               setPa18CtlLoading(p => ({ ...p, correctness: true }));
-              try { setPa18CorrectnessData(await api.pa18Correctness()); } catch (_) {}
+              try { setPa18CorrectnessData(await api.pa18Correctness()); } catch { /* ignore */ }
               setPa18CtlLoading(p => ({ ...p, correctness: false }));
             }}
             style={{
@@ -3509,7 +3511,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             disabled={pa18CtlLoading.privacy}
             onClick={async () => {
               setPa18CtlLoading(p => ({ ...p, privacy: true }));
-              try { setPa18PrivacyData(await api.pa18Privacy()); } catch (_) {}
+              try { setPa18PrivacyData(await api.pa18Privacy()); } catch { /* ignore */ }
               setPa18CtlLoading(p => ({ ...p, privacy: false }));
             }}
             style={{
@@ -3891,7 +3893,6 @@ const PADemoModal = ({ pa, onClose, api }) => {
     };
     const sectionBox = { background: 'rgba(0,0,0,0.25)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)', marginBottom: '12px' };
     const labelSt = { fontSize: '11px', fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: '4px' };
-    const monoVal = { fontFamily: 'monospace', fontSize: '12px', wordBreak: 'break-all', color: 'var(--text2)' };
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
         <div style={sectionBox}>
@@ -4045,7 +4046,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
               {def.params
-                .filter(p => !isPaDemo7 && !isPaDemo13 && !isPaDemo2 && !isPA4 && !isPA5 && !isPA6 && !isPA12 && !isPA14 && !isPA15 && !isPA16 && !isPA17 && !isPA19 && !isPA20)
+                .filter(() => !isPaDemo7 && !isPaDemo13 && !isPaDemo2 && !isPA4 && !isPA5 && !isPA6 && !isPA12 && !isPA14 && !isPA15 && !isPA16 && !isPA17 && !isPA19 && !isPA20)
                 .map(p => (
                 <div className="field" key={p.name} style={{ marginBottom: 0 }}>
                   <label style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -4101,7 +4102,7 @@ const PADemoModal = ({ pa, onClose, api }) => {
             {isPaDemo7 ? renderPA7Special() : isPaDemo1 ? renderPA1Special() : isPaDemo2 ? renderPA2Special() : isPaDemo3 ? renderPA3Special() : isPA4 ? renderPA4Special() : isPA5 ? renderPA5Special() : isPA6 ? renderPA6Special() : isPaDemo8 ? renderPA8Special() : isPaDemo9 ? renderPA9Special() : isPaDemo10 ? renderPA10Special() : isPaDemo11 ? renderPA11Special() : isPA12 ? renderPA12Special() : isPaDemo13 ? renderPA13Special() : isPA14 ? renderPA14Special() : isPA15 ? renderPA15Special() : isPA16 ? renderPA16Special() : isPaDemo18 ? renderPA18Special() : isPA17 ? renderPA17Special() : isPA19 ? renderPA19Special() : isPA20 ? renderPA20Special() : (result && renderResult(result))}
 
             {!isPaDemo1 && !isPaDemo2 && !isPaDemo3 && !isPaDemo7 && !isPaDemo8 && !isPaDemo9 && !isPaDemo10 && !isPaDemo11 && !isPA12 && !isPaDemo13 && !isPA14 && !isPA15 && !isPA16 && !isPaDemo18 && !isPA4 && !isPA5 && !isPA6 && !isPA17 && !isPA19 && !isPA20 && (
-              <button className="run-button" onClick={handleRunDemo} disabled={isLoading} style={{ marginTop: '20px' }}>
+              <button className="run-button" onClick={() => runDemo()} disabled={isLoading} style={{ marginTop: '20px' }}>
                 {isLoading ? 'Running Demo...' : 'Run Interactive Demo'}
               </button>
             )}          </div>

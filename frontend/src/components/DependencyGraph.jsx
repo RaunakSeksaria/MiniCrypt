@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 
 const nodes = [
   {id:'AES',x:100,y:50,c:'#6366f1'},{id:'OWF/PRG',x:100,y:150,c:'#6366f1'},

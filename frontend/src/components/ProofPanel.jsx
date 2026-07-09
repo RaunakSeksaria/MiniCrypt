@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 const ProofPanel = ({ proofData, foundation, source, target }) => {
   const [isOpen, setIsOpen] = useState(false);

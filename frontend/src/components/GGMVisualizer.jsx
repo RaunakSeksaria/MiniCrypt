@@ -1,4 +1,3 @@
-import React from 'react';
 
 const GGMVisualizer = ({ tree, queryBits, output }) => {
   if (!tree) return null;

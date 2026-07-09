@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import Nav from './components/Nav';
 import Explorer from './components/Explorer';
@@ -16,11 +16,13 @@ function App() {
   const [proofData, setProofData] = useState(null);
   const [reductionState, setReductionState] = useState({ source: 'PRF', target: 'PRP' });
 
-  // Connect API to local state for proof updates
-  api.onProofUpdate = (data) => {
-    setProofData(data);
-    setReductionState({ source: data.source || 'PRF', target: data.target || 'PRP' });
-  };
+  // Connect API to local state for proof updates (set once, after mount)
+  useEffect(() => {
+    api.onProofUpdate = (data) => {
+      setProofData(data);
+      setReductionState({ source: data.source || 'PRF', target: data.target || 'PRP' });
+    };
+  }, []);
 
   return (
     <div className="app-container">
