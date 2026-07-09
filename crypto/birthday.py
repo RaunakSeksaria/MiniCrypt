@@ -253,29 +253,6 @@ def attack_toy_hash(n_bits_list=None, num_trials: int = 20):
             'trials': num_trials,
         }
 
-    try:
-        import matplotlib.pyplot as plt
-        n_vals = sorted(results.keys())
-        expected_vals = [results[n]['expected_birthday'] for n in n_vals]
-        naive_vals = [results[n]['avg_evaluations_naive'] for n in n_vals]
-        floyd_vals = [results[n]['avg_evaluations_floyd'] for n in n_vals]
-
-        plt.figure(figsize=(8, 5))
-        plt.plot(n_vals, expected_vals, 'k--', label='Theoretical $2^{n/2}$')
-        plt.plot(n_vals, naive_vals, 'bo-', label='Empirical (Naive)')
-        plt.plot(n_vals, floyd_vals, 'rs-', label='Empirical (Floyd)')
-        plt.xlabel('Hash Output Bits (n)')
-        plt.ylabel('Evaluations until Collision')
-        plt.title('Birthday Attack: Evaluations vs Output Size')
-        plt.yscale('log')
-        plt.legend()
-        plt.grid(True, which="both", ls="-", alpha=0.2)
-        plt.savefig('toy_hash_evals.png')
-        plt.close()
-        print("Plot saved as 'toy_hash_evals.png'")
-    except ImportError:
-        pass
-
     return results
 
 
@@ -318,21 +295,13 @@ def attack_dlp_hash_truncated(output_bits: int = 16,
 
 def empirical_birthday_curve(n_bits_list=None, num_trials: int = 100):
     """
-    Run many trials and plot the distribution of evaluations until collision.
+    Run many trials and collect the distribution of evaluations until collision,
+    comparing the empirical mean against the theoretical 2^(n/2) birthday bound.
     """
     if n_bits_list is None:
         n_bits_list = [8, 10, 12, 14, 16]
 
     all_data = {}
-
-    try:
-        import matplotlib.pyplot as plt
-        import numpy as np
-        plt.figure(figsize=(10, 6))
-    except ImportError:
-        plt = None
-        np = None
-
     for n_bits in n_bits_list:
         hash_fn = make_toy_hash(n_bits)
         evaluations_list = []
@@ -342,35 +311,12 @@ def empirical_birthday_curve(n_bits_list=None, num_trials: int = 100):
             if result['found']:
                 evaluations_list.append(result['evaluations'])
 
-        evaluations_list.sort()
         expected = 2 ** (n_bits / 2)
-
-        if plt is not None:
-            # Plot Empirical CDF
-            y_vals = np.arange(1, len(evaluations_list) + 1) / len(evaluations_list)
-            p = plt.plot(evaluations_list, y_vals, label=f'Empirical n={n_bits}',
-                         marker='.', linestyle='none', alpha=0.6)
-
-            # Overlay Theoretical Curve: 1 - exp(-k*(k-1)/(2 * 2^n))
-            k_vals = np.linspace(1, max(evaluations_list) if evaluations_list else 100, 200)
-            theo_y = 1.0 - np.exp(-k_vals * (k_vals - 1) / (2.0 * (2 ** n_bits)))
-            plt.plot(k_vals, theo_y, color=p[0].get_color(), linestyle='-', alpha=0.8)
-
         all_data[n_bits] = {
             'num_trials': num_trials,
             'mean': sum(evaluations_list) / len(evaluations_list) if evaluations_list else 0,
             'expected_birthday': expected,
         }
-
-    if plt is not None:
-        plt.xlabel('Evaluations (k)')
-        plt.ylabel('Probability of Collision')
-        plt.title('Empirical vs Theoretical Birthday Curve')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        plt.savefig('empirical_birthday_curve.png')
-        plt.close()
-        print("Plot saved as 'empirical_birthday_curve.png'")
 
     return all_data
 
