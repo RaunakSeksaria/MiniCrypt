@@ -11,8 +11,7 @@ Dependencies: crypto.utils
 Used by: (DLP-CRHF), (HMAC)
 """
 
-from crypto.utils import int_to_bytes, bytes_to_int, xor_bytes, to_hex
-
+from crypto.utils import to_hex
 
 # ---------------------------------------------------------------------------
 # Merkle-Damgård Transform
@@ -110,11 +109,11 @@ class MerkleDamgard:
 
         # Calculate where message data ends
         msg_len = len(message)
-        
+
         cv = self.iv
         for i, block in enumerate(blocks):
             new_cv = self.compress(cv, block)
-            
+
             # Determine label
             start_offset = i * self.block_size
             if start_offset + self.block_size <= msg_len:
@@ -262,7 +261,7 @@ if __name__ == '__main__':
     print("\n--- Collision Propagation Demo ---")
     demo = collision_propagation_demo()
     if demo['found']:
-        print(f"Collision found!")
+        print("Collision found!")
         print(f"  M1 = {demo['message1']}")
         print(f"  M2 = {demo['message2']}")
         print(f"  H(M1) = H(M2) = {demo['digest']}")

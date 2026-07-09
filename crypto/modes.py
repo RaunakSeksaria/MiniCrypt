@@ -11,12 +11,17 @@ Implements:
 Dependencies: crypto.prf_ggm (PRF/PRP), crypto.aes, crypto.utils
 """
 
+from crypto.aes import BLOCK_SIZE, aes_decrypt_block, aes_encrypt_block
 from crypto.utils import (
-    xor_bytes, random_bytes, int_to_bytes, bytes_to_int,
-    pad_pkcs7, unpad_pkcs7, to_hex, split_blocks
+    bytes_to_int,
+    int_to_bytes,
+    pad_pkcs7,
+    random_bytes,
+    split_blocks,
+    to_hex,
+    unpad_pkcs7,
+    xor_bytes,
 )
-from crypto.aes import aes_encrypt_block, aes_decrypt_block, BLOCK_SIZE
-
 
 # ---------------------------------------------------------------------------
 # CBC Mode

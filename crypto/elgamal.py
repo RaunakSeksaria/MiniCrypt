@@ -12,9 +12,8 @@ Dependencies: crypto.diffie_hellman, crypto.miller_rabin, crypto.utils
 Used by: (CCA-PKC), (OT)
 """
 
-from crypto.utils import mod_exp, mod_inverse, random_int, to_hex
 from crypto.diffie_hellman import DHGroup
-
+from crypto.utils import mod_exp, mod_inverse, random_int
 
 # ---------------------------------------------------------------------------
 # ElGamal Key Generation

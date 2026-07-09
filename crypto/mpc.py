@@ -13,14 +13,12 @@ Implements:
   6. Performance report
 
 Dependencies: crypto.secure_and, crypto.ot
-Full lineage: → → → → → 
+Full lineage: → → → → →
 """
 
 import time
-from crypto.secure_and import SecureGates, AND, XOR, NOT
-from crypto.ot import OTProtocol
-from crypto.diffie_hellman import DHGroup
 
+from crypto.secure_and import SecureGates
 
 # ---------------------------------------------------------------------------
 # Circuit Class
@@ -409,7 +407,7 @@ def verify_circuit(circuit: Circuit, test_cases: list) -> dict:
 def end_to_end_lineage_trace():
     """
     Return the full lineage trace for one AND gate evaluation.
-    → → → → → 
+    → → → → →
     """
     return """
     END-TO-END LINEAGE TRACE (one AND gate)
@@ -495,7 +493,7 @@ if __name__ == '__main__':
     print(f"  {x} > {y}? Plain eval: {result[0]} (expected: {1 if x > y else 0})")
 
     # Test all pairs for n=3
-    print(f"\n  Verification (n=3):")
+    print("\n  Verification (n=3):")
     comp3 = build_comparator(3)
     all_ok = True
     for xx in range(8):

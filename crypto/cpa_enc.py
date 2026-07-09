@@ -11,13 +11,18 @@ Dependencies: crypto.prf_ggm (PRF), crypto.utils
 Used by: (CCA-secure encryption), (Encrypt-then-HMAC)
 """
 
-from crypto.utils import (
-    xor_bytes, random_bytes, int_to_bytes, bytes_to_int,
-    pad_pkcs7, unpad_pkcs7, to_hex, split_blocks
-)
-from crypto.prf_ggm import PRF
 from crypto.aes import BLOCK_SIZE
-
+from crypto.prf_ggm import PRF
+from crypto.utils import (
+    bytes_to_int,
+    int_to_bytes,
+    pad_pkcs7,
+    random_bytes,
+    split_blocks,
+    to_hex,
+    unpad_pkcs7,
+    xor_bytes,
+)
 
 # ---------------------------------------------------------------------------
 # CPA-Secure Encryption Scheme

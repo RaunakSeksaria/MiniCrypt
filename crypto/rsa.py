@@ -12,12 +12,8 @@ Dependencies: crypto.miller_rabin, crypto.utils
 Used by: (CRT), (signatures), (OT)
 """
 
-from crypto.utils import (
-    mod_exp, mod_inverse, random_bytes, bytes_to_int, int_to_bytes,
-    to_hex, random_int
-)
 from crypto.miller_rabin import gen_prime
-
+from crypto.utils import bytes_to_int, int_to_bytes, mod_exp, mod_inverse, random_bytes, random_int
 
 # ---------------------------------------------------------------------------
 # RSA Key Generation
@@ -34,7 +30,7 @@ class RSAKeyPair:
         self.q = q
         self.bits = n.bit_length()
 
-        # CRT components for 
+        # CRT components for
         if p and q:
             self.dp = d % (p - 1)
             self.dq = d % (q - 1)

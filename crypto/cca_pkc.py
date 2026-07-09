@@ -8,17 +8,13 @@ Implements:
   4. Contrast: malleability on plain ElGamal vs blocked on CCA-PKC
 
 Dependencies: crypto.signatures, crypto.elgamal
-Full lineage: → → → 
-              → → → 
+Full lineage: → → →
+              → → →
 """
 
-from crypto.utils import int_to_bytes, bytes_to_int, random_int
-from crypto.elgamal import (
-    elgamal_keygen, elgamal_encrypt, elgamal_decrypt, ElGamalKey
-)
+from crypto.elgamal import ElGamalKey, elgamal_decrypt, elgamal_encrypt, elgamal_keygen
 from crypto.signatures import DigitalSignature
-from crypto.rsa import rsa_keygen
-
+from crypto.utils import int_to_bytes, random_int
 
 # ---------------------------------------------------------------------------
 # CCA-Secure PKC (Encrypt-then-Sign)

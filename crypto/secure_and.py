@@ -21,10 +21,9 @@ Privacy argument:
   - Secure NOT: Purely local computation; no communication ⟹ trivially private.
 """
 
-from crypto.utils import random_int
-from crypto.ot import OTProtocol
 from crypto.diffie_hellman import DHGroup
-
+from crypto.ot import OTProtocol
+from crypto.utils import random_int
 
 # ---------------------------------------------------------------------------
 # Secure AND (from OT)

@@ -24,14 +24,18 @@ Bidirectional: OWF ⇔ PRG
 
 import math
 import time
-from crypto.utils import (
-    mod_exp, random_bytes, random_int, random_bits,
-    bytes_to_int, int_to_bytes, xor_bytes, to_hex,
-    bytes_to_bits, bits_to_bytes
-)
-from crypto.aes import aes_encrypt_block, aes_owf, BLOCK_SIZE, KEY_SIZE
-from crypto.miller_rabin import gen_safe_prime, find_generator, is_prime
 
+from crypto.aes import BLOCK_SIZE, aes_encrypt_block, aes_owf
+from crypto.miller_rabin import find_generator, gen_safe_prime
+from crypto.utils import (
+    bits_to_bytes,
+    bytes_to_bits,
+    int_to_bytes,
+    mod_exp,
+    random_bytes,
+    random_int,
+    to_hex,
+)
 
 # ---------------------------------------------------------------------------
 # One-Way Functions
@@ -197,30 +201,6 @@ class PRG_from_OWF:
         self.r = random_int(1, (1 << self.n_bits) - 1)
         self.current_state = None
 
-    def seed(self, s: any):
-        """Requirement: Initialize with seed."""
-        if isinstance(s, bytes):
-            self.current_state = int.from_bytes(s, 'big')
-        else:
-            self.current_state = s % getattr(self.owf, 'q', (1 << 128))
-
-    def next_bits(self, n: int) -> list:
-        """Requirement: Extract next n bits."""
-        if self.current_state is None:
-            raise ValueError("PRG not seeded. Call seed(s) first.")
-        
-        bits = []
-        for _ in range(n):
-            b = goldreich_levin_bit(self.current_state, self.r, self.n_bits)
-            bits.append(b)
-            # Iterate OWF
-            if hasattr(self.owf, 'q'):
-                self.current_state = self.owf.evaluate(self.current_state)
-            else:
-                s_bytes = self.current_state.to_bytes(16, 'big')
-                self.current_state = int.from_bytes(self.owf.evaluate(s_bytes), 'big')
-        return bits
-
     def generate(self, seed: any, output_bits: int) -> list:
         bits = []
         # Handle seed conversion: int for DLP, bytes for AES
@@ -275,27 +255,6 @@ class PRG_from_AES:
         self.block_size = BLOCK_SIZE  # 16 bytes
         self.current_seed = None
         self.counter = 0
-
-    def seed(self, s: bytes):
-        """Requirement: Initialize with seed."""
-        if len(s) != 16:
-            raise ValueError("Seed must be 16 bytes for AES PRG")
-        self.current_seed = s
-        self.counter = 0
-
-    def next_bits(self, n: int) -> list:
-        """Requirement: Extract next n bits."""
-        if self.current_seed is None:
-            raise ValueError("PRG not seeded. Call seed(s) first.")
-        
-        from crypto.utils import bytes_to_bits
-        bits = []
-        while len(bits) < n:
-            ctr_block = int_to_bytes(self.counter, 16)
-            block_out = aes_encrypt_block(ctr_block, self.current_seed)
-            bits.extend(bytes_to_bits(block_out))
-            self.counter += 1
-        return bits[:n]
 
     def generate(self, seed: bytes, output_bytes: int) -> bytes:
         """
@@ -364,7 +323,7 @@ def demonstrate_prg_inversion_v2(prg, trials: int = 50):
     WRITTEN ARGUMENT (Requirement 3):
     Proof by Contradiction:
     1. Suppose f(s) = G(s) is NOT a One-Way Function.
-    2. Then there exists a PPT adversary A that, given y = G(s), 
+    2. Then there exists a PPT adversary A that, given y = G(s),
        can find s' such that G(s') = y with non-negligible probability.
     3. If such an A exists, we can build a distinguisher D for the PRG:
        - D receives a challenge string Z.
@@ -553,7 +512,7 @@ if __name__ == '__main__':
 
     # Statistical tests on PRG output
     bits = prg_aes.next_bits(seed_aes, 1000)
-    print(f"\nStatistical tests on 1000 PRG bits:")
+    print("\nStatistical tests on 1000 PRG bits:")
     for result in run_statistical_tests(bits):
         status = "PASS" if result['pass'] else "FAIL"
         print(f"  {result['test']}: {status} (p={result['p_value']:.4f})")

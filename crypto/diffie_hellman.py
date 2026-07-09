@@ -11,9 +11,8 @@ Dependencies: crypto.miller_rabin (safe prime generation)
 Used by: (ElGamal)
 """
 
-from crypto.utils import mod_exp, random_int, random_bytes, to_hex, int_to_bytes
-from crypto.miller_rabin import gen_safe_prime, find_generator
-
+from crypto.miller_rabin import find_generator, gen_safe_prime
+from crypto.utils import mod_exp, random_int
 
 # ---------------------------------------------------------------------------
 # DH Group Parameters

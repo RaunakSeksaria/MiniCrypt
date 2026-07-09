@@ -11,10 +11,7 @@ Implements:
 Dependencies: crypto.dlp_crhf, crypto.utils
 """
 
-import time
-import math
-from crypto.utils import random_bytes, bytes_to_int, to_hex
-
+from crypto.utils import bytes_to_int, random_bytes
 
 # ---------------------------------------------------------------------------
 # Naive Birthday Algorithm (Dictionary-based)

@@ -10,11 +10,10 @@ Implements:
 Dependencies: crypto.cpa_enc (CPA-Enc), crypto.mac (MAC)
 """
 
-from crypto.utils import random_bytes, to_hex, xor_bytes
-from crypto.cpa_enc import CPAEncryption
-from crypto.mac import MAC, CBCMAC
 from crypto.aes import BLOCK_SIZE
-
+from crypto.cpa_enc import CPAEncryption
+from crypto.mac import MAC
+from crypto.utils import random_bytes, to_hex
 
 # ---------------------------------------------------------------------------
 # CCA-Secure Encryption (Encrypt-then-MAC)

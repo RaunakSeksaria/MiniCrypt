@@ -12,10 +12,9 @@ Dependencies: crypto.rsa, crypto.dlp_crhf, crypto.utils
 Used by: (CCA-PKC)
 """
 
-from crypto.utils import mod_exp, random_bytes, bytes_to_int, int_to_bytes, to_hex
-from crypto.rsa import rsa_keygen, RSAKeyPair
-from crypto.dlp_crhf import DLP_CRHF, get_crhf
-
+from crypto.dlp_crhf import DLP_CRHF
+from crypto.rsa import RSAKeyPair, rsa_keygen
+from crypto.utils import bytes_to_int, int_to_bytes, mod_exp, random_bytes
 
 # ---------------------------------------------------------------------------
 # Digital Signature Scheme (RSA + Hash)

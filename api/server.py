@@ -2,17 +2,26 @@
 api/server.py — FastAPI backend for the MiniCrypt Explorer.
 Exposes all crypto primitives via REST endpoints.
 """
-import sys, os
+import os
+import sys
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+import logging
+import threading
+import time
+import uuid
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional
-import json, traceback, threading, uuid, time
 
 app = FastAPI(title="MiniCrypt Explorer API")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("minicrypt")
 
 # ── Pydantic models ──
 class BuildRequest(BaseModel):
@@ -62,7 +71,7 @@ def find_shortest_path(start, end):
     while queue:
         path = queue.pop(0)
         node = path[-1]
-        for (src, dst), desc in DIRECT_REDUCTIONS.items():
+        for (src, dst), _desc in DIRECT_REDUCTIONS.items():
             if src == node:
                 if dst not in visited:
                     new_path = list(path)
@@ -111,7 +120,7 @@ class PrimitiveFactory:
         if foundation == "AES":
             from crypto.owf_prg import AES_OWF, PRG_from_AES, PRG_from_OWF
             from crypto.prf_ggm import PRF
-            
+
             if p_type == "OWF":
                 return PrimitiveWrapper(AES_OWF())
             if p_type == "PRG":
@@ -132,9 +141,9 @@ class PrimitiveFactory:
                     return PRG_from_AES().generate(seed[:16], 16)
             return PRG_Practical()
         else: # DLP
-            from crypto.miller_rabin import gen_safe_prime, find_generator
+            from crypto.miller_rabin import find_generator, gen_safe_prime
             from crypto.utils import bytes_to_int, mod_exp
-            
+
             global _CACHED_DLP
             if '_CACHED_DLP' not in globals():
                 p, q = gen_safe_prime(32)
@@ -144,19 +153,19 @@ class PrimitiveFactory:
                 p, q, g = globals()['_CACHED_DLP']
 
             from crypto.owf_prg import DLP_OWF, PRG_from_OWF
-            
+
             if p_type == "OWF":
                 return PrimitiveWrapper(DLP_OWF(32))
             if p_type == "PRG":
                 return PrimitiveWrapper(PRG_from_OWF(DLP_OWF(32), 32), 'generate_bytes')
-            
+
             class DLPWrapper:
-                def evaluate(self, x): 
+                def evaluate(self, x):
                     val = bytes_to_int(x) % q
                     gx = mod_exp(g, val, p)
                     return gx.to_bytes((p.bit_length() + 7) // 8, 'big')
             return DLPWrapper()
-        
+
         # Fallback
         class Identity:
             def evaluate(self, x): return x
@@ -193,9 +202,9 @@ def build_primitive(req: BuildRequest):
                 steps.append({"fn":f"AES → {req.source}","input":key.hex(),"output":"Ready"})
                 result_hex = key.hex()
         else: # DLP
-            from crypto.miller_rabin import gen_safe_prime, find_generator
+            from crypto.miller_rabin import find_generator, gen_safe_prime
             from crypto.utils import bytes_to_int, mod_exp
-            
+
             # Use cached params for speed in Explorer
             global _CACHED_DLP
             if '_CACHED_DLP' not in globals():
@@ -212,14 +221,14 @@ def build_primitive(req: BuildRequest):
             result_hex = f"{gx:x}"
 
         return {"steps":steps,"result":result_hex,"source":req.source,"foundation":req.foundation}
-    except Exception as e:
-        raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 # ── Reduce endpoint (Column 2) ──
 @app.post("/api/reduce")
 def reduce_primitive(req: ReduceRequest):
     try:
-        key_pair = (req.source, req.target)
         chain = find_shortest_path(req.source, req.target)
         if chain is None:
             return {"error": f"No direct reduction from {req.source} to {req.target}.",
@@ -227,38 +236,38 @@ def reduce_primitive(req: ReduceRequest):
 
         seed_bytes = bytes.fromhex(req.seed) if req.seed else os.urandom(16)
         query_bytes = bytes.fromhex(req.query) if req.query else b'\x00'*16
-        
+
         # Instantiate the TARGET primitive (the one we built via reduction)
         steps = []; proofs = []
         current_state = seed_bytes
-        
+
         for label, desc in chain:
             proof = PROOF_DB.get(label, {"theorem":"","security":"","pa":""})
             proofs.append({"step":label,"description":desc,**proof})
-            
+
             # Special case for HILL () iterations display
             if label == "OWF→PRG":
-                from crypto.owf_prg import PRG_from_OWF, AES_OWF
+                from crypto.owf_prg import AES_OWF, PRG_from_OWF
                 from crypto.utils import bytes_to_bits
                 prg_impl = PRG_from_OWF(AES_OWF(), 128) if req.foundation == "AES" else PRG_from_OWF(None, 32)
                 res_bytes = prg_impl.generate_bytes(int.from_bytes(current_state, 'big'), 16)
                 all_bits = bytes_to_bits(res_bytes)
-                
+
                 iter_x = current_state
                 for i in range(4):
                     steps.append({"fn": f"HILL Iteration {i+1}", "input": f"x_{i}: {safe_hex(iter_x)[:8]}...", "output": f"Bit: {all_bits[i]} → Next"})
                     iter_x = (int.from_bytes(iter_x, 'big') + 1).to_bytes(16, 'big') # visualization mock
-                
+
                 steps.append({"fn": "...", "input": "Iterations 5-128", "output": f"Full PRG Out: {res_bytes.hex()[:8]}..."})
                 current_state = res_bytes # Update state for next reduction step (e.g. GGM)
-                
+
             elif label == "PRG→PRF":
                 # GGM Tree Trace: Show tree walking using CURRENT_STATE as Root Key
                 from crypto.prf_ggm import GGM_PRF
                 from crypto.utils import bytes_to_bits
                 ggm = GGM_PRF()
                 x_bits = bytes_to_bits(query_bytes)
-                
+
                 node_val = current_state
                 for i in range(4):
                     bit = x_bits[i]
@@ -267,7 +276,7 @@ def reduce_primitive(req: ReduceRequest):
                     chosen = g0 if bit == 0 else g1
                     steps.append({"fn": f"GGM Depth {i+1}", "input": f"Node: {safe_hex(node_val)[:8]}... (Bit {bit})", "output": f"→ {safe_hex(chosen)[:8]}..."})
                     node_val = chosen
-                
+
                 steps.append({"fn": "...", "input": "Depths 5-128", "output": "Truncated for brevity"})
                 current_state = node_val
             else:
@@ -278,35 +287,37 @@ def reduce_primitive(req: ReduceRequest):
                     mid_out = mid_prim.evaluate(query_bytes)
                     steps.append({"fn": desc, "input": safe_hex(query_bytes), "output": safe_hex(mid_out)})
                 except Exception as e:
-                    import traceback
-                    print(f"DEBUG: Reduction step {label} failed: {e}\n{traceback.format_exc()}")
+                    logger.debug("Reduction step %s failed: %s", label, e)
                     steps.append({"fn": desc, "input": safe_hex(query_bytes)[:8]+"...", "output": "→"})
 
         # Final result is the state after all steps
         output_hex = safe_hex(current_state)
         steps.append({"fn": f"Final {req.target} output", "input": safe_hex(query_bytes), "output": output_hex})
-        return {"steps":steps,"proofs":proofs,"output":output_hex,"chain":[l for l,_ in chain], "source": req.source, "target": req.target}
-    except Exception as e:
-        raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
-    except Exception as e:
-        raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
+        return {"steps":steps,"proofs":proofs,"output":output_hex,"chain":[lbl for lbl,_ in chain], "source": req.source, "target": req.target}
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 # ── Demo endpoints ──
 @app.post("/api/demo")
 def run_demo(req: DemoRequest):
     try:
         if req.pa == "owf_prg":
-            from crypto.owf_prg import AES_OWF, PRG_from_AES, run_statistical_tests, demonstrate_prg_inversion_v2
-            from crypto.utils import bytes_to_bits, to_hex
+            from crypto.owf_prg import (
+                PRG_from_AES,
+                demonstrate_prg_inversion_v2,
+                run_statistical_tests,
+            )
+            from crypto.utils import to_hex
             seed_hex = req.params.get("seed", "2b7e151628aed2a6abf7158809cf4f3c")
             length = int(req.params.get("length", 32))
             seed = bytes.fromhex(seed_hex)
             # Robust Normalization: Ensure exactly 16 bytes for AES
             seed = (seed + b'\x00' * 16)[:16]
-            
+
             prg = PRG_from_AES()
             output = prg.generate(seed, length)
-            
+
             task = req.params.get("task")
             bits_str = "".join([bin(b)[2:].zfill(8) for b in output])
             response = {
@@ -321,55 +332,54 @@ def run_demo(req: DemoRequest):
                 response["stats"] = run_statistical_tests(test_bits)
                 ones_count = sum(test_bits)
                 response["ratio"] = ones_count / len(test_bits)
-            
+
             if task == "inversion":
                 # Only run expensive brute-force demo when requested
                 response["inversion"] = demonstrate_prg_inversion_v2(prg)
             return response
         elif req.pa == "prf_ggm":
-            from crypto.utils import to_hex, bytes_to_bits
+            from crypto.utils import to_hex
             key_hex = req.params.get("key", "2b7e151628aed2a6abf7158809cf4f3c")
-            query_hex = req.params.get("query", "00000000000000000000000000000001")
             depth = int(req.params.get("depth", 4))
-            
+
             key = bytes.fromhex(key_hex)
             key = (key + b'\x00' * 16)[:16]
-            
-            # Interpret 'query' as a bit string (0101...) for 
+
+            # Interpret 'query' as a bit string (0101...) for
             query_str = req.params.get("query", "0000")
             query_bits = []
             for bit in query_str:
                 if bit in ('0', '1'):
                     query_bits.append(int(bit))
-            
+
             # Pad or truncate query bits to match depth
             query_bits = (query_bits + [0] * depth)[:depth]
-            
+
             # Use the unified PRF wrapper with GGM mode
             from crypto.prf_ggm import PRF
             ggm = PRF(mode='ggm')
             task = req.params.get("task")
-            
+
             if task == "game":
                 from crypto.prf_ggm import distinguishing_game
                 game_result = distinguishing_game(ggm, 100)
                 return {"game": game_result}
-            
+
             if task == "randomness":
-                from crypto.prf_ggm import PRG_from_PRF
                 from crypto.owf_prg import run_statistical_tests
+                from crypto.prf_ggm import PRG_from_PRF
                 prg = PRG_from_PRF(ggm)
                 test_bits = prg.next_bits(key, 2048)
                 return {
                     "stats": run_statistical_tests(test_bits),
                     "ratio": sum(test_bits) / len(test_bits)
                 }
-            
+
             # For tree visualization, use the underlying GGM_PRF directly
-            ggm_impl = ggm._impl 
+            ggm_impl = ggm._impl
             full_tree = ggm_impl.generate_full_tree(key, depth)
             trace = ggm_impl.evaluate_with_trace(key, query_bits)
-            
+
             return {
                 "key": to_hex(key),
                 "query_bits": query_bits,
@@ -389,7 +399,7 @@ def run_demo(req: DemoRequest):
             game = ind_cpa_game(enc, 50)
             return {"plaintext":msg.decode(),"nonce":to_hex(r),"ciphertext":to_hex(ct),"decrypted":pt.decode(),"match":pt==msg,"game":game,"prf_mode":prf_mode}
         elif req.pa == "modes":
-            from crypto.modes import encrypt, decrypt
+            from crypto.modes import decrypt, encrypt
             from crypto.utils import random_bytes, to_hex
             k = random_bytes(16)
             msg = req.params.get("message","Modes of Operation test!").encode()
@@ -410,7 +420,7 @@ def run_demo(req: DemoRequest):
             game = euf_cma_game(mac, 30, 10)
             return {"message":msg.decode(),"tag":to_hex(tag),"verify":mac.Vrfy(k,msg,tag),"game":game,"prf_mode":prf_mode}
         elif req.pa == "cca_enc":
-            from crypto.cca_enc import CCAEncryption, malleability_attack_demo, key_separation_demo
+            from crypto.cca_enc import CCAEncryption, key_separation_demo, malleability_attack_demo
             from crypto.cpa_enc import CPAEncryption
             from crypto.mac import MAC
             from crypto.prf_ggm import PRF
@@ -425,19 +435,19 @@ def run_demo(req: DemoRequest):
             key_sep = key_separation_demo()
             return {"plaintext":msg.decode(),"decrypted":pt.decode(),"match":pt==msg,"tamper_rejected":cca.decrypt(ke,km,r,bytes([ct[0]^1])+ct[1:],tag) is None,"attack":{"cpa_malleable":attack['cpa_only']['malleable'],"cca_rejected":attack['cca_secure']['rejected']},"key_separation":key_sep,"prf_mode":prf_mode}
         elif req.pa == "merkle_damgard":
-            from crypto.merkle_damgard import create_toy_hash, collision_propagation_demo
+            from crypto.merkle_damgard import collision_propagation_demo, create_toy_hash
             msg_str = req.params.get('message', 'Hello Hash!')
             is_hex = req.params.get('is_hex', False)
             output_size = int(req.params.get('output_size', 4))
-            
+
             try:
                 if is_hex:
                     msg = bytes.fromhex(msg_str.replace(' ', ''))
                 else:
                     msg = msg_str.encode()
-            except:
+            except (ValueError, UnicodeEncodeError):
                 msg = b"Invalid Input"
-                
+
             toy = create_toy_hash(digest_size=output_size)
             trace = toy.hash_with_trace(msg)
             trace["collision_propagation"] = collision_propagation_demo()
@@ -450,7 +460,11 @@ def run_demo(req: DemoRequest):
             h = crhf.hash(msg)
             return {"message":msg.decode(),"hash":to_hex(h),"p":crhf.dlp.p,"g":crhf.dlp.g,"h_pub":crhf.dlp.h}
         elif req.pa == "birthday":
-            from crypto.birthday import attack_toy_hash, practical_context, make_toy_hash, birthday_attack_naive
+            from crypto.birthday import (
+                birthday_attack_naive,
+                make_toy_hash,
+                practical_context,
+            )
             n_bits = int(req.params.get("n_bits", 12))
             hash_fn = make_toy_hash(n_bits)
             res = birthday_attack_naive(hash_fn, n_bits)
@@ -474,14 +488,23 @@ def run_demo(req: DemoRequest):
             tag = hmac.mac(k, msg)
             return {"message":msg.decode(),"tag":to_hex(tag),"verify":hmac.verify(k,msg,tag),"tamper":not hmac.verify(k,b"wrong",tag)}
         elif req.pa == "diffie_hellman":
-            from crypto.diffie_hellman import DiffieHellman, mitm_attack, cdh_hardness_demo
+            from crypto.diffie_hellman import DiffieHellman, cdh_hardness_demo, mitm_attack
             dh = DiffieHellman(bits=32)
             exch = dh.key_exchange()
             mitm = mitm_attack(dh)
             cdh = cdh_hardness_demo(dh, tiny_bits=20)
             return {"exchange":{"p":exch['p'],"g":exch['g'],"A":exch['A'],"B":exch['B'],"K_alice":exch['K_alice'],"K_bob":exch['K_bob'],"match":exch['keys_match']},"mitm":{"eve_has_alice_key":mitm['eve_has_alice_key'],"eve_has_bob_key":mitm['eve_has_bob_key'],"alice_bob_same":mitm['alice_bob_same']}, "cdh": cdh}
         elif req.pa == "rsa":
-            from crypto.rsa import rsa_keygen, rsa_encrypt, rsa_decrypt, pkcs15_encrypt, pkcs15_decrypt, determinism_attack_demo, multiplicative_homomorphism_demo, bleichenbacher_oracle_demo
+            from crypto.rsa import (
+                bleichenbacher_oracle_demo,
+                determinism_attack_demo,
+                multiplicative_homomorphism_demo,
+                pkcs15_decrypt,
+                pkcs15_encrypt,
+                rsa_decrypt,
+                rsa_encrypt,
+                rsa_keygen,
+            )
             kp = rsa_keygen(256); m = int(req.params.get("message_int", 42))
             c = rsa_encrypt(kp.n, kp.e, m)
             d = rsa_decrypt(kp.d, kp.n, c)
@@ -490,10 +513,15 @@ def run_demo(req: DemoRequest):
             d2 = pkcs15_decrypt(kp.d, kp.n, c2)
             return {"textbook":{"m":m,"c":str(c),"d":d,"match":d==m},"pkcs":{"message":msg.decode(),"decrypted":d2.decode(),"match":d2==msg},"n":str(kp.n),"e":kp.e,"bits":kp.bits, "determinism": determinism_attack_demo(256), "homomorphism": multiplicative_homomorphism_demo(256), "bleichenbacher": bleichenbacher_oracle_demo(256)}
         elif req.pa == "miller_rabin":
-            from crypto.miller_rabin import is_prime, gen_prime, miller_rabin_with_trace, carmichael_demo, benchmark_prime_generation
+            from crypto.miller_rabin import (
+                benchmark_prime_generation,
+                carmichael_demo,
+                gen_prime,
+                miller_rabin_with_trace,
+            )
             task = req.params.get("task", "test")
             rounds = int(req.params.get("rounds", 10))
-            
+
             if task == "test":
                 n = int(req.params.get("n", 1009))
                 start = time.time()
@@ -513,7 +541,6 @@ def run_demo(req: DemoRequest):
                 # Known 512-bit prime (Mersenne prime M521 snippet or a standard one)
                 p512 = (2**521) - 1 # M521 is prime
                 # Known composite that looks tricky
-                comp = 561
                 return {"p512": str(p512), "composite": "12345678901234567891"}
             else:
                 return {"error": "Unknown task"}
@@ -534,7 +561,12 @@ def run_demo(req: DemoRequest):
             attack = homomorphism_attack_demo(256)
             return {"message":msg.decode(),"signature":str(sigma),"verify":ds.verify(msg,sigma),"wrong":not ds.verify(b"wrong",sigma),"attack":{"raw_works":attack['raw_attack_works'],"hash_works":attack['hash_then_sign_attack_works']}}
         elif req.pa == "elgamal":
-            from crypto.elgamal import elgamal_keygen, elgamal_encrypt, elgamal_decrypt, malleability_attack
+            from crypto.elgamal import (
+                elgamal_decrypt,
+                elgamal_encrypt,
+                elgamal_keygen,
+                malleability_attack,
+            )
             key = elgamal_keygen(bits=32); m = int(req.params.get("message_int", 42))
             c1,c2 = elgamal_encrypt(key.pk, m)
             d = elgamal_decrypt(key.sk, key.p, c1, c2)
@@ -548,14 +580,14 @@ def run_demo(req: DemoRequest):
             bad=cca.decrypt(ct['c1'],(ct['c2']*2)%cca.eg_key.p,ct['sigma'])
             return {"m":m,"decrypted":pt,"match":pt==m,"tamper_rejected":bad is None, "contrast": contrast_demo(cca)}
         elif req.pa == "ot":
-            from crypto.ot import run_ot, receiver_privacy_demo, sender_privacy_demo
+            from crypto.ot import receiver_privacy_demo, run_ot, sender_privacy_demo
             m0 = int(req.params.get("m0", 42))
             m1 = int(req.params.get("m1", 99))
             b = int(req.params.get("b", 0))
             r = run_ot(m0, m1, b, bits=32)
             return {"m0": m0, "m1": m1, "b": b, "received": r['received'], "correct": r['correct'], "receiver_privacy": receiver_privacy_demo(32), "sender_privacy": sender_privacy_demo(32)}
-            
-            
+
+
         elif req.pa == "secure_and":
             from crypto.secure_and import SecureGates
             gates = SecureGates(bits=32)
@@ -564,7 +596,13 @@ def run_demo(req: DemoRequest):
             r = gates.secure_and(a, b)
             return {"input":{"a":a,"b":b},"result":r['result'],"correct":r['correct'],"all_gates": "Check server logs for other gate tests"}
         elif req.pa == "mpc":
-            from crypto.mpc import build_comparator, build_equality, build_adder, int_to_bits, bits_to_int
+            from crypto.mpc import (
+                bits_to_int,
+                build_adder,
+                build_comparator,
+                build_equality,
+                int_to_bits,
+            )
             results = {}
             alice_val = int(req.params.get("alice_val", 7))
             bob_val = int(req.params.get("bob_val", 3))
@@ -580,8 +618,9 @@ def run_demo(req: DemoRequest):
             return results
         else:
             return {"error":f"Demo {req.pa} not found"}
-    except Exception as e:
-        raise HTTPException(400, str(e)+"\n"+traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 # ── dedicated birthday-attack endpoints ──
@@ -613,8 +652,9 @@ def birthday_start(req: BirthdayStartRequest):
     _pa9_hunts[hunt_id] = state
 
     def _hunt(state):
-        from crypto.birthday import make_toy_hash
         import math as _math
+
+        from crypto.birthday import make_toy_hash
         try:
             n = state["n_bits"]
             hash_fn = make_toy_hash(n)
@@ -731,8 +771,9 @@ def dlp_crhf_live_hash(req: DlpCrhfHashRequest):
             "h_pub": crhf.dlp.h,
             "digest_bytes": crhf.digest_size,
         }
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 @app.post("/api/dlp_crhf/collision/start")
@@ -843,16 +884,17 @@ class HmacLengthExtRequest(BaseModel):
 def hmac_length_extension(req: HmacLengthExtRequest):
     """Interactive length-extension demo: left panel (broken) + right panel (HMAC)."""
     try:
-        from crypto.hmac import length_extension_attack, HMAC as _HMAC
-        from crypto.utils import random_bytes, to_hex
         import hashlib
+
+        from crypto.utils import to_hex
 
         suffix_bytes = req.suffix.encode()
         hmac_obj = _get_hmac()
 
         if req.hash_mode == "sha256":
             # SHA-256 path (for the toggle comparison)
-            import os, struct
+            import os
+            import struct
             key = os.urandom(16)
             message = b"original message"
 
@@ -868,17 +910,15 @@ def hmac_length_extension(req: HmacLengthExtRequest):
             while (km_len + len(pad) + 8) % 64 != 0:
                 pad += b'\x00'
             pad += struct.pack('>Q', km_bits)
-            pad_suffix_bytes = pad   # the padding bytes only
             forged_message = message + pad + suffix_bytes
 
             # SHA-256 length-extension: re-run with injected state
             # We set initial state = naive_tag (8 x uint32 from the digest)
-            h = list(struct.unpack('>8I', naive_tag_bytes))
             # Process the suffix through SHA-256 update with forged state
             # Use hashlib _hashlib directly for demo; we replicate the block loop
             # Simplified: just show the concept — for display we recompute server-side check
             server_check = hashlib.sha256(key + forged_message).hexdigest()
-            # For a true demo we'd implement the SHA-256 block manually; 
+            # For a true demo we'd implement the SHA-256 block manually;
             # here we show the structural vulnerability clearly
             forged_tag_hex = server_check  # conceptual placeholder
             forgery_valid = True  # SHA-256 is MD-based, attack works structurally
@@ -905,8 +945,9 @@ def hmac_length_extension(req: HmacLengthExtRequest):
         )
         result["mode"] = "dlp"
         return result
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 
@@ -932,7 +973,6 @@ class DhExchangeRequest(BaseModel):
 def dh_exchange(req: DhExchangeRequest):
     """Full DH key exchange. Accepts optional private exponents; randomises if omitted."""
     try:
-        from crypto.diffie_hellman import DiffieHellman
         from crypto.utils import mod_exp, random_int
         dh = _get_dh()
 
@@ -956,8 +996,9 @@ def dh_exchange(req: DhExchangeRequest):
             "K_bob":   hex(K_bob),
             "match":   K_alice == K_bob,
         }
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 class DhMitmRequest(BaseModel):
@@ -1018,8 +1059,9 @@ def dh_mitm(req: DhMitmRequest):
             "alice_bob_match": K_alice     == K_bob,        # should be False
             "attack_success":  K_alice == K_eve_alice and K_bob == K_eve_bob,
         }
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 class DhCdhRequest(BaseModel):
@@ -1030,7 +1072,7 @@ class DhCdhRequest(BaseModel):
 def dh_cdh(req: DhCdhRequest):
     """CDH hardness demo: brute-force DL at tiny bit-size, report time taken."""
     try:
-        from crypto.diffie_hellman import cdh_hardness_demo, DiffieHellman
+        from crypto.diffie_hellman import DiffieHellman, cdh_hardness_demo
         bits = max(8, min(24, req.bits))
         dh   = DiffieHellman(bits=bits)
         res  = cdh_hardness_demo(dh=dh, tiny_bits=bits)
@@ -1043,8 +1085,9 @@ def dh_cdh(req: DhCdhRequest):
             "time_sec":          round(res["time_sec"], 4),
             "conclusion":        res["conclusion"],
         }
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 
@@ -1059,8 +1102,8 @@ class OtPlayRequest(BaseModel):
 def ot_play(req: OtPlayRequest):
     """Run full OT protocol and return step-by-step trace + cheat attempt result."""
     try:
-        from crypto.ot import OTProtocol
         from crypto.elgamal import elgamal_decrypt
+        from crypto.ot import OTProtocol
         if req.b not in (0, 1):
             raise HTTPException(400, "Choice bit b must be 0 or 1")
 
@@ -1114,8 +1157,9 @@ def ot_play(req: OtPlayRequest):
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 @app.post("/api/ot/correctness")
@@ -1124,8 +1168,9 @@ def ot_correctness():
     try:
         from crypto.ot import correctness_test
         return correctness_test(bits=32, trials=100)
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 @app.post("/api/ot/privacy")
@@ -1136,8 +1181,9 @@ def ot_privacy():
         rp = receiver_privacy_demo(bits=32, trials=100)
         sp = sender_privacy_demo(bits=32)
         return {'receiver': rp, 'sender': sp}
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 # ── Interactive IND-CPA Game endpoints ──
 
@@ -1151,9 +1197,8 @@ class CpaInitRequest(BaseModel):
 @app.post("/api/cpa_enc/init")
 def cpa_init(req: CpaInitRequest):
     """Start a new IND-CPA game session. Returns session_id and optionally the fixed nonce (broken mode)."""
+
     from crypto.utils import random_bytes, to_hex
-    from crypto.cpa_enc import CPAEncryption
-    import random as _random
 
     session_id = str(uuid.uuid4())
     key = random_bytes(16)
@@ -1223,6 +1268,7 @@ class CpaChallengeRequest(BaseModel):
 def cpa_challenge(req: CpaChallengeRequest):
     """Submit m0, m1. Challenger picks random b and returns C* = Enc_k(m_b)."""
     import random as _random
+
     from crypto.cpa_enc import CPAEncryption
     from crypto.utils import to_hex
 
@@ -1315,7 +1361,7 @@ class CpaSimRequest(BaseModel):
 @app.post("/api/cpa_enc/simulate")
 def cpa_simulate(req: CpaSimRequest):
     """Run automated IND-CPA simulation (dummy adversary) and return advantage."""
-    from crypto.cpa_enc import CPAEncryption, ind_cpa_game, demonstrate_deterministic_attack
+    from crypto.cpa_enc import CPAEncryption, ind_cpa_game
     from crypto.utils import random_bytes
 
     rounds = max(5, min(100, req.rounds))
@@ -1327,7 +1373,6 @@ def cpa_simulate(req: CpaSimRequest):
         correct = 0
         for _ in range(rounds):
             m0 = random_bytes(8)
-            m1 = random_bytes(8)
             # Use deterministic encrypt with fixed nonce
             fixed_r = b'\x42' * 16
             _, ct0 = enc.encrypt_deterministic(key, m0, fixed_r)
@@ -1352,20 +1397,20 @@ class CcaEncInitRequest(BaseModel):
 
 @app.post("/api/cca_enc/malleability_init")
 def cca_enc_malleability_init(req: CcaEncInitRequest):
-    from crypto.cpa_enc import CPAEncryption
     from crypto.cca_enc import CCAEncryption
+    from crypto.cpa_enc import CPAEncryption
     from crypto.utils import random_bytes, to_hex
-    
+
     msg_bytes = req.message.encode()
     key_enc = random_bytes(16)
     key_mac = random_bytes(16)
-    
+
     cpa = CPAEncryption()
     cca = CCAEncryption()
-    
+
     cpa_r, cpa_ct = cpa.encrypt(key_enc, msg_bytes)
     cca_r, cca_ct, cca_tag = cca.encrypt(key_enc, key_mac, msg_bytes)
-    
+
     return {
         "key_enc": to_hex(key_enc),
         "key_mac": to_hex(key_mac),
@@ -1387,15 +1432,15 @@ class CcaEncFlipRequest(BaseModel):
 
 @app.post("/api/cca_enc/malleability_flip")
 def cca_enc_malleability_flip(req: CcaEncFlipRequest):
-    from crypto.cpa_enc import CPAEncryption
     from crypto.cca_enc import CCAEncryption
-    
+    from crypto.cpa_enc import CPAEncryption
+
     key_e = bytes.fromhex(req.key_enc)
     key_m = bytes.fromhex(req.key_mac)
-    
+
     cpa_ct = bytes.fromhex(req.cpa_ct)
     cca_ct = bytes.fromhex(req.cca_ct)
-    
+
     # CPA decrypt
     cpa_dec = None
     cpa_err = None
@@ -1403,7 +1448,7 @@ def cca_enc_malleability_flip(req: CcaEncFlipRequest):
         cpa_dec = CPAEncryption().decrypt(key_e, bytes.fromhex(req.cpa_r), cpa_ct)
     except Exception as e:
         cpa_err = str(e)
-        
+
     # CCA decrypt
     cca_dec = None
     cca_err = None
@@ -1411,10 +1456,10 @@ def cca_enc_malleability_flip(req: CcaEncFlipRequest):
         cca_dec = CCAEncryption().decrypt(key_e, key_m, bytes.fromhex(req.cca_r), cca_ct, bytes.fromhex(req.cca_tag))
     except Exception as e:
         cca_err = str(e)
-        
+
     cpa_str = cpa_dec.decode(errors='replace') if cpa_dec else None
     cca_str = cca_dec.decode(errors='replace') if cca_dec else None
-    
+
     return {
         "cpa_decrypted": cpa_str,
         "cpa_error": cpa_err,
@@ -1444,14 +1489,14 @@ def cca_pkc_malleability_init(req: CcaPkcInitRequest):
     m = req.message % cca.eg_key.p
     if m == 0:
         m = 1
-    
+
     # CPA (ElGamal only)
     from crypto.elgamal import elgamal_encrypt
     c1_cpa, c2_cpa = elgamal_encrypt(cca.eg_key.pk, m)
-    
+
     # CCA (Encrypt-then-Sign)
     ct_cca = cca.encrypt(m)
-    
+
     return {
         "p": str(cca.eg_key.p),
         "m": str(m),
@@ -1476,14 +1521,14 @@ class CcaPkcFlipRequest(BaseModel):
 @app.post("/api/cca_pkc/malleability_flip")
 def cca_pkc_malleability_flip(req: CcaPkcFlipRequest):
     cca = _get_cca_pkc()
-    
+
     # Decrypt CPA (ElGamal)
     from crypto.elgamal import elgamal_decrypt
     cpa_dec = elgamal_decrypt(cca.eg_key.sk, cca.eg_key.p, int(req.cpa_c1), int(req.cpa_c2))
-    
+
     # Decrypt CCA (Encrypt-then-Sign)
     cca_dec = cca.decrypt(int(req.cca_c1), int(req.cca_c2), int(req.cca_sigma))
-    
+
     return {
         "cpa_decrypted": str(cpa_dec) if cpa_dec is not None else None,
         "cca_decrypted": str(cca_dec) if cca_dec is not None else None,
@@ -1509,8 +1554,8 @@ def secure_and_truth_table():
     from crypto.secure_and import truth_table_test
     # 1 run per combo is enough for the UI truth table (just to show it works)
     res = truth_table_test(runs_per_combo=1)
-    
-    # FastAPI's jsonable_encoder converts tuples to lists, which then throws an error 
+
+    # FastAPI's jsonable_encoder converts tuples to lists, which then throws an error
     # when used as dict keys. We must stringify the tuple keys manually.
     formatted_res = {
         **res,
@@ -1529,27 +1574,34 @@ class MpcEvalRequest(BaseModel):
 
 @app.post("/api/mpc/evaluate")
 def mpc_evaluate(req: MpcEvalRequest):
-    from crypto.mpc import build_comparator, build_equality, build_adder, secure_eval, int_to_bits, bits_to_int
+    from crypto.mpc import (
+        bits_to_int,
+        build_adder,
+        build_comparator,
+        build_equality,
+        int_to_bits,
+        secure_eval,
+    )
     from crypto.secure_and import SecureGates
-    
+
     if req.mode == "equality":
         circ = build_equality(req.bits)
     elif req.mode == "adder":
         circ = build_adder(req.bits)
     else:
         circ = build_comparator(req.bits)
-        
+
     x_bits = int_to_bits(req.alice_val, req.bits)
     y_bits = int_to_bits(req.bob_val, req.bits)
-    
+
     gates = SecureGates(bits=32)
     result = secure_eval(circ, x_bits, y_bits, gates)
-    
+
     if req.mode == "adder":
         output_val = bits_to_int(result['output'])
     else:
         output_val = result['output'][0]
-    
+
     return {
         "alice_val_hidden": req.alice_val,
         "bob_val_hidden": req.bob_val,
@@ -1583,14 +1635,15 @@ def modes_animate(req: ModesAnimateRequest):
       xor_intermediate_hex (CBC only), ciphertext_hex
     """
     try:
-        from crypto.modes import (
-            cbc_encrypt, ofb_encrypt, ctr_encrypt,
-            ofb_keystream, split_blocks as _split
-        )
-        from crypto.aes import aes_encrypt_block, aes_decrypt_block, BLOCK_SIZE
+        from crypto.aes import BLOCK_SIZE, aes_encrypt_block
         from crypto.utils import (
-            random_bytes, pad_pkcs7, xor_bytes, to_hex,
-            int_to_bytes, bytes_to_int, split_blocks
+            bytes_to_int,
+            int_to_bytes,
+            pad_pkcs7,
+            random_bytes,
+            split_blocks,
+            to_hex,
+            xor_bytes,
         )
 
         mode = req.mode.upper()
@@ -1679,8 +1732,9 @@ def modes_animate(req: ModesAnimateRequest):
 
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 class ModesFlipRequest(BaseModel):
@@ -1698,9 +1752,8 @@ def modes_flip(req: ModesFlipRequest):
     Returns which plaintext blocks changed — demonstrating error propagation.
     """
     try:
-        from crypto.modes import cbc_decrypt, ofb_decrypt, ctr_decrypt
         from crypto.aes import BLOCK_SIZE
-        from crypto.utils import to_hex, split_blocks
+        from crypto.utils import split_blocks, to_hex
 
         mode = req.mode.upper()
         key = bytes.fromhex(req.key_hex)
@@ -1708,7 +1761,7 @@ def modes_flip(req: ModesFlipRequest):
         ct = bytes.fromhex(req.ciphertext_hex)
 
         from crypto.aes import aes_decrypt_block, aes_encrypt_block
-        from crypto.utils import xor_bytes, int_to_bytes, bytes_to_int
+        from crypto.utils import bytes_to_int, int_to_bytes, xor_bytes
 
         def decrypt_no_unpad(m_mode, m_key, m_iv, m_ct):
             blocks = split_blocks(m_ct, BLOCK_SIZE)
@@ -1757,8 +1810,9 @@ def modes_flip(req: ModesFlipRequest):
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 class ModesIvReuseRequest(BaseModel):
@@ -1775,9 +1829,9 @@ def modes_iv_reuse(req: ModesIvReuseRequest):
     Returns per-block ciphertext comparison; matching blocks are highlighted.
     """
     try:
-        from crypto.modes import cbc_encrypt
         from crypto.aes import BLOCK_SIZE
-        from crypto.utils import random_bytes, to_hex, pad_pkcs7, split_blocks
+        from crypto.modes import cbc_encrypt
+        from crypto.utils import pad_pkcs7, random_bytes, split_blocks, to_hex
 
         key = bytes.fromhex(req.key_hex) if req.key_hex else random_bytes(BLOCK_SIZE)
         key = (key + b'\x00' * BLOCK_SIZE)[:BLOCK_SIZE]
@@ -1812,33 +1866,33 @@ def modes_iv_reuse(req: ModesIvReuseRequest):
         }
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(400, str(e) + "\n" + traceback.format_exc())
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 # ==============================================================================
 # Endpoints (Interactive MACs)
 # ==============================================================================
 
-import uuid
 mac_sessions = {}
 
 @app.get("/api/mac/euf_init")
 def mac_euf_init():
     from crypto.mac import MAC
     from crypto.utils import random_bytes, to_hex
-    
+
     session_id = str(uuid.uuid4())
     key = random_bytes(16)
     mac_sessions[session_id] = key
     mac = MAC(mode='cbc')
-    
+
     messages = []
     for _ in range(50):
         m = random_bytes(16)
         t = mac.Mac(key, m)
         messages.append({"message_hex": to_hex(m), "tag_hex": to_hex(t)})
-        
+
     return {"session_id": session_id, "messages": messages}
 
 class MacVerifyRequest(BaseModel):
@@ -1849,11 +1903,11 @@ class MacVerifyRequest(BaseModel):
 @app.post("/api/mac/euf_verify")
 def mac_euf_verify(req: MacVerifyRequest):
     from crypto.mac import MAC
-    
+
     key = mac_sessions.get(req.session_id)
     if not key:
         raise HTTPException(400, "Invalid session")
-    
+
     mac = MAC(mode='cbc')
     try:
         m = bytes.fromhex(req.message_hex)
@@ -1872,16 +1926,16 @@ class MacCheatRequest(BaseModel):
 def mac_euf_cheat(req: MacCheatRequest):
     from crypto.mac import MAC
     from crypto.utils import to_hex
-    
+
     key = mac_sessions.get(req.session_id)
     if not key:
         raise HTTPException(400, "Invalid session")
-    
+
     mac = MAC(mode='cbc')
     # Generate a new 16-byte message
     m_star = b"Hacked message!!"
     t_star = mac.Mac(key, m_star)
-    
+
     return {
         "message_hex": to_hex(m_star),
         "tag_hex": to_hex(t_star),
@@ -1898,13 +1952,14 @@ def mac_length_extension(req: MacLengthExtensionRequest):
         suffix_bytes = req.suffix.encode()
         res = length_extension_demo(suffix=suffix_bytes)
         return res
-    except Exception as e:
-        raise HTTPException(400, str(e))
+    except Exception:
+        logger.exception("Unhandled error while handling request")
+        raise HTTPException(400, "Internal error") from None
 
 
 # ── Routing table ──
 @app.get("/api/reductions")
 def get_reductions():
-    return {"reductions":{f"{a}→{b}": [{"step":l,"desc":d}] for (a,b),(l,d) in DIRECT_REDUCTIONS.items()},
+    return {"reductions":{f"{a}→{b}": [{"step":lbl,"desc":d}] for (a,b),(lbl,d) in DIRECT_REDUCTIONS.items()},
             "proofs":PROOF_DB,
             "primitives":["OWF","PRG","PRF","PRP","MAC","CRHF","HMAC"]}

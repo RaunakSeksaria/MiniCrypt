@@ -13,8 +13,8 @@ Used by: (DH), (RSA), (DLP-CRHF)
 """
 
 import time
-from crypto.utils import mod_exp, random_int, random_bits
 
+from crypto.utils import mod_exp, random_bits, random_int
 
 # ---------------------------------------------------------------------------
 # Miller-Rabin Primality Test
@@ -84,11 +84,11 @@ def miller_rabin_with_trace(n: int, k: int = 40) -> dict:
 
     rounds_trace = []
     is_prime_result = True
-    
+
     for i in range(k):
         a = random_int(2, n - 2)
         x = mod_exp(a, d, n)
-        
+
         round_data = {
             "round": i + 1,
             "witness": a,
@@ -115,7 +115,7 @@ def miller_rabin_with_trace(n: int, k: int = 40) -> dict:
             rounds_trace.append(round_data)
             is_prime_result = False
             break
-            
+
         rounds_trace.append(round_data)
 
     return {
@@ -240,7 +240,7 @@ def carmichael_demo():
     while d % 2 == 0:
         s += 1
         d //= 2
-    
+
     for _ in range(100):
         a = random_int(2, n - 2)
         x = mod_exp(a, d, n)
@@ -272,7 +272,7 @@ def benchmark_prime_generation(bit_sizes=None):
         start = time.time()
         # Scale trials down for larger primes to keep it responsive
         trials = 5 if bits < 512 else (2 if bits < 1024 else 1)
-        
+
         for _ in range(trials):
             count = 0
             while True:
@@ -306,8 +306,11 @@ if __name__ == '__main__':
     print("\n--- Carmichael Number Demo (n = 561) ---")
     demo = carmichael_demo()
     print(f"n = {demo['n']} = {demo['factorization']}")
-    print(f"Fermat says prime: {demo['fermat_results']}")
-    print(f"Miller-Rabin says prime: {demo['miller_rabin_results']}")
+    fermat_fooled = sum(1 for s in demo['fermat_samples'] if s['result'] == 1)
+    print(f"Fermat test: {fermat_fooled}/{len(demo['fermat_samples'])} random bases wrongly suggest prime")
+    witness = demo['miller_rabin_witness']
+    print(f"Miller-Rabin says prime: {demo['is_prime']}"
+          + (f"  (caught by witness a={witness['a']})" if witness else ""))
 
     # 2. Generate some primes
     print("\n--- Prime Generation ---")

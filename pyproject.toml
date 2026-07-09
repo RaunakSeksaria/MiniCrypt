@@ -1,0 +1,17 @@
+# Dev-only tooling config. The crypto library itself has no third-party
+# dependencies; ruff is used for linting during development/CI only.
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+extend-exclude = ["frontend"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+ignore = [
+    "E501",   # line length — didactic docstrings/tables; formatter owns wrapping
+    "E701",   # multiple statements on one line (colon) — compact one-liners are intentional here
+    "E702",   # multiple statements on one line (semicolon) — same
+    "SIM102", # nested-if — kept explicit for readability in teaching code
+    "SIM108", # if-else -> ternary — explicit blocks are clearer here
+    "SIM110", # for-loop -> any()/all() — explicit loops are clearer here
+]

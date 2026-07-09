@@ -12,7 +12,6 @@ NO external crypto libraries. Only os.urandom and Python built-in int.
 
 import os
 
-
 # ---------------------------------------------------------------------------
 # Modular Arithmetic
 # ---------------------------------------------------------------------------

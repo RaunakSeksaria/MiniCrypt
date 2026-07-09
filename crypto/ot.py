@@ -11,13 +11,12 @@ Implements:
 Dependencies: crypto.elgamal (ElGamal PKC)
 Used by: (Secure AND), (MPC)
 
-Lineage: → → → 
+Lineage: → → →
 """
 
-from crypto.utils import mod_exp, mod_inverse, random_int, random_bytes, to_hex
-from crypto.elgamal import elgamal_keygen, elgamal_encrypt, elgamal_decrypt
 from crypto.diffie_hellman import DHGroup
-
+from crypto.elgamal import elgamal_decrypt, elgamal_encrypt
+from crypto.utils import mod_exp, random_int
 
 # ---------------------------------------------------------------------------
 # OT Protocol (Bellare-Micali style using ElGamal)
@@ -199,7 +198,7 @@ def receiver_privacy_demo(bits: int = 64, trials: int = 100) -> dict:
     b0_count = 0
     for _ in range(trials):
         b = random_int(0, 1)
-        step1 = ot.receiver_step1(b)
+        ot.receiver_step1(b)
 
         # Sender's "best strategy": guess randomly
         guess = random_int(0, 1)

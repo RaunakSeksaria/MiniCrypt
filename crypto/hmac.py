@@ -15,14 +15,12 @@ Bidirectional: CRHF ⇔ MAC via HMAC
 """
 
 import time
-from crypto.utils import (
-    xor_bytes, random_bytes, bytes_to_int, int_to_bytes, to_hex
-)
-from crypto.merkle_damgard import MerkleDamgard
-from crypto.dlp_crhf import DLP_CRHF, get_crhf
-from crypto.cpa_enc import CPAEncryption
-from crypto.aes import BLOCK_SIZE
 
+from crypto.aes import BLOCK_SIZE
+from crypto.cpa_enc import CPAEncryption
+from crypto.dlp_crhf import DLP_CRHF
+from crypto.merkle_damgard import MerkleDamgard
+from crypto.utils import random_bytes, to_hex, xor_bytes
 
 # ---------------------------------------------------------------------------
 # HMAC Implementation
@@ -183,37 +181,37 @@ def length_extension_attack(crhf, naive_tag: bytes, key_len: int, message: bytes
     and hash just `suffix`. The result equals H(k‖m‖pad(k‖m)‖suffix).
     """
     from crypto.merkle_damgard import MerkleDamgard
-    
+
     # The total message the server will hash is: k ‖ m ‖ pad(k‖m) ‖ suffix
     # The server will apply MD padding to this entire string.
     # The attacker knows the length of k, m, and the padding.
-    
+
     md = MerkleDamgard(
         compress=crhf.dlp.compress_bytes,
         iv=naive_tag,          # <- attacker injects the leaked state
         block_size=crhf.block_size,
     )
-    
+
     # Reconstruct what the server will hash
     # To find the exact padding the server will append to the end,
     # we need the length of the extended message including the key.
-    
+
     padded_km = md.pad(b'\x00' * key_len + message)
     extended_message_with_key = padded_km + suffix
-    
+
     # Get the padding that the server WILL add to the extended message
     final_padded = md.pad(extended_message_with_key)
-    
+
     # The blocks to hash starting from naive_tag are ONLY the suffix + new padding
     suffix_and_new_pad = final_padded[len(padded_km):]
-    
-    blocks = [suffix_and_new_pad[i:i + md.block_size] 
+
+    blocks = [suffix_and_new_pad[i:i + md.block_size]
               for i in range(0, len(suffix_and_new_pad), md.block_size)]
-    
+
     cv = naive_tag
     for block in blocks:
         cv = md.compress(cv, block)
-        
+
     return cv
 
 

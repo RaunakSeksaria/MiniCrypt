@@ -12,9 +12,9 @@ Dependencies: crypto.rsa, crypto.miller_rabin, crypto.utils
 """
 
 import time
-from crypto.utils import mod_exp, mod_inverse, random_int, to_hex
-from crypto.rsa import rsa_keygen, rsa_encrypt, rsa_decrypt, RSAKeyPair
 
+from crypto.rsa import RSAKeyPair, rsa_decrypt, rsa_encrypt, rsa_keygen
+from crypto.utils import mod_exp, mod_inverse, random_int
 
 # ---------------------------------------------------------------------------
 # Chinese Remainder Theorem
@@ -219,7 +219,7 @@ def padding_defeats_hastad(bits: int = 256, e: int = 3) -> dict:
     Show that PKCS#1 v1.5 padding defeats Håstad's attack
     because each ciphertext encrypts a different padded message.
     """
-    from crypto.rsa import pkcs15_encrypt, pkcs15_decrypt
+    from crypto.rsa import pkcs15_encrypt
 
     keys = [rsa_keygen(bits, e=e) for _ in range(e)]
     message = b"Hi"

@@ -16,13 +16,9 @@ Bidirectional: PRF ⇔ MAC
   Backward: MAC used as PRF passes distinguishing test
 """
 
-from crypto.utils import (
-    xor_bytes, random_bytes, int_to_bytes, bytes_to_int,
-    pad_pkcs7, to_hex, split_blocks
-)
-from crypto.prf_ggm import PRF
 from crypto.aes import BLOCK_SIZE
-
+from crypto.prf_ggm import PRF
+from crypto.utils import int_to_bytes, pad_pkcs7, random_bytes, split_blocks, to_hex, xor_bytes
 
 # ---------------------------------------------------------------------------
 # PRF-MAC (Fixed-Length)

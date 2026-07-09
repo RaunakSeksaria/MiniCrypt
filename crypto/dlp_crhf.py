@@ -11,13 +11,9 @@ Dependencies: crypto.merkle_damgard, crypto.miller_rabin, crypto.utils
 Used by: (birthday attack), (HMAC), (signatures)
 """
 
-from crypto.utils import (
-    mod_exp, random_int, random_bytes, bytes_to_int, int_to_bytes,
-    to_hex, int_to_bytes_auto
-)
-from crypto.miller_rabin import gen_safe_prime, find_generator
 from crypto.merkle_damgard import MerkleDamgard
-
+from crypto.miller_rabin import find_generator, gen_safe_prime
+from crypto.utils import bytes_to_int, int_to_bytes, mod_exp, random_bytes, random_int, to_hex
 
 # ---------------------------------------------------------------------------
 # DLP Group Setup

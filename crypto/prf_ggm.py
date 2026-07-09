@@ -16,13 +16,9 @@ Bidirectional: PRG ⇔ PRF
   Backward: PRF ⇒ PRG via G(s) = F_s(0) ‖ F_s(1)
 """
 
-from crypto.utils import (
-    xor_bytes, random_bytes, bytes_to_int, int_to_bytes,
-    to_hex, get_bit, bytes_to_bits
-)
-from crypto.aes import aes_encrypt_block, aes_decrypt_block, BLOCK_SIZE
+from crypto.aes import BLOCK_SIZE, aes_decrypt_block, aes_encrypt_block
 from crypto.owf_prg import PRG_from_AES, run_statistical_tests
-
+from crypto.utils import bytes_to_bits, get_bit, int_to_bytes, random_bytes, to_hex
 
 # ---------------------------------------------------------------------------
 # GGM Tree PRF (from PRG)
@@ -112,17 +108,17 @@ class GGM_PRF:
             raise ValueError("Max depth for full tree visualization is 8")
 
         tree = {0: [{"value": to_hex(key), "index": 0}]}
-        
+
         for d in range(depth):
             tree[d+1] = []
             for i, parent_node in enumerate(tree[d]):
                 parent_val = bytes.fromhex(parent_node["value"])
                 g0 = self.prg.G0(parent_val)
                 g1 = self.prg.G1(parent_val)
-                
+
                 tree[d+1].append({"value": to_hex(g0), "index": i*2, "parent_index": i})
                 tree[d+1].append({"value": to_hex(g1), "index": i*2+1, "parent_index": i})
-        
+
         return tree
 
     def evaluate_with_trace(self, key: bytes, x_bits: list) -> dict:
@@ -295,7 +291,6 @@ def distinguishing_game(prf: PRF, num_queries: int = 100) -> dict:
     The adversary makes num_queries queries and tries to distinguish.
     We run both scenarios and show the outputs are statistically similar.
     """
-    import random as stdlib_random
 
     key = random_bytes(16)
 
@@ -394,7 +389,7 @@ if __name__ == '__main__':
     print(f"G(s) = F_s(0)‖F_s(1) ({len(prg_output)} bytes): {to_hex(prg_output)}")
 
     prg_test = demonstrate_prf_to_prg(prf)
-    print(f"\nStatistical tests on PRF→PRG output:")
+    print("\nStatistical tests on PRF→PRG output:")
     for result in prg_test['tests']:
         status = "PASS" if result['pass'] else "FAIL"
         print(f"  {result['test']}: {status} (p={result['p_value']:.4f})")
